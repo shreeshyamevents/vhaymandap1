@@ -24,19 +24,19 @@
                     <span class="text-xs bg-gray-700 px-2 py-0.5 rounded">{{ current_user.role|title }}</span>
                 </span>
                 {% if current_user.role == 'admin' %}
-                    <a href="{{ url_for('admin.dashboard') }}" class="hover:text-white">
+                    <a href="{{ url_for('admin_dashboard') }}" class="hover:text-white">
                         <i class="fa-regular fa-shield mr-1"></i>Admin
                     </a>
                 {% endif %}
-                <a href="{{ url_for('main.dashboard') }}" class="hover:text-white">
+                <a href="{{ url_for('dashboard') }}" class="hover:text-white">
                     <i class="fa-regular fa-gauge mr-1"></i>Dashboard
                 </a>
-                <a href="{{ url_for('auth.logout') }}" class="text-red-400 hover:text-red-300">
+                <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300">
                     Logout
                 </a>
             {% else %}
-                <a href="{{ url_for('auth.login') }}" class="hover:text-white">Login</a>
-                <a href="{{ url_for('auth.register') }}" class="bg-green-700 px-3 py-0.5 rounded hover:bg-green-600">
+                <a href="{{ url_for('login') }}" class="hover:text-white">Login</a>
+                <a href="{{ url_for('register') }}" class="bg-green-700 px-3 py-0.5 rounded hover:bg-green-600">
                     Register
                 </a>
             {% endif %}
@@ -46,7 +46,7 @@
     <!-- Header -->
     <header class="bg-white border-b sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <a href="{{ url_for('main.index') }}" class="flex items-center gap-3">
+            <a href="{{ url_for('index') }}" class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-green-700 flex items-center justify-center text-white font-bold text-sm">
                     VM
                 </div>
@@ -61,11 +61,11 @@
             </a>
             <div class="flex items-center gap-3">
                 {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                    <a href="{{ url_for('admin.add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-green-600">
+                    <a href="{{ url_for('admin_add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-green-600">
                         <i class="fa-regular fa-plus mr-1"></i>Add Item
                     </a>
                 {% endif %}
-                <a href="{{ url_for('main.index') }}" class="text-sm font-medium text-gray-600 hover:text-green-700">
+                <a href="{{ url_for('index') }}" class="text-sm font-medium text-gray-600 hover:text-green-700">
                     Browse
                 </a>
                 <span class="text-xs text-gray-400 hidden md:inline">| 📞 {{ business_phone }}</span>
