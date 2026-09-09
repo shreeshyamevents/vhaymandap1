@@ -1,24 +1,193 @@
-from flask import Flask
-from flask_login import LoginManager
-from config import Config
-from models import db, User
 import os
+import sys
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+from werkzeug.utils import secure_filename
+import re
+import random
+import string
 
-# Initialize Flask app
+# ============================================
+# CONFIGURATION
+# ============================================
+
+class Config:
+    APP_NAME = "VyahMandap"
+    APP_TAGLINE = "Taiyari Hamari, Celebration Aapka!"
+    
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'vyahmandap-secret-key-change-in-production'
+    
+    # SQLite Database - Use /tmp on Render, local otherwise
+    if os.environ.get('RENDER') or 'RENDER' in os.environ:
+        # On Render, use /tmp directory (writable)
+        db_path = '/tmp/vyahmandap.db'
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
+        UPLOAD_FOLDER = '/tmp/uploads'
+    else:
+        # Local development
+        SQLALCHEMY_DATABASE_URI = 'sqlite:///database/vyahmandap.db'
+        UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'connect_args': {
+            'check_same_thread': False,
+            'timeout': 30
+        }
+    }
+    
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    
+    # Business Details
+    BUSINESS_NAME = "VyahMandap"
+    BUSINESS_PHONE = "8319337063"
+    BUSINESS_PHONE_ALT = "9981845362"
+    BUSINESS_EMAIL = "info@vyahmandap.com"
+    BUSINESS_LOCATION = "Harda, Madhya Pradesh"
+    
+    # Admin Credentials
+    ADMIN_MOBILE = "8319337063"
+    ADMIN_PASSWORD = "123456"
+    
+    # Transport Rates
+    TRANSPORT_RATES = {
+        'city': {'till_20': 600, 'above_20': 1100},
+        'outskirts': {'till_20': 1500, 'above_20': 2000}
+    }
+    
+    COMMISSION_RATE = 0.05
+    
+    CATEGORIES = [
+        ('furniture', 'Sofas & Furniture'),
+        ('lighting', 'Truss & Lighting'),
+        ('decor', 'Decor & Floral'),
+        ('mandap', 'Mandap & Stage')
+    ]
+
+
+# ============================================
+# INITIALIZE APP
+# ============================================
+
 app = Flask(__name__)
 app.config.from_object(Config)
 
 # Ensure directories exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs('static/images', exist_ok=True)
-os.makedirs('database', exist_ok=True)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    print(f"✅ Upload folder created: {app.config['UPLOAD_FOLDER']}")
+except Exception as e:
+    print(f"⚠️ Could not create upload folder: {e}")
+
+# Create database directory if using local SQLite
+if 'sqlite:///database/' in app.config['SQLALCHEMY_DATABASE_URI']:
+    os.makedirs('database', exist_ok=True)
+    print("✅ Database directory created")
 
 # Initialize database
-db.init_app(app)
+db = SQLAlchemy(app)
 
-# Initialize login manager
+
+# ============================================
+# MODELS
+# ============================================
+
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    mobile = db.Column(db.String(10), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=True)
+    password_hash = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), default='customer')
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    items = db.relationship('Item', backref='vendor', lazy=True)
+    bookings = db.relationship('Booking', backref='customer', lazy=True)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+    
+    def get_id(self):
+        return str(self.id)
+
+
+class Item(db.Model):
+    __tablename__ = 'items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(50), nullable=False)
+    rate_per_day = db.Column(db.Float, nullable=False)
+    deposit_amount = db.Column(db.Float, default=0)
+    stock = db.Column(db.Integer, default=1)
+    image_url = db.Column(db.String(500))
+    image_filename = db.Column(db.String(200))
+    vendor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    is_available = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    bookings = db.relationship('Booking', backref='item', lazy=True)
+    
+    @property
+    def rate_with_commission(self):
+        return round(self.rate_per_day * (1 + Config.COMMISSION_RATE), 2)
+    
+    def get_image(self):
+        if self.image_url:
+            return self.image_url
+        elif self.image_filename:
+            return f'/uploads/{self.image_filename}'
+        return '/static/images/default-item.jpg'
+
+
+class Booking(db.Model):
+    __tablename__ = 'bookings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    booking_reference = db.Column(db.String(20), unique=True, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    
+    start_date = db.Column(db.Date, nullable=False)
+    start_time = db.Column(db.String(10), default='10:00')
+    end_date = db.Column(db.Date, nullable=False)
+    end_time = db.Column(db.String(10), default='20:00')
+    quantity = db.Column(db.Integer, default=1)
+    
+    venue_address = db.Column(db.Text, nullable=False)
+    delivery_area = db.Column(db.String(20), default='city')
+    weight_category = db.Column(db.String(20), default='till_20')
+    
+    base_rent = db.Column(db.Float, nullable=False)
+    commission = db.Column(db.Float, nullable=False)
+    deposit = db.Column(db.Float, nullable=False)
+    transport_fee = db.Column(db.Float, nullable=False)
+    total_amount = db.Column(db.Float, nullable=False)
+    
+    utr_number = db.Column(db.String(50), nullable=False)
+    payment_status = db.Column(db.String(20), default='pending')
+    booking_status = db.Column(db.String(20), default='confirmed')
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ============================================
+# LOGIN MANAGER
+# ============================================
+
 login_manager = LoginManager()
-login_manager.login_view = 'auth.login'
+login_manager.login_view = 'login'
 login_manager.login_message = 'Please login to access this page.'
 login_manager.login_message_category = 'warning'
 login_manager.init_app(app)
@@ -27,101 +196,469 @@ login_manager.init_app(app)
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Create tables and default data
-with app.app_context():
-    db.create_all()
+
+# ============================================
+# UTILITY FUNCTIONS
+# ============================================
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+
+def save_uploaded_file(file):
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            file.save(filepath)
+            return unique_filename
+        except Exception as e:
+            print(f"Error saving file: {e}")
+            return None
+    return None
+
+def calculate_booking_total(item, start_date, end_date, quantity, area, weight_category):
+    days = (end_date - start_date).days + 1
+    if days < 1:
+        days = 1
     
-    # Create admin if not exists
-    admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
-    if not admin:
-        admin = User(
-            name='VyahMandap Admin',
-            mobile=Config.ADMIN_MOBILE,
-            email='admin@vyahmandap.com',
-            role='admin'
-        )
-        admin.set_password(Config.ADMIN_PASSWORD)
-        db.session.add(admin)
-        db.session.commit()
-        print('✅ Admin user created successfully!')
+    base_rent = item.rate_per_day * days * quantity
+    commission = round(base_rent * Config.COMMISSION_RATE, 2)
+    deposit = item.deposit_amount * quantity
+    transport_fee = Config.TRANSPORT_RATES.get(area, {}).get(weight_category, 600)
+    total = base_rent + commission + deposit + transport_fee
     
-    # Create demo customer if not exists
-    demo = User.query.filter_by(mobile='9876543210').first()
-    if not demo:
-        demo = User(
-            name='Demo Customer',
-            mobile='9876543210',
-            email='demo@vyahmandap.com',
+    return {
+        'days': days,
+        'base_rent': base_rent,
+        'commission': commission,
+        'deposit': deposit,
+        'transport_fee': transport_fee,
+        'total': total
+    }
+
+def generate_booking_reference():
+    return 'VM' + ''.join(random.choices(string.digits, k=8))
+
+def format_currency(amount):
+    return f"₹{amount:,.2f}"
+
+def validate_mobile(mobile):
+    return re.match(r'^\d{10}$', mobile) is not None
+
+
+# ============================================
+# ROUTES - AUTHENTICATION
+# ============================================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        mobile = request.form.get('mobile', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        user = User.query.filter_by(mobile=mobile).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            flash(f'🎉 Welcome back, {user.name}!', 'success')
+            if user.role == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('index'))
+        else:
+            flash('❌ Invalid mobile number or password.', 'danger')
+    
+    return render_template('auth/login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        mobile = request.form.get('mobile', '').strip()
+        email = request.form.get('email', '').strip() or None
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        
+        errors = []
+        if not name:
+            errors.append('Name is required.')
+        if not mobile:
+            errors.append('Mobile number is required.')
+        elif not validate_mobile(mobile):
+            errors.append('Please enter a valid 10-digit mobile number.')
+        if not password:
+            errors.append('Password is required.')
+        elif len(password) < 6:
+            errors.append('Password must be at least 6 characters.')
+        if password != confirm_password:
+            errors.append('Passwords do not match.')
+        
+        if User.query.filter_by(mobile=mobile).first():
+            errors.append('A user with this mobile number already exists.')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'danger')
+            return render_template('auth/register.html')
+        
+        user = User(
+            name=name,
+            mobile=mobile,
+            email=email,
             role='customer'
         )
-        demo.set_password('123456')
-        db.session.add(demo)
+        user.set_password(password)
+        db.session.add(user)
         db.session.commit()
-        print('✅ Demo customer created successfully!')
+        
+        flash('✅ Account created successfully! Please login.', 'success')
+        return redirect(url_for('login'))
     
-    # Create default items if none exist
-    if Item.query.count() == 0:
-        from models import Item
-        default_items = [
-            {
-                'title': 'Maharaja Gold Carved Wedding Sofa',
-                'description': 'Elegant gold carved sofa for royal wedding setups.',
-                'category': 'furniture',
-                'rate_per_day': 4500,
-                'deposit_amount': 3000,
-                'stock': 5,
-                'image_url': 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80',
-                'vendor_id': admin.id
-            },
-            {
-                'title': 'Heavy Truss & LED Setup (Per Box)',
-                'description': 'Professional truss lighting system for events.',
-                'category': 'lighting',
-                'rate_per_day': 2500,
-                'deposit_amount': 1500,
-                'stock': 12,
-                'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
-                'vendor_id': admin.id
-            },
-            {
-                'title': 'Royal Floral Mandap Setup',
-                'description': 'Beautiful floral mandap for wedding ceremonies.',
-                'category': 'mandap',
-                'rate_per_day': 12000,
-                'deposit_amount': 5000,
-                'stock': 3,
-                'image_url': 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80',
-                'vendor_id': admin.id
-            },
-            {
-                'title': 'Wedding Arch Decor',
-                'description': 'Elegant wedding arch with floral arrangements.',
-                'category': 'decor',
-                'rate_per_day': 7500,
-                'deposit_amount': 2500,
-                'stock': 4,
-                'image_url': 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=600&q=80',
-                'vendor_id': admin.id
-            }
-        ]
-        for item_data in default_items:
-            item = Item(**item_data)
-            db.session.add(item)
+    return render_template('auth/register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('🔒 You have been logged out.', 'info')
+    return redirect(url_for('index'))
+
+
+# ============================================
+# ROUTES - MAIN
+# ============================================
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/api/items')
+def get_items():
+    category = request.args.get('category', 'all')
+    query = Item.query.filter_by(is_available=True)
+    
+    if category != 'all':
+        query = query.filter_by(category=category)
+    
+    items = query.order_by(Item.created_at.desc()).all()
+    
+    return jsonify([{
+        'id': item.id,
+        'title': item.title,
+        'description': item.description,
+        'category': item.category,
+        'rate': item.rate_per_day,
+        'rate_with_commission': item.rate_with_commission,
+        'deposit': item.deposit_amount,
+        'stock': item.stock,
+        'image': item.get_image(),
+        'vendor': item.vendor.name,
+        'vendor_id': item.vendor_id
+    } for item in items])
+
+@app.route('/api/calculate', methods=['POST'])
+def calculate():
+    data = request.get_json()
+    item_id = data.get('item_id')
+    start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d').date()
+    end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d').date()
+    quantity = int(data.get('quantity', 1))
+    area = data.get('area', 'city')
+    weight = data.get('weight', 'till_20')
+    
+    item = Item.query.get_or_404(item_id)
+    result = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
+    
+    return jsonify(result)
+
+@app.route('/book/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+def book_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    
+    if not item.is_available or item.stock <= 0:
+        flash('This item is currently not available for booking.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        try:
+            start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
+            end_date = datetime.strptime(request.form.get('end_date'), '%Y-%m-%d').date()
+            quantity = int(request.form.get('quantity', 1))
+            area = request.form.get('area', 'city')
+            weight = request.form.get('weight', 'till_20')
+            venue_address = request.form.get('address', '').strip()
+            utr = request.form.get('utr', '').strip()
+            
+            if not venue_address:
+                flash('Venue address is required.', 'danger')
+                return render_template('booking.html', item=item)
+            
+            if not utr:
+                flash('UTR number is required.', 'danger')
+                return render_template('booking.html', item=item)
+            
+            if quantity > item.stock:
+                flash(f'Only {item.stock} items available.', 'danger')
+                return render_template('booking.html', item=item)
+            
+            calc = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
+            
+            booking = Booking(
+                booking_reference=generate_booking_reference(),
+                customer_id=current_user.id,
+                item_id=item.id,
+                start_date=start_date,
+                start_time=request.form.get('start_time', '10:00'),
+                end_date=end_date,
+                end_time=request.form.get('end_time', '20:00'),
+                quantity=quantity,
+                venue_address=venue_address,
+                delivery_area=area,
+                weight_category=weight,
+                base_rent=calc['base_rent'],
+                commission=calc['commission'],
+                deposit=calc['deposit'],
+                transport_fee=calc['transport_fee'],
+                total_amount=calc['total'],
+                utr_number=utr,
+                payment_status='verified',
+                booking_status='confirmed'
+            )
+            
+            item.stock -= quantity
+            if item.stock <= 0:
+                item.is_available = False
+            
+            db.session.add(booking)
+            db.session.commit()
+            
+            flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating booking: {str(e)}', 'danger')
+            return render_template('booking.html', item=item)
+    
+    return render_template('booking.html', item=item)
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    bookings = Booking.query.filter_by(customer_id=current_user.id)\
+        .order_by(Booking.created_at.desc()).all()
+    
+    total_spent = sum(b.total_amount for b in bookings)
+    active_bookings = sum(1 for b in bookings if b.booking_status == 'confirmed')
+    
+    return render_template('dashboard.html',
+                         bookings=bookings,
+                         total_spent=total_spent,
+                         active_bookings=active_bookings)
+
+
+# ============================================
+# ROUTES - ADMIN
+# ============================================
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if current_user.role != 'admin':
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    total_bookings = Booking.query.count()
+    total_commission = db.session.query(db.func.sum(Booking.commission)).scalar() or 0
+    total_revenue = db.session.query(db.func.sum(Booking.total_amount)).scalar() or 0
+    total_items = Item.query.count()
+    total_users = User.query.count()
+    pending_bookings = Booking.query.filter_by(booking_status='pending').count()
+    
+    recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(20).all()
+    
+    return render_template('admin/dashboard.html',
+                         total_bookings=total_bookings,
+                         total_commission=total_commission,
+                         total_revenue=total_revenue,
+                         total_items=total_items,
+                         total_users=total_users,
+                         pending_bookings=pending_bookings,
+                         recent_bookings=recent_bookings)
+
+@app.route('/admin/items')
+@login_required
+def admin_items():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    items = Item.query.order_by(Item.created_at.desc()).all()
+    return render_template('admin/items.html', items=items)
+
+@app.route('/admin/item/add', methods=['GET', 'POST'])
+@login_required
+def admin_add_item():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        category = request.form.get('category', '')
+        rate = float(request.form.get('rate', 0))
+        deposit = float(request.form.get('deposit', 0))
+        stock = int(request.form.get('stock', 1))
+        image_url = request.form.get('image_url', '').strip()
+        
+        image_filename = None
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            image_filename = save_uploaded_file(request.files['image_file'])
+        
+        if not title or rate <= 0:
+            flash('Title and rate are required.', 'danger')
+            return render_template('admin/item_form.html')
+        
+        item = Item(
+            title=title,
+            description=description,
+            category=category,
+            rate_per_day=rate,
+            deposit_amount=deposit,
+            stock=stock,
+            image_url=image_url if image_url else None,
+            image_filename=image_filename,
+            vendor_id=current_user.id
+        )
+        
+        db.session.add(item)
         db.session.commit()
-        print('✅ Default items created!')
+        
+        flash('✅ Item added successfully!', 'success')
+        return redirect(url_for('admin_items'))
+    
+    return render_template('admin/item_form.html')
 
-# Register blueprints
-from routes import auth, main, admin
+@app.route('/admin/item/edit/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_item(item_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    if request.method == 'POST':
+        item.title = request.form.get('title', '').strip()
+        item.description = request.form.get('description', '').strip()
+        item.category = request.form.get('category', '')
+        item.rate_per_day = float(request.form.get('rate', 0))
+        item.deposit_amount = float(request.form.get('deposit', 0))
+        item.stock = int(request.form.get('stock', 1))
+        item.is_available = 'is_available' in request.form
+        
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            image_filename = save_uploaded_file(request.files['image_file'])
+            if image_filename:
+                item.image_filename = image_filename
+                item.image_url = None
+        
+        image_url = request.form.get('image_url', '').strip()
+        if image_url:
+            item.image_url = image_url
+            item.image_filename = None
+        
+        db.session.commit()
+        flash('✅ Item updated successfully!', 'success')
+        return redirect(url_for('admin_items'))
+    
+    return render_template('admin/item_form.html', item=item)
 
-app.register_blueprint(auth.bp)
-app.register_blueprint(main.bp)
-app.register_blueprint(admin.bp)
+@app.route('/admin/item/delete/<int:item_id>', methods=['POST'])
+@login_required
+def admin_delete_item(item_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    flash('Item deleted successfully.', 'success')
+    return redirect(url_for('admin_items'))
 
-# Context processors
+@app.route('/admin/bookings')
+@login_required
+def admin_bookings():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+    return render_template('admin/bookings.html', bookings=bookings)
+
+@app.route('/admin/booking/<int:booking_id>/status', methods=['POST'])
+@login_required
+def admin_update_booking_status(booking_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    booking = Booking.query.get_or_404(booking_id)
+    new_status = request.form.get('status', '')
+    
+    if new_status in ['confirmed', 'cancelled', 'completed', 'pending']:
+        booking.booking_status = new_status
+        db.session.commit()
+        flash('Booking status updated.', 'success')
+    
+    return redirect(url_for('admin_bookings'))
+
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    users = User.query.order_by(User.created_at.desc()).all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/user/<int:user_id>/role', methods=['POST'])
+@login_required
+def admin_update_user_role(user_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(user_id)
+    new_role = request.form.get('role', '')
+    
+    if new_role in ['admin', 'customer'] and user.id != current_user.id:
+        user.role = new_role
+        db.session.commit()
+        flash('User role updated.', 'success')
+    
+    return redirect(url_for('admin_users'))
+
+
+# ============================================
+# CONTEXT PROCESSORS
+# ============================================
+
 @app.context_processor
 def utility_processor():
-    from config import Config
-    from utils import format_currency, get_category_icon, get_category_label
     return dict(
         app_name=Config.APP_NAME,
         app_tagline=Config.APP_TAGLINE,
@@ -129,12 +666,131 @@ def utility_processor():
         business_phone_alt=Config.BUSINESS_PHONE_ALT,
         business_location=Config.BUSINESS_LOCATION,
         categories=Config.CATEGORIES,
-        format_currency=format_currency,
-        get_category_icon=get_category_icon,
-        get_category_label=get_category_label,
-        Config=Config
+        format_currency=format_currency
     )
+
+
+# ============================================
+# CREATE TABLES & DEFAULT DATA
+# ============================================
+
+def init_database():
+    """Initialize database with tables and default data"""
+    try:
+        db.create_all()
+        print("✅ Database tables created successfully!")
+        
+        # Create admin user
+        admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
+        if not admin:
+            admin = User(
+                name='VyahMandap Admin',
+                mobile=Config.ADMIN_MOBILE,
+                email='admin@vyahmandap.com',
+                role='admin'
+            )
+            admin.set_password(Config.ADMIN_PASSWORD)
+            db.session.add(admin)
+            db.session.commit()
+            print('✅ Admin user created!')
+        
+        # Create demo customer
+        demo = User.query.filter_by(mobile='9876543210').first()
+        if not demo:
+            demo = User(
+                name='Demo Customer',
+                mobile='9876543210',
+                email='demo@vyahmandap.com',
+                role='customer'
+            )
+            demo.set_password('123456')
+            db.session.add(demo)
+            db.session.commit()
+            print('✅ Demo customer created!')
+        
+        # Create default items
+        if Item.query.count() == 0:
+            default_items = [
+                {
+                    'title': 'Maharaja Gold Carved Wedding Sofa',
+                    'description': 'Elegant gold carved sofa for royal wedding setups.',
+                    'category': 'furniture',
+                    'rate_per_day': 4500,
+                    'deposit_amount': 3000,
+                    'stock': 5,
+                    'image_url': 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80',
+                    'vendor_id': admin.id
+                },
+                {
+                    'title': 'Heavy Truss & LED Setup (Per Box)',
+                    'description': 'Professional truss lighting system for events.',
+                    'category': 'lighting',
+                    'rate_per_day': 2500,
+                    'deposit_amount': 1500,
+                    'stock': 12,
+                    'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
+                    'vendor_id': admin.id
+                },
+                {
+                    'title': 'Royal Floral Mandap Setup',
+                    'description': 'Beautiful floral mandap for wedding ceremonies.',
+                    'category': 'mandap',
+                    'rate_per_day': 12000,
+                    'deposit_amount': 5000,
+                    'stock': 3,
+                    'image_url': 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80',
+                    'vendor_id': admin.id
+                },
+                {
+                    'title': 'Wedding Arch Decor',
+                    'description': 'Elegant wedding arch with floral arrangements.',
+                    'category': 'decor',
+                    'rate_per_day': 7500,
+                    'deposit_amount': 2500,
+                    'stock': 4,
+                    'image_url': 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=600&q=80',
+                    'vendor_id': admin.id
+                }
+            ]
+            
+            for item_data in default_items:
+                item = Item(**item_data)
+                db.session.add(item)
+            
+            db.session.commit()
+            print('✅ Default items created!')
+        
+        return True
+    except Exception as e:
+        print(f"❌ Error initializing database: {e}")
+        return False
+
+
+# ============================================
+# RUN APP
+# ============================================
+
+# Initialize database on startup
+with app.app_context():
+    print("=" * 50)
+    print(f"🚀 Starting {Config.APP_NAME}...")
+    print(f"📁 Database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    print(f"📁 Upload folder: {app.config['UPLOAD_FOLDER']}")
+    print("=" * 50)
+    
+    # Check if database file exists and is writable
+    db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+    if db_path:
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+                print(f"✅ Created database directory: {db_dir}")
+            except Exception as e:
+                print(f"⚠️ Could not create database directory: {e}")
+    
+    init_database()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
