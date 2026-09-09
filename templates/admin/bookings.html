@@ -42,7 +42,7 @@
                         </span>
                     </td>
                     <td class="p-3">
-                        <form method="POST" action="{{ url_for('admin.update_booking_status', booking_id=booking.id) }}" class="flex gap-1">
+                        <form method="POST" action="{{ url_for('admin_update_booking_status', booking_id=booking.id) }}" class="flex gap-1">
                             <select name="status" class="text-xs border rounded p-1">
                                 <option value="confirmed" {% if booking.booking_status == 'confirmed' %}selected{% endif %}>Confirm</option>
                                 <option value="completed" {% if booking.booking_status == 'completed' %}selected{% endif %}>Complete</option>
