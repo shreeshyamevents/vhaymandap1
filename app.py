@@ -1,14 +1,14 @@
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-from werkzeug.utils import secure_filename
 import re
 import random
 import string
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
+from werkzeug.utils import secure_filename
 
 # ============================================
 # CONFIGURATION
@@ -96,7 +96,7 @@ db = SQLAlchemy(app)
 # MODELS
 # ============================================
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -107,6 +107,7 @@ class User(db.Model):
     role = db.Column(db.String(20), default='customer')
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     items = db.relationship('Item', backref='vendor', lazy=True)
     bookings = db.relationship('Booking', backref='customer', lazy=True)
@@ -117,8 +118,24 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
+    # Flask-Login required properties
+    @property
+    def is_authenticated(self):
+        return True
+    
+    @property
+    def is_active(self):
+        return True
+    
+    @property
+    def is_anonymous(self):
+        return False
+    
     def get_id(self):
         return str(self.id)
+    
+    def __repr__(self):
+        return f'<User {self.mobile}>'
 
 
 class Item(db.Model):
@@ -136,6 +153,7 @@ class Item(db.Model):
     vendor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     is_available = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     bookings = db.relationship('Booking', backref='item', lazy=True)
     
@@ -149,6 +167,9 @@ class Item(db.Model):
         elif self.image_filename:
             return f'/uploads/{self.image_filename}'
         return '/static/images/default-item.jpg'
+    
+    def __repr__(self):
+        return f'<Item {self.title}>'
 
 
 class Booking(db.Model):
@@ -180,6 +201,19 @@ class Booking(db.Model):
     booking_status = db.Column(db.String(20), default='confirmed')
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def get_status_badge(self):
+        colors = {
+            'confirmed': 'bg-green-100 text-green-800',
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'cancelled': 'bg-red-100 text-red-800',
+            'completed': 'bg-blue-100 text-blue-800'
+        }
+        return colors.get(self.booking_status, 'bg-gray-100 text-gray-800')
+    
+    def __repr__(self):
+        return f'<Booking {self.booking_reference}>'
 
 
 # ============================================
@@ -666,7 +700,13 @@ def utility_processor():
         business_phone_alt=Config.BUSINESS_PHONE_ALT,
         business_location=Config.BUSINESS_LOCATION,
         categories=Config.CATEGORIES,
-        format_currency=format_currency
+        format_currency=format_currency,
+        get_category_icon=lambda c: {
+            'furniture': 'fa-couch',
+            'lighting': 'fa-lightbulb',
+            'decor': 'fa-palette',
+            'mandap': 'fa-archway'
+        }.get(c, 'fa-box')
     )
 
 
