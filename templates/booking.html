@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Book {{ item.title }} - VyahMandap{% endblock %}
+
+{% block extra_head %}
+<script>
+let itemData = {
+    id: {{ item.id }},
+    rate: {{ item.rate_per_day }},
+    deposit: {{ item.deposit_amount }}
+};
+
+function calculateTotal() {
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const qty = parseInt(document.getElementById('qty').value) || 1;
+    const area = document.getElementById('area').value;
+    const weight = document.getElementById('weight').value;
+    
+    if (!start || !end) return;
+    
+    fetch('/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            item_id: itemData.id,
+            start_date: start,
+            end_date: end,
+            quantity: qty,
+            area: area,
+            weight: weight
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('calcDays').textContent = data.days + ' days';
+        document.getElementById('calcRent').textContent = '₹' + data.base_rent;
+        document.getElementById('calcComm').textContent = '₹' + data.commission;
+        document.getElementById('calcDeposit').textContent = '₹' + data.deposit;
+        document.getElementById('calcTransport').textContent = '₹' + data.transport_fee;
+        document.getElementById('calcTotal').textContent = '₹' + data.total;
+    })
+    .catch(err => console.error('Error calculating:', err));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today;
+    document.getElementById('endDate').value = today;
+    calculateTotal();
+    
+    ['startDate', 'endDate', 'qty', 'area', 'weight'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', calculateTotal);
+            el.addEventListener('input', calculateTotal);
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">📋 Book Equipment</h2>
+        <a href="{{ url_for('main.index') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl border shadow-sm">
+        <!-- Item Summary -->
+        <div class="flex gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+            <div class="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='/static/images/default-item.jpg'">
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">{{ item.title }}</h3>
+                <p class="text-sm text-gray-500">by {{ item.vendor.name }}</p>
+                <div class="flex gap-3 text-sm mt-1 flex-wrap">
+                    <span><strong>₹{{ item.rate_per_day }}</strong>/day</span>
+                    <span>Deposit: ₹{{ item.deposit_amount }}</span>
+                    <span class="text-green-700">Stock: {{ item.stock }}</span>
+                </div>
+            </div>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <!-- Dates -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-sm mb-1">Start Date *</label>
+                    <input type="date" id="startDate" name="start_date" required class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block font-semibold text-sm mb-1">Start Time</label>
+                    <input type="time" id="startTime" name="start_time" value="10:00" class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-sm mb-1">End Date *</label>
+                    <input type="date" id="endDate" name="end_date" required class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block font-semibold text-sm mb-1">End Time</label>
+                    <input type="time" id="endTime" name="end_time" value="20:00" class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+            </div>
+
+            <!-- Quantity -->
+            <div>
+                <label class="block font-semibold text-sm mb-1">Quantity *</label>
+                <input type="number" id="qty" name="quantity" required min="1" max="{{ item.stock }}" value="1" class="w-full border rounded-lg p-2.5 text-sm">
+                <p class="text-xs text-gray-500 mt-1">Max: {{ item.stock }} available</p>
+            </div>
+
+            <!-- Location -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block font-semibold text-sm mb-1">Delivery Area</label>
+                    <select id="area" name="area" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+                        <option value="city">Harda City</option>
+                        <option value="outskirts">Outskirts</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-sm mb-1">Weight Category</label>
+                    <select id="weight" name="weight" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+                        <option value="till_20">Up to 20 Ton</option>
+                        <option value="above_20">20 Ton+</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-sm mb-1">Venue Address *</label>
+                <input type="text" name="address" required placeholder="Marriage Garden, Harda" class="w-full border rounded-lg p-2.5 text-sm">
+            </div>
+
+            <!-- Cost Breakdown -->
+            <div class="bg-gray-50 p-4 rounded-xl space-y-1 text-sm">
+                <h4 class="font-bold mb-2 text-green-700">💰 Cost Breakdown</h4>
+                <div class="flex justify-between"><span>Rental Period</span><strong id="calcDays">-</strong></div>
+                <div class="flex justify-between"><span>Base Rent</span><strong id="calcRent">₹0</strong></div>
+                <div class="flex justify-between text-green-700"><span>Platform Commission (5%)</span><strong id="calcComm">₹0</strong></div>
+                <div class="flex justify-between"><span>Security Deposit</span><strong id="calcDeposit">₹0</strong></div>
+                <div class="flex justify-between"><span>Transport Fee</span><strong id="calcTransport">₹0</strong></div>
+                <hr class="my-2 border-gray-300">
+                <div class="flex justify-between font-bold text-base"><span>Total Payable</span><strong id="calcTotal" class="text-green-700">₹0</strong></div>
+            </div>
+
+            <!-- Payment -->
+            <div class="bg-gray-900 text-white p-5 rounded-xl text-center space-y-3">
+                <div class="flex items-center justify-center gap-2 text-sm">
+                    <span class="bg-purple-600 px-3 py-0.5 rounded text-xs font-bold">PhonePe</span>
+                    <span>Pay to {{ app_name }}</span>
+                </div>
+                <div class="bg-white p-3 inline-block rounded-xl mx-auto">
+                    <div class="w-32 h-32 bg-gray-200 rounded-lg mx-auto flex items-center justify-center text-gray-500 text-xs">
+                        <div class="text-center">
+                            <i class="fa-regular fa-qrcode text-5xl text-gray-400"></i>
+                            <p class="mt-1 text-[10px]">Scan to Pay</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-left">
+                    <label class="block font-semibold mb-1 text-white/80">UTR / Transaction ID *</label>
+                    <input type="text" id="utr" name="utr" required placeholder="Enter PhonePe UTR" class="w-full border rounded-lg p-2.5 text-black text-sm">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-green-700 text-white font-bold py-3.5 rounded-xl hover:bg-green-600 transition text-sm">
+                Confirm Booking
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

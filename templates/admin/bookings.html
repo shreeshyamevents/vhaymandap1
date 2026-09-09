@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Bookings - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">📋 All Bookings</h2>
+    <span class="text-sm text-gray-500">Total: {{ bookings|length }}</span>
+</div>
+
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="p-3">Ref</th>
+                    <th class="p-3">Customer</th>
+                    <th class="p-3">Item</th>
+                    <th class="p-3">Dates</th>
+                    <th class="p-3">Amount</th>
+                    <th class="p-3">UTR</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for booking in bookings %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3 font-mono text-xs">{{ booking.booking_reference }}</td>
+                    <td class="p-3">{{ booking.customer.name }}</td>
+                    <td class="p-3">{{ booking.item.title[:20] }}{% if booking.item.title|length > 20 %}...{% endif %}</td>
+                    <td class="p-3 text-xs">{{ booking.start_date }} → {{ booking.end_date }}</td>
+                    <td class="p-3 font-bold">₹{{ booking.total_amount }}</td>
+                    <td class="p-3 font-mono text-green-700 text-xs">{{ booking.utr_number }}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
+                            {% if booking.booking_status == 'confirmed' %}bg-green-100 text-green-800
+                            {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
+                            {% elif booking.booking_status == 'completed' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ booking.booking_status|title }}
+                        </span>
+                    </td>
+                    <td class="p-3">
+                        <form method="POST" action="{{ url_for('admin.update_booking_status', booking_id=booking.id) }}" class="flex gap-1">
+                            <select name="status" class="text-xs border rounded p-1">
+                                <option value="confirmed" {% if booking.booking_status == 'confirmed' %}selected{% endif %}>Confirm</option>
+                                <option value="completed" {% if booking.booking_status == 'completed' %}selected{% endif %}>Complete</option>
+                                <option value="cancelled" {% if booking.booking_status == 'cancelled' %}selected{% endif %}>Cancel</option>
+                                <option value="pending" {% if booking.booking_status == 'pending' %}selected{% endif %}>Pending</option>
+                            </select>
+                            <button type="submit" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Update</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}My Dashboard - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold">👤 My Dashboard</h2>
+        <p class="text-sm text-gray-500">Welcome back, {{ current_user.name }}!</p>
+    </div>
+    <a href="{{ url_for('main.index') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
+        ← Browse Marketplace
+    </a>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Total Bookings</span>
+        <h3 class="text-2xl font-bold">{{ bookings|length }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Total Spent</span>
+        <h3 class="text-2xl font-bold text-green-700">{{ format_currency(total_spent) }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Active Bookings</span>
+        <h3 class="text-2xl font-bold">{{ active_bookings }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Member Since</span>
+        <h3 class="text-lg font-bold">{{ current_user.created_at.strftime('%b %Y') if current_user.created_at else '-' }}</h3>
+    </div>
+</div>
+
+<!-- Bookings -->
+<h3 class="font-bold text-lg mb-4">My Bookings</h3>
+<div class="space-y-4">
+    {% if bookings %}
+        {% for booking in bookings %}
+        <div class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md transition">
+            <div class="flex flex-wrap justify-between items-start">
+                <div>
+                    <span class="text-[10px] font-bold text-gray-500 uppercase">#{{ booking.booking_reference }}</span>
+                    <h4 class="font-bold text-lg">{{ booking.item.title }}</h4>
+                    <p class="text-xs text-gray-500">Vendor: {{ booking.item.vendor.name }}</p>
+                </div>
+                <span class="text-xs px-3 py-0.5 rounded-full font-bold 
+                    {% if booking.booking_status == 'confirmed' %}bg-green-100 text-green-800
+                    {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
+                    {% elif booking.booking_status == 'completed' %}bg-blue-100 text-blue-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ booking.booking_status|title }}
+                </span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mt-3 text-gray-500">
+                <span><i class="fa-regular fa-calendar mr-1"></i> {{ booking.start_date }} → {{ booking.end_date }}</span>
+                <span><i class="fa-regular fa-clock mr-1"></i> {{ booking.start_time }} - {{ booking.end_time }}</span>
+                <span><i class="fa-regular fa-location-dot mr-1"></i> {{ booking.venue_address[:25] }}{% if booking.venue_address|length > 25 %}...{% endif %}</span>
+                <span class="font-bold text-green-700">₹{{ booking.total_amount }}</span>
+            </div>
+            <div class="flex justify-between items-center mt-3 pt-3 border-t text-xs">
+                <span class="font-mono text-green-700"><i class="fa-regular fa-receipt mr-1"></i>UTR: {{ booking.utr_number }}</span>
+                <span class="text-gray-500">Booked: {{ booking.created_at.strftime('%d/%m/%Y') }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="bg-white p-6 rounded-xl border text-gray-500 text-sm text-center py-12">
+            <i class="fa-regular fa-calendar-xmark text-4xl text-gray-300 mb-3 block"></i>
+            You have no bookings yet. 
+            <a href="{{ url_for('main.index') }}" class="text-green-700 font-bold hover:underline">Browse the marketplace!</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

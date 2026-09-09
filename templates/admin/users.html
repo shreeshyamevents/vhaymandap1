@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">👥 Users</h2>
+    <span class="text-sm text-gray-500">Total: {{ users|length }}</span>
+</div>
+
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="p-3">ID</th>
+                    <th class="p-3">Name</th>
+                    <th class="p-3">Mobile</th>
+                    <th class="p-3">Email</th>
+                    <th class="p-3">Role</th>
+                    <th class="p-3">Bookings</th>
+                    <th class="p-3">Joined</th>
+                    <th class="p-3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3 text-xs text-gray-500">#{{ user.id }}</td>
+                    <td class="p-3 font-medium">{{ user.name }}</td>
+                    <td class="p-3">{{ user.mobile }}</td>
+                    <td class="p-3 text-xs">{{ user.email or '-' }}</td>
+                    <td class="p-3">
+                        <span class="text-xs px-2 py-0.5 rounded-full {% if user.role == 'admin' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ user.role|title }}
+                        </span>
+                    </td>
+                    <td class="p-3 text-center">{{ user.bookings|length }}</td>
+                    <td class="p-3 text-xs">{{ user.created_at.strftime('%d/%m/%Y') if user.created_at else '-' }}</td>
+                    <td class="p-3">
+                        {% if user.id != current_user.id %}
+                        <form method="POST" action="{{ url_for('admin.update_user_role', user_id=user.id) }}" class="flex gap-1">
+                            <select name="role" class="text-xs border rounded p-1">
+                                <option value="customer" {% if user.role == 'customer' %}selected{% endif %}>Customer</option>
+                                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                            </select>
+                            <button type="submit" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Update</button>
+                        </form>
+                        {% else %}
+                        <span class="text-xs text-gray-400">You</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

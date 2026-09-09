@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Items - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">📦 Manage Items</h2>
+    <a href="{{ url_for('admin.add_item') }}" class="bg-green-700 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-green-600">
+        <i class="fa-regular fa-plus mr-1"></i>Add New Item
+    </a>
+</div>
+
+<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="p-3">ID</th>
+                    <th class="p-3">Image</th>
+                    <th class="p-3">Title</th>
+                    <th class="p-3">Category</th>
+                    <th class="p-3">Rate/Day</th>
+                    <th class="p-3">Stock</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3 text-xs text-gray-500">#{{ item.id }}</td>
+                    <td class="p-3">
+                        <div class="w-10 h-10 bg-gray-100 rounded overflow-hidden">
+                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='/static/images/default-item.jpg'">
+                        </div>
+                    </td>
+                    <td class="p-3 font-medium">{{ item.title }}</td>
+                    <td class="p-3 text-xs">{{ get_category_label(item.category) }}</td>
+                    <td class="p-3 font-bold">₹{{ item.rate_per_day }}</td>
+                    <td class="p-3">{{ item.stock }}</td>
+                    <td class="p-3">
+                        <span class="text-xs px-2 py-0.5 rounded-full {% if item.is_available %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ 'Available' if item.is_available else 'Unavailable' }}
+                        </span>
+                    </td>
+                    <td class="p-3 flex gap-2">
+                        <a href="{{ url_for('admin.edit_item', item_id=item.id) }}" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</a>
+                        <form method="POST" action="{{ url_for('admin.delete_item', item_id=item.id) }}" onsubmit="return confirm('Delete this item?')">
+                            <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

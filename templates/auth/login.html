@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Login - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-white p-8 rounded-2xl border shadow-sm">
+        <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-green-700 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-2xl">VM</div>
+            <h3 class="text-2xl font-bold mt-3">Welcome Back</h3>
+            <p class="text-sm text-gray-500">Login to your VyahMandap account</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block font-semibold text-sm mb-1">Mobile Number</label>
+                <input type="text" name="mobile" required placeholder="Enter 10-digit mobile" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+            <div>
+                <label class="block font-semibold text-sm mb-1">Password</label>
+                <input type="password" name="password" required placeholder="Your password" class="w-full border rounded-lg p-3 text-sm">
+            </div>
+            <button type="submit" class="w-full bg-green-700 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition">
+                Sign In
+            </button>
+        </form>
+
+        <p class="text-center text-sm text-gray-500 mt-4">
+            Don't have an account? <a href="{{ url_for('auth.register') }}" class="text-green-700 font-bold hover:underline">Register</a>
+        </p>
+        
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
+            <p class="font-semibold text-gray-700">Demo Accounts:</p>
+            <p>Admin: <strong>8319337063</strong> / 123456</p>
+            <p>Customer: <strong>9876543210</strong> / 123456</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

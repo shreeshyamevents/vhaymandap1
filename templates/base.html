@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VyahMandap - Wedding Equipment Marketplace{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+    
+    <!-- Top Bar -->
+    <div class="bg-gray-900 text-white text-xs py-2 px-4 flex flex-wrap justify-between items-center">
+        <span>
+            <i class="fa-regular fa-calendar mr-1"></i> 
+            <strong>{{ app_name }}</strong> — Taiyari Hamari, Celebration Aapka!
+        </span>
+        <div class="flex gap-3 items-center flex-wrap">
+            {% if current_user.is_authenticated %}
+                <span class="text-gray-400">👋 {{ current_user.name }} 
+                    <span class="text-xs bg-gray-700 px-2 py-0.5 rounded">{{ current_user.role|title }}</span>
+                </span>
+                {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="hover:text-white">
+                        <i class="fa-regular fa-shield mr-1"></i>Admin
+                    </a>
+                {% endif %}
+                <a href="{{ url_for('main.dashboard') }}" class="hover:text-white">
+                    <i class="fa-regular fa-gauge mr-1"></i>Dashboard
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="text-red-400 hover:text-red-300">
+                    Logout
+                </a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}" class="hover:text-white">Login</a>
+                <a href="{{ url_for('auth.register') }}" class="bg-green-700 px-3 py-0.5 rounded hover:bg-green-600">
+                    Register
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-white border-b sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <a href="{{ url_for('main.index') }}" class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-green-700 flex items-center justify-center text-white font-bold text-sm">
+                    VM
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">
+                        Vyah<span class="text-green-700">Mandap</span>
+                    </h1>
+                    <span class="text-[9px] font-medium text-gray-500 uppercase tracking-wider">
+                        Wedding Equipment Marketplace
+                    </span>
+                </div>
+            </a>
+            <div class="flex items-center gap-3">
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin.add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-green-600">
+                        <i class="fa-regular fa-plus mr-1"></i>Add Item
+                    </a>
+                {% endif %}
+                <a href="{{ url_for('main.index') }}" class="text-sm font-medium text-gray-600 hover:text-green-700">
+                    Browse
+                </a>
+                <span class="text-xs text-gray-400 hidden md:inline">| 📞 {{ business_phone }}</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Flash Messages -->
+    <div class="max-w-7xl mx-auto px-4 pt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-3 rounded-lg text-sm mb-2 flash-message 
+                        {% if category == 'success' %}bg-green-100 text-green-800
+                        {% elif category == 'danger' %}bg-red-100 text-red-800
+                        {% elif category == 'warning' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto px-4 py-6 w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 text-xs py-6 mt-8">
+        <div class="max-w-7xl mx-auto px-4 flex flex-wrap justify-between gap-6">
+            <div>
+                <span class="font-bold text-white text-sm">VyahMandap</span>
+                <p class="mt-1 max-w-xs">B2B Wedding Equipment Rental Marketplace. Taiyari Hamari, Celebration Aapka!</p>
+            </div>
+            <div class="flex gap-8">
+                <div>
+                    <span class="text-white font-semibold">Contact</span>
+                    <p class="mt-1">📞 {{ business_phone }}</p>
+                    <p class="mt-1">📞 {{ business_phone_alt }}</p>
+                </div>
+                <div>
+                    <span class="text-white font-semibold">Location</span>
+                    <p class="mt-1">{{ business_location }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 mt-4 pt-4 border-t border-gray-800 text-center text-[10px] text-gray-600">
+            © 2026 {{ app_name }} — All rights reserved.
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
