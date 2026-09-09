@@ -6,16 +6,16 @@
 <div class="flex justify-between items-center mb-6">
     <h2 class="text-2xl font-bold">🛡️ Admin Dashboard</h2>
     <div class="flex gap-2 flex-wrap">
-        <a href="{{ url_for('admin.add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
+        <a href="{{ url_for('admin_add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
             <i class="fa-regular fa-plus mr-1"></i>Add Item
         </a>
-        <a href="{{ url_for('admin.items') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">
+        <a href="{{ url_for('admin_items') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">
             Manage Items
         </a>
-        <a href="{{ url_for('admin.bookings') }}" class="bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-600">
+        <a href="{{ url_for('admin_bookings') }}" class="bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-600">
             Bookings
         </a>
-        <a href="{{ url_for('admin.users') }}" class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-600">
+        <a href="{{ url_for('admin_users') }}" class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-600">
             Users
         </a>
     </div>
@@ -63,44 +63,4 @@
 
 <!-- Recent Bookings -->
 <div class="bg-white p-6 rounded-xl border shadow-sm">
-    <h4 class="font-bold mb-4">Recent Bookings</h4>
-    {% if recent_bookings %}
-    <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="p-2">Ref</th>
-                    <th class="p-2">Customer</th>
-                    <th class="p-2">Item</th>
-                    <th class="p-2">Amount</th>
-                    <th class="p-2">UTR</th>
-                    <th class="p-2">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for booking in recent_bookings %}
-                <tr class="border-b hover:bg-gray-50">
-                    <td class="p-2 font-mono text-xs">{{ booking.booking_reference }}</td>
-                    <td class="p-2">{{ booking.customer.name }}</td>
-                    <td class="p-2">{{ booking.item.title[:20] }}{% if booking.item.title|length > 20 %}...{% endif %}</td>
-                    <td class="p-2 font-bold">₹{{ booking.total_amount }}</td>
-                    <td class="p-2 font-mono text-green-700 text-xs">{{ booking.utr_number }}</td>
-                    <td class="p-2">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
-                            {% if booking.booking_status == 'confirmed' %}bg-green-100 text-green-800
-                            {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
-                            {% elif booking.booking_status == 'completed' %}bg-blue-100 text-blue-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ booking.booking_status|title }}
-                        </span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p class="text-gray-500 text-sm">No bookings yet.</p>
-    {% endif %}
-</div>
-{% endblock %}
+    <h4 class="font
