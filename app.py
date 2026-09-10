@@ -95,7 +95,6 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='customer')
     is_active = db.Column(db.Boolean, default=True)
-    # Verification fields (for feature 3 & 5 later)
     is_verified = db.Column(db.Boolean, default=False)
     verified_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -139,6 +138,8 @@ class Item(db.Model):
     image_filename = db.Column(db.String(200))
     vendor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     is_available = db.Column(db.Boolean, default=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    verified_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -148,12 +149,20 @@ class Item(db.Model):
     def rate_with_commission(self):
         return round(self.rate_per_day * (1 + Config.COMMISSION_RATE), 2)
     
+    @property
+    def is_currently_verified(self):
+        if not self.is_verified:
+            return False
+        if self.verified_until and self.verified_until > datetime.utcnow():
+            return True
+        return False
+    
     def get_image(self):
         if self.image_url:
             return self.image_url
         elif self.image_filename:
             return f'/uploads/{self.image_filename}'
-        return '/static/images/default-item.jpg'
+        return 'https://via.placeholder.com/400x300/e5e7eb/9ca3af?text=No+Image'
 
 
 class Booking(db.Model):
@@ -178,6 +187,10 @@ class Booking(db.Model):
     utr_number = db.Column(db.String(50), nullable=False)
     payment_status = db.Column(db.String(20), default='pending')
     booking_status = db.Column(db.String(20), default='confirmed')
+    kyc_required = db.Column(db.Boolean, default=False)
+    aadhaar_number = db.Column(db.String(12), nullable=True)
+    pan_number = db.Column(db.String(10), nullable=True)
+    kyc_verified = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -195,6 +208,19 @@ class Message(db.Model):
     
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+
+class Review(db.Model):
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False, unique=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    comment = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    customer = db.relationship('User', foreign_keys=[customer_id])
 
 
 # ============================================
@@ -255,18 +281,14 @@ def format_currency(amount):
 def validate_mobile(mobile):
     return re.match(r'^\d{10}$', mobile) is not None
 
-# ===== Chat Number Masking Helpers =====
 def mask_phone_numbers(text):
-    """Mask any 10-digit numbers to prevent sharing"""
     return re.sub(r'\b(\d{2})\d{6}(\d{2})\b', r'\1XXXXXX\2', text)
 
 def contains_too_many_digits(text, max_consecutive=4):
-    """Check if message has more than N consecutive digits"""
     matches = re.findall(r'\d{' + str(max_consecutive + 1) + r',}', text)
     return len(matches) > 0
 
 def get_longest_digit_sequence(text):
-    """Get the longest digit sequence in text"""
     sequences = re.findall(r'\d+', text)
     if not sequences:
         return 0
@@ -359,15 +381,32 @@ def get_items():
     if category != 'all':
         query = query.filter_by(category=category)
     items = query.order_by(Item.created_at.desc()).all()
-    return jsonify([{
-        'id': item.id, 'title': item.title, 'description': item.description,
-        'category': item.category, 'rate': item.rate_per_day,
-        'rate_with_commission': item.rate_with_commission,
-        'deposit': item.deposit_amount, 'stock': item.stock,
-        'image': item.get_image(), 'vendor': item.vendor.name,
-        'vendor_id': item.vendor_id,
-        'vendor_verified': item.vendor.is_verified
-    } for item in items])
+    
+    result = []
+    for item in items:
+        avg_rating = 0
+        review_count = 0
+        try:
+            reviews = Review.query.filter_by(item_id=item.id).all()
+            if reviews:
+                avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
+                review_count = len(reviews)
+        except:
+            pass
+        
+        result.append({
+            'id': item.id, 'title': item.title, 'description': item.description,
+            'category': item.category, 'rate': item.rate_per_day,
+            'rate_with_commission': item.rate_with_commission,
+            'deposit': item.deposit_amount, 'stock': item.stock,
+            'image': item.get_image(), 'vendor': item.vendor.name,
+            'vendor_id': item.vendor_id,
+            'vendor_verified': item.vendor.is_verified,
+            'item_verified': item.is_currently_verified,
+            'avg_rating': avg_rating,
+            'review_count': review_count
+        })
+    return jsonify(result)
 
 
 @app.route('/api/calculate', methods=['POST'])
@@ -384,13 +423,11 @@ def calculate():
     return jsonify(result)
 
 
-# ===== NEW: Availability Calendar APIs (Feature 1) =====
+# ===== Availability Calendar APIs =====
 
 @app.route('/api/item/<int:item_id>/availability-calendar')
 def item_availability_calendar(item_id):
-    """Returns all booked dates with availability status for calendar"""
     item = Item.query.get_or_404(item_id)
-    
     bookings = Booking.query.filter_by(item_id=item_id)\
         .filter(Booking.booking_status.in_(['confirmed', 'pending'])).all()
     
@@ -436,13 +473,10 @@ def item_availability_calendar(item_id):
 
 @app.route('/api/item/<int:item_id>/availability')
 def item_availability_single(item_id):
-    """Check availability for a single date"""
     item = Item.query.get_or_404(item_id)
     date_str = request.args.get('date')
-    
     if not date_str:
         return jsonify({'error': 'date required'}), 400
-    
     try:
         check_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except:
@@ -457,7 +491,6 @@ def item_availability_single(item_id):
     
     booked_qty = sum(b.quantity for b in overlapping)
     available_qty = max(0, item.stock - booked_qty)
-    
     if available_qty <= 0:
         status = 'booked'
     elif available_qty < item.stock:
@@ -466,10 +499,8 @@ def item_availability_single(item_id):
         status = 'available'
     
     return jsonify({
-        'date': date_str,
-        'status': status,
-        'total_stock': item.stock,
-        'booked_qty': booked_qty,
+        'date': date_str, 'status': status,
+        'total_stock': item.stock, 'booked_qty': booked_qty,
         'available_qty': available_qty
     })
 
@@ -490,6 +521,7 @@ def book_item(item_id):
             weight = request.form.get('weight', 'till_20')
             venue_address = request.form.get('address', '').strip()
             utr = request.form.get('utr', '').strip()
+            
             if not venue_address:
                 flash('Venue address is required.', 'danger')
                 return render_template('booking.html', item=item)
@@ -499,7 +531,23 @@ def book_item(item_id):
             if quantity > item.stock:
                 flash(f'Only {item.stock} items available.', 'danger')
                 return render_template('booking.html', item=item)
+            
             calc = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
+            
+            kyc_required = calc['total'] >= 30000
+            aadhaar = None
+            pan = None
+            
+            if kyc_required:
+                aadhaar = request.form.get('aadhaar', '').strip()
+                pan = request.form.get('pan', '').strip().upper()
+                if not aadhaar or not re.match(r'^\d{12}$', aadhaar):
+                    flash('⚠️ Booking ≥ ₹30,000 — Valid 12-digit Aadhaar required.', 'danger')
+                    return render_template('booking.html', item=item)
+                if not pan or not re.match(r'^[A-Z]{5}\d{4}[A-Z]$', pan):
+                    flash('⚠️ Booking ≥ ₹30,000 — Valid PAN required (e.g. ABCDE1234F).', 'danger')
+                    return render_template('booking.html', item=item)
+            
             booking = Booking(
                 booking_reference=generate_booking_reference(),
                 customer_id=current_user.id, item_id=item.id,
@@ -510,14 +558,20 @@ def book_item(item_id):
                 base_rent=calc['base_rent'], commission=calc['commission'],
                 deposit=calc['deposit'], transport_fee=calc['transport_fee'],
                 total_amount=calc['total'], utr_number=utr,
-                payment_status='verified', booking_status='confirmed'
+                payment_status='verified', booking_status='confirmed',
+                kyc_required=kyc_required, aadhaar_number=aadhaar,
+                pan_number=pan, kyc_verified=kyc_required
             )
             item.stock -= quantity
             if item.stock <= 0:
                 item.is_available = False
             db.session.add(booking)
             db.session.commit()
-            flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}', 'success')
+            
+            if kyc_required:
+                flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}. KYC verified.', 'success')
+            else:
+                flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}', 'success')
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
@@ -722,13 +776,103 @@ def vendor_delete_item(item_id):
 
 
 # ============================================
-# CHAT ROUTES (Feature 2 - with number masking)
+# VERIFICATION ROUTES (Feature 3)
+# ============================================
+
+VERIFICATION_PRICE = 999
+VERIFICATION_DAYS = 90
+
+
+@app.route('/vendor/item/<int:item_id>/verify', methods=['GET', 'POST'])
+@login_required
+def vendor_verify_item(item_id):
+    """Vendor pays ₹999 to verify an item for 3 months"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied. This item does not belong to you.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+    
+    if item.is_currently_verified:
+        flash('This item is already verified.', 'info')
+        return redirect(url_for('vendor_dashboard'))
+    
+    if request.method == 'POST':
+        utr = request.form.get('utr', '').strip()
+        
+        if not utr:
+            flash('UTR number is required.', 'danger')
+            return render_template('vendor/verify_item.html', item=item, price=VERIFICATION_PRICE)
+        
+        item.is_verified = True
+        
+        if item.verified_until and item.verified_until > datetime.utcnow():
+            item.verified_until = item.verified_until + timedelta(days=VERIFICATION_DAYS)
+        else:
+            item.verified_until = datetime.utcnow() + timedelta(days=VERIFICATION_DAYS)
+        
+        db.session.commit()
+        
+        flash(f'✅ Item verified successfully! Valid until {item.verified_until.strftime("%d %b, %Y")}.', 'success')
+        return redirect(url_for('vendor_dashboard'))
+    
+    return render_template('vendor/verify_item.html', item=item, price=VERIFICATION_PRICE)
+
+
+# ============================================
+# REVIEW ROUTES (Feature 4)
+# ============================================
+
+@app.route('/item/<int:item_id>/reviews')
+def item_reviews(item_id):
+    item = Item.query.get_or_404(item_id)
+    reviews = Review.query.filter_by(item_id=item_id).order_by(Review.created_at.desc()).all()
+    avg_rating = 0
+    if reviews:
+        avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
+    return render_template('item_reviews.html', item=item, reviews=reviews, avg_rating=avg_rating)
+
+
+@app.route('/booking/<int:booking_id>/review', methods=['GET', 'POST'])
+@login_required
+def submit_review(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    if booking.customer_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('dashboard'))
+    if booking.booking_status not in ['completed', 'confirmed']:
+        flash('You can only review completed or confirmed bookings.', 'warning')
+        return redirect(url_for('dashboard'))
+    existing = Review.query.filter_by(booking_id=booking_id).first()
+    if existing:
+        flash('You have already reviewed this booking.', 'info')
+        return redirect(url_for('dashboard'))
+    if request.method == 'POST':
+        rating = int(request.form.get('rating', 0))
+        comment = request.form.get('comment', '').strip()
+        if rating < 1 or rating > 5:
+            flash('Please select a rating between 1 and 5.', 'danger')
+            return render_template('review_form.html', booking=booking)
+        review = Review(booking_id=booking.id, item_id=booking.item_id,
+                       customer_id=current_user.id, rating=rating, comment=comment)
+        db.session.add(review)
+        db.session.commit()
+        flash('⭐ Thank you for your review!', 'success')
+        return redirect(url_for('dashboard'))
+    return render_template('review_form.html', booking=booking)
+
+
+# ============================================
+# CHAT ROUTES (Feature 2)
 # ============================================
 
 @app.route('/chat')
 @login_required
 def chat_list():
-    """List all conversations for current user"""
     messages = Message.query.filter(
         (Message.sender_id == current_user.id) | (Message.receiver_id == current_user.id)
     ).order_by(Message.created_at.desc()).all()
@@ -753,7 +897,6 @@ def chat_list():
 @app.route('/chat/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def chat_with(user_id):
-    """Chat with a specific user"""
     other_user = User.query.get_or_404(user_id)
     
     if other_user.id == current_user.id:
@@ -764,7 +907,6 @@ def chat_with(user_id):
     
     if request.method == 'POST':
         body = request.form.get('body', '').strip()
-        
         if not body:
             flash('Message cannot be empty.', 'danger')
         elif contains_too_many_digits(body, max_consecutive=4):
@@ -773,12 +915,8 @@ def chat_with(user_id):
                   f'(found {longest}). This prevents phone number sharing.', 'danger')
         else:
             masked_body = mask_phone_numbers(body)
-            msg = Message(
-                sender_id=current_user.id,
-                receiver_id=other_user.id,
-                item_id=item_id,
-                body=masked_body
-            )
+            msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
+                         item_id=item_id, body=masked_body)
             db.session.add(msg)
             db.session.commit()
             if masked_body != body:
@@ -798,15 +936,12 @@ def chat_with(user_id):
     item = Item.query.get(item_id) if item_id else None
     
     return render_template('chat/conversation.html',
-                         other_user=other_user,
-                         messages=messages,
-                         item=item)
+                         other_user=other_user, messages=messages, item=item)
 
 
 @app.route('/api/chat/send', methods=['POST'])
 @login_required
 def api_chat_send():
-    """AJAX endpoint to send message"""
     data = request.get_json()
     receiver_id = data.get('receiver_id')
     body = data.get('body', '').strip()
@@ -821,26 +956,18 @@ def api_chat_send():
     
     if contains_too_many_digits(body, max_consecutive=4):
         longest = get_longest_digit_sequence(body)
-        return jsonify({
-            'error': f'Number masking: Cannot share more than 4 consecutive digits. Found {longest}.'
-        }), 400
+        return jsonify({'error': f'Number masking: Cannot share more than 4 consecutive digits. Found {longest}.'}), 400
     
     masked_body = mask_phone_numbers(body)
-    
-    msg = Message(
-        sender_id=current_user.id,
-        receiver_id=other_user.id,
-        item_id=item_id,
-        body=masked_body
-    )
+    msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
+                 item_id=item_id, body=masked_body)
     db.session.add(msg)
     db.session.commit()
     
     return jsonify({
         'success': True,
         'message': {
-            'id': msg.id,
-            'body': msg.body,
+            'id': msg.id, 'body': msg.body,
             'masked': masked_body != body,
             'created_at': msg.created_at.strftime('%H:%M')
         }
@@ -850,7 +977,6 @@ def api_chat_send():
 @app.route('/api/chat/messages/<int:user_id>')
 @login_required
 def api_chat_messages(user_id):
-    """Get messages with a user (for polling)"""
     messages = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id)) |
         ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
@@ -862,9 +988,7 @@ def api_chat_messages(user_id):
     db.session.commit()
     
     return jsonify([{
-        'id': m.id,
-        'sender_id': m.sender_id,
-        'body': m.body,
+        'id': m.id, 'sender_id': m.sender_id, 'body': m.body,
         'is_mine': m.sender_id == current_user.id,
         'created_at': m.created_at.strftime('%d %b, %H:%M')
     } for m in messages])
