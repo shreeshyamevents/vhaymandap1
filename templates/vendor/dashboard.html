@@ -18,25 +18,39 @@
     </div>
 </div>
 
+<!-- Stats Cards -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
     <div class="bg-white p-4 rounded-xl border shadow-sm">
-        <span class="text-xs text-gray-500">Total Items</span>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Total Items</span>
+            <i class="fa-solid fa-box text-green-700"></i>
+        </div>
         <h3 class="text-2xl font-bold mt-1">{{ total_items }}</h3>
     </div>
     <div class="bg-white p-4 rounded-xl border shadow-sm">
-        <span class="text-xs text-gray-500">Total Bookings</span>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Total Bookings</span>
+            <i class="fa-solid fa-calendar-check text-blue-700"></i>
+        </div>
         <h3 class="text-2xl font-bold mt-1">{{ total_bookings }}</h3>
     </div>
     <div class="bg-white p-4 rounded-xl border shadow-sm">
-        <span class="text-xs text-gray-500">Active Rentals</span>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Active Rentals</span>
+            <i class="fa-solid fa-clock text-orange-600"></i>
+        </div>
         <h3 class="text-2xl font-bold mt-1 text-orange-600">{{ active_rentals }}</h3>
     </div>
     <div class="bg-white p-4 rounded-xl border shadow-sm">
-        <span class="text-xs text-gray-500">Total Earnings</span>
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">Total Earnings</span>
+            <i class="fa-solid fa-indian-rupee-sign text-green-700"></i>
+        </div>
         <h3 class="text-2xl font-bold mt-1 text-green-700">{{ format_currency(total_earnings) }}</h3>
     </div>
 </div>
 
+<!-- Upcoming Bookings -->
 {% if upcoming_bookings %}
 <div class="bg-white p-6 rounded-xl border shadow-sm mb-8">
     <div class="flex justify-between items-center mb-4">
@@ -49,12 +63,16 @@
             <div class="flex-1 min-w-[200px]">
                 <p class="font-bold text-sm">{{ booking.item.title }}</p>
                 <p class="text-xs text-gray-500">
-                    👤 {{ booking.customer.name }} • Qty: {{ booking.quantity }}
+                    <i class="fa-regular fa-user mr-1"></i>{{ booking.customer.name }}
+                    <span class="mx-2">•</span>
+                    <i class="fa-regular fa-box mr-1"></i>Qty: {{ booking.quantity }}
                 </p>
             </div>
-            <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-bold">
-                {{ booking.start_date.strftime('%d %b') }} → {{ booking.end_date.strftime('%d %b') }}
-            </span>
+            <div class="text-xs">
+                <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold">
+                    {{ booking.start_date.strftime('%d %b') }} → {{ booking.end_date.strftime('%d %b') }}
+                </span>
+            </div>
             <div class="text-xs font-bold text-green-700">
                 {{ format_currency(booking.base_rent) }}
             </div>
@@ -64,6 +82,7 @@
 </div>
 {% endif %}
 
+<!-- My Items -->
 <div class="bg-white p-6 rounded-xl border shadow-sm mb-8">
     <div class="flex justify-between items-center mb-4">
         <h4 class="font-bold">📦 My Listed Items</h4>
@@ -91,10 +110,15 @@
                 <tr class="border-b hover:bg-gray-50">
                     <td class="p-3">
                         <div class="w-12 h-12 bg-gray-100 rounded overflow-hidden">
-                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" onerror="this.src='/static/images/default-item.jpg'">
+                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='/static/images/default-item.jpg'">
                         </div>
                     </td>
-                    <td class="p-3 font-medium">{{ item.title }}</td>
+                    <td class="p-3 font-medium">
+                        {{ item.title }}
+                        {% if item.is_currently_verified %}
+                            <i class="fa-solid fa-circle-check text-blue-600 ml-1" title="Verified Item"></i>
+                        {% endif %}
+                    </td>
                     <td class="p-3 text-xs">{{ item.category|title }}</td>
                     <td class="p-3 font-bold text-green-700">₹{{ item.rate_per_day }}</td>
                     <td class="p-3">{{ item.stock }}</td>
@@ -103,11 +127,20 @@
                             {{ 'Available' if item.is_available else 'Unavailable' }}
                         </span>
                     </td>
-                    <td class="p-3 flex gap-2">
-                        <a href="{{ url_for('vendor_edit_item', item_id=item.id) }}" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</a>
-                        <form method="POST" action="{{ url_for('vendor_delete_item', item_id=item.id) }}" onsubmit="return confirm('Delete?')" class="inline">
-                            <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Delete</button>
-                        </form>
+                    <td class="p-3">
+                        <div class="flex gap-2 items-center flex-wrap">
+                            <a href="{{ url_for('vendor_edit_item', item_id=item.id) }}" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</a>
+                            {% if not item.is_currently_verified %}
+                                <a href="{{ url_for('vendor_verify_item', item_id=item.id) }}" class="text-yellow-600 hover:text-yellow-800 text-xs font-bold">✨ Verify</a>
+                            {% else %}
+                                <span class="text-xs text-blue-600 font-bold">
+                                    <i class="fa-solid fa-circle-check"></i> Verified
+                                </span>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('vendor_delete_item', item_id=item.id) }}" onsubmit="return confirm('Delete this item?')" class="inline">
+                                <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -123,8 +156,10 @@
     {% endif %}
 </div>
 
+<!-- Recent Bookings -->
 <div class="bg-white p-6 rounded-xl border shadow-sm">
     <h4 class="font-bold mb-4">📋 Recent Bookings</h4>
+    
     {% if bookings %}
     <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
@@ -137,6 +172,7 @@
                     <th class="p-2">Qty</th>
                     <th class="p-2">Earnings</th>
                     <th class="p-2">Status</th>
+                    <th class="p-2">Chat</th>
                 </tr>
             </thead>
             <tbody>
@@ -159,6 +195,11 @@
                             {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ booking.booking_status|title }}
                         </span>
+                    </td>
+                    <td class="p-2">
+                        <a href="{{ url_for('chat_with', user_id=booking.customer_id) }}" class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded hover:bg-blue-700">
+                            <i class="fa-regular fa-comment"></i>
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
