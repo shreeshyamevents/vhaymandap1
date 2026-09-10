@@ -37,12 +37,12 @@
             </div>
         </div>
 
-        <!-- ✅ NEW: Check Availability Button -->
+        <!-- Check Availability Button -->
         <button type="button" onclick="toggleAvailability()" class="w-full mb-4 bg-blue-50 border-2 border-blue-200 text-blue-800 font-bold py-2.5 rounded-xl hover:bg-blue-100 transition text-sm">
             <i class="fa-regular fa-calendar-check mr-1"></i> Check Availability
         </button>
 
-        <!-- ✅ NEW: Availability Calendar -->
+        <!-- Availability Calendar -->
         <div id="availabilitySection" class="hidden mb-6">
             <div class="bg-white border rounded-xl p-4">
                 <div class="flex justify-between items-center mb-3">
@@ -110,6 +110,7 @@
                 <input type="text" name="address" required placeholder="Marriage Garden, Harda" class="w-full border rounded-lg p-2.5 text-sm">
             </div>
 
+            <!-- Cost Breakdown -->
             <div class="bg-gray-50 p-4 rounded-xl space-y-1 text-sm">
                 <h4 class="font-bold mb-2 text-green-700">💰 Cost Breakdown</h4>
                 <div class="flex justify-between"><span>Rental Period</span><strong id="calcDays">-</strong></div>
@@ -121,177 +122,23 @@
                 <div class="flex justify-between font-bold text-base"><span>Total Payable</span><strong id="calcTotal" class="text-green-700">₹0</strong></div>
             </div>
 
-            <div class="bg-gray-900 text-white p-5 rounded-xl text-center space-y-3">
-                <div class="flex items-center justify-center gap-2 text-sm">
-                    <span class="bg-purple-600 px-3 py-0.5 rounded text-xs font-bold">PhonePe</span>
-                    <span>Pay to {{ app_name }}</span>
+            <!-- KYC Section (Conditionally Shown) -->
+            <div id="kycSection" class="hidden bg-yellow-50 border-2 border-yellow-300 p-4 rounded-xl space-y-3">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-yellow-700"></i>
+                    <h4 class="font-bold text-yellow-900">🛡️ KYC Verification Required</h4>
                 </div>
-                <div class="bg-white p-3 inline-block rounded-xl mx-auto">
-                    <div class="w-32 h-32 bg-gray-200 rounded-lg mx-auto flex items-center justify-center text-gray-500 text-xs">
-                        <div class="text-center">
-                            <i class="fa-regular fa-qrcode text-5xl text-gray-400"></i>
-                            <p class="mt-1 text-[10px]">Scan to Pay</p>
-                        </div>
-                    </div>
+                <p class="text-xs text-yellow-800">
+                    Your booking total is <strong>₹30,000 or above</strong>. For security, please provide your Aadhaar and PAN details.
+                </p>
+                <div>
+                    <label class="block font-semibold text-sm mb-1">Aadhaar Number (12 digits) *</label>
+                    <input type="text" name="aadhaar" id="aadhaarInput" maxlength="12" pattern="\d{12}" 
+                           placeholder="123456789012"
+                           class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
-                <div class="text-left">
-                    <label class="block font-semibold mb-1 text-white/80">UTR / Transaction ID *</label>
-                    <input type="text" id="utr" name="utr" required placeholder="Enter PhonePe UTR" class="w-full border rounded-lg p-2.5 text-black text-sm">
-                </div>
-            </div>
-
-            <button type="submit" class="w-full bg-green-700 text-white font-bold py-3.5 rounded-xl hover:bg-green-600 transition text-sm">
-                Confirm Booking
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- Date Details Modal -->
-<div id="dateDetailModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background: rgba(0,0,0,0.55);">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 relative shadow-2xl">
-        <button onclick="closeDateModal()" class="absolute top-3 right-4 text-2xl text-gray-400 hover:text-black">&times;</button>
-        <h3 class="text-lg font-bold mb-3">📅 Availability Details</h3>
-        <div id="dateDetailContent" class="text-sm space-y-2"></div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-let itemData = {
-    id: {{ item.id }},
-    rate: {{ item.rate_per_day }},
-    deposit: {{ item.deposit_amount }},
-    stock: {{ item.stock }}
-};
-
-let availabilityCalendar = null;
-
-// ===== Cost Calculation =====
-function calculateTotal() {
-    const start = document.getElementById('startDate').value;
-    const end = document.getElementById('endDate').value;
-    const qty = parseInt(document.getElementById('qty').value) || 1;
-    const area = document.getElementById('area').value;
-    const weight = document.getElementById('weight').value;
-    
-    if (!start || !end) return;
-    
-    fetch('/api/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            item_id: itemData.id,
-            start_date: start,
-            end_date: end,
-            quantity: qty,
-            area: area,
-            weight: weight
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        document.getElementById('calcDays').textContent = data.days + ' days';
-        document.getElementById('calcRent').textContent = '₹' + data.base_rent;
-        document.getElementById('calcComm').textContent = '₹' + data.commission;
-        document.getElementById('calcDeposit').textContent = '₹' + data.deposit;
-        document.getElementById('calcTransport').textContent = '₹' + data.transport_fee;
-        document.getElementById('calcTotal').textContent = '₹' + data.total;
-    })
-    .catch(err => console.error('Error:', err));
-}
-
-// ===== Availability Calendar =====
-function toggleAvailability() {
-    const section = document.getElementById('availabilitySection');
-    section.classList.toggle('hidden');
-    
-    if (!section.classList.contains('hidden') && !availabilityCalendar) {
-        initAvailabilityCalendar();
-    }
-}
-
-function initAvailabilityCalendar() {
-    const calendarEl = document.getElementById('availabilityCalendar');
-    
-    availabilityCalendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-            left: 'prev,next',
-            center: 'title',
-            right: 'today'
-        },
-        height: 'auto',
-        events: `/api/item/{{ item.id }}/availability-calendar`,
-        eventClick: function(info) {
-            showDateDetails(info.event);
-        },
-        dateClick: function(info) {
-            const dateStr = info.dateStr;
-            showDateDetailsByDate(dateStr);
-        },
-        dayCellClassNames: function(arg) {
-            // Nothing - we use events for coloring
-            return [];
-        }
-    });
-    
-    availabilityCalendar.render();
-}
-
-function showDateDetails(event) {
-    const p = event.extendedProps;
-    const content = document.getElementById('dateDetailContent');
-    
-    content.innerHTML = `
-        <div><strong>Date:</strong> ${new Date(event.start).toLocaleDateString('en-IN')}</div>
-        <div><strong>Status:</strong> <span class="font-bold ${p.status === 'available' ? 'text-green-700' : p.status === 'partial' ? 'text-yellow-700' : 'text-red-700'}">${p.status.toUpperCase()}</span></div>
-        <div><strong>Total Stock:</strong> ${p.total_stock}</div>
-        <div><strong>Booked:</strong> ${p.booked_qty}</div>
-        <div><strong>Available:</strong> ${p.available_qty}</div>
-    `;
-    
-    document.getElementById('dateDetailModal').classList.remove('hidden');
-    document.getElementById('dateDetailModal').classList.add('flex');
-}
-
-function showDateDetailsByDate(dateStr) {
-    fetch(`/api/item/{{ item.id }}/availability?date=${dateStr}`)
-        .then(res => res.json())
-        .then(data => {
-            const content = document.getElementById('dateDetailContent');
-            content.innerHTML = `
-                <div><strong>Date:</strong> ${new Date(dateStr).toLocaleDateString('en-IN')}</div>
-                <div><strong>Status:</strong> <span class="font-bold ${data.status === 'available' ? 'text-green-700' : data.status === 'partial' ? 'text-yellow-700' : 'text-red-700'}">${data.status.toUpperCase()}</span></div>
-                <div><strong>Total Stock:</strong> ${data.total_stock}</div>
-                <div><strong>Booked:</strong> ${data.booked_qty}</div>
-                <div><strong>Available:</strong> ${data.available_qty}</div>
-            `;
-            document.getElementById('dateDetailModal').classList.remove('hidden');
-            document.getElementById('dateDetailModal').classList.add('flex');
-        })
-        .catch(err => console.error(err));
-}
-
-function closeDateModal() {
-    document.getElementById('dateDetailModal').classList.add('hidden');
-    document.getElementById('dateDetailModal').classList.remove('flex');
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('startDate').value = today;
-    document.getElementById('endDate').value = today;
-    calculateTotal();
-    
-    ['startDate', 'endDate', 'qty', 'area', 'weight'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('change', calculateTotal);
-            el.addEventListener('input', calculateTotal);
-        }
-    });
-});
-</script>
-{% endblock %}
+                <div>
+                    <label class="block font-semibold text-sm mb-1">PAN Number *</label>
+                    <input type="text" name="pan" id="panInput" maxlength="10" 
+                           placeholder="ABCDE1234F" style="text-transform: uppercase;"
+                           class="w-full
