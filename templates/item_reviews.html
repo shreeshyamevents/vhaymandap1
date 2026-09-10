@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Reviews for {{ item.title }} - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">⭐ Reviews</h2>
+        <a href="{{ url_for('book_item', item_id=item.id) }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back to Item</a>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl border shadow-sm mb-6">
+        <div class="flex gap-4">
+            <div class="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                <img src="{{ item.get_image() }}" class="w-full h-full object-cover" onerror="this.src='/static/images/default-item.jpg'">
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">{{ item.title }}</h3>
+                <p class="text-sm text-gray-500">{{ item.vendor.name }}</p>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="text-yellow-400 text-xl">
+                        {% for i in range(1, 6) %}
+                            {% if i <= avg_rating %}★{% else %}☆{% endif %}
+                        {% endfor %}
+                    </span>
+                    <span class="font-bold">{{ avg_rating }}</span>
+                    <span class="text-xs text-gray-500">({{ reviews|length }} review{{ 's' if reviews|length != 1 else '' }})</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if reviews %}
+        <div class="space-y-4">
+            {% for review in reviews %}
+            <div class="bg-white p-5 rounded-xl border shadow-sm">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <span class="font-bold">{{ review.customer.name }}</span>
+                        <span class="text-xs text-gray-500 ml-2">{{ review.created_at.strftime('%d %b, %Y') }}</span>
+                    </div>
+                    <span class="text-yellow-400">
+                        {% for i in range(1, 6) %}
+                            {% if i <= review.rating %}★{% else %}☆{% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+                {% if review.comment %}
+                    <p class="text-sm text-gray-700">{{ review.comment }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white p-8 rounded-xl border text-center text-gray-500">
+            <i class="fa-regular fa-star text-4xl text-gray-300 mb-3 block"></i>
+            <p class="text-sm">No reviews yet. Be the first to review!</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
