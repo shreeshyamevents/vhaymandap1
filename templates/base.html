@@ -21,6 +21,9 @@
             {% if current_user.is_authenticated %}
                 <span class="text-gray-400">👋 {{ current_user.name }} 
                     <span class="text-xs bg-gray-700 px-2 py-0.5 rounded">{{ current_user.role|title }}</span>
+                    {% if current_user.is_verified %}
+                        <span class="text-blue-400 text-xs ml-1"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                    {% endif %}
                 </span>
                 {% if current_user.role == 'admin' %}
                     <a href="{{ url_for('admin_dashboard') }}" class="hover:text-white">
@@ -40,6 +43,12 @@
                         <i class="fa-regular fa-gauge mr-1"></i>Dashboard
                     </a>
                 {% endif %}
+                <a href="{{ url_for('chat_list') }}" class="hover:text-white relative">
+                    <i class="fa-regular fa-comments mr-1"></i>Messages
+                    {% if unread_message_count > 0 %}
+                        <span class="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ unread_message_count }}</span>
+                    {% endif %}
+                </a>
                 <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300">
                     Logout
                 </a>
