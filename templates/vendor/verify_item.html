@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Item - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">✨ Verify Your Item</h2>
+        <a href="{{ url_for('vendor_dashboard') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl border shadow-sm">
+        <!-- Item Card -->
+        <div class="flex gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+            <div class="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                <img src="{{ item.get_image() }}" class="w-full h-full object-cover" onerror="this.src='/static/images/default-item.jpg'">
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">{{ item.title }}</h3>
+                <p class="text-sm text-gray-500">{{ item.category|title }}</p>
+                <p class="text-sm mt-1"><strong>₹{{ item.rate_per_day }}</strong>/day</p>
+            </div>
+        </div>
+
+        <!-- Benefits -->
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
+            <h4 class="font-bold text-blue-900 mb-2">✨ Verified Badge Benefits:</h4>
+            <ul class="text-sm text-blue-800 space-y-1">
+                <li>✓ Blue verified tick on your item</li>
+                <li>✓ Higher visibility in marketplace</li>
+                <li>✓ Builds customer trust instantly</li>
+                <li>✓ Better conversion rate</li>
+                <li>✓ Valid for <strong>3 months</strong></li>
+            </ul>
+        </div>
+
+        <!-- Payment Info -->
+        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 mb-6">
+            <h4 class="font-bold text-yellow-900 mb-2">💳 Verification Fee:</h4>
+            <p class="text-2xl font-bold text-yellow-800">₹{{ price }}</p>
+            <p class="text-xs text-yellow-700 mt-1">For 3 months (90 days)</p>
+        </div>
+
+        <!-- Payment Form -->
+        <form method="POST" class="space-y-4">
+            <div class="bg-gray-900 text-white p-5 rounded-xl text-center space-y-3">
+                <div class="flex items-center justify-center gap-2 text-sm">
+                    <span class="bg-purple-600 px-3 py-0.5 rounded text-xs font-bold">PhonePe</span>
+                    <span>Pay ₹{{ price }} to {{ app_name }}</span>
+                </div>
+                <div class="bg-white p-3 inline-block rounded-xl mx-auto">
+                    <div class="w-32 h-32 bg-gray-200 rounded-lg mx-auto flex items-center justify-center text-gray-500 text-xs">
+                        <div class="text-center">
+                            <i class="fa-regular fa-qrcode text-5xl text-gray-400"></i>
+                            <p class="mt-1 text-[10px]">Scan to Pay</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-left">
+                    <label class="block font-semibold mb-1 text-white/80">UTR / Transaction ID *</label>
+                    <input type="text" name="utr" required placeholder="Enter PhonePe UTR" class="w-full border rounded-lg p-2.5 text-black text-sm">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-700 text-white font-bold py-3.5 rounded-xl hover:bg-blue-600 transition text-sm">
+                ✨ Pay ₹{{ price }} & Verify Item
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
