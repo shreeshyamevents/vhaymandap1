@@ -3,11 +3,11 @@ import sys
 import re
 import random
 import string
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
 from werkzeug.utils import secure_filename
 
 # ============================================
@@ -18,16 +18,14 @@ class Config:
     APP_NAME = "VyahMandap"
     APP_TAGLINE = "Taiyari Hamari, Celebration Aapka!"
     
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'vyahmandap-secret-key-change-in-production'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'vyahmandap-fixed-secret-key-2026-do-not-change'
     
     # SQLite Database - Use /tmp on Render, local otherwise
     if os.environ.get('RENDER') or 'RENDER' in os.environ:
-        # On Render, use /tmp directory (writable)
         db_path = '/tmp/vyahmandap.db'
         SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
         UPLOAD_FOLDER = '/tmp/uploads'
     else:
-        # Local development
         SQLALCHEMY_DATABASE_URI = 'sqlite:///database/vyahmandap.db'
         UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
     
@@ -38,6 +36,15 @@ class Config:
             'timeout': 30
         }
     }
+    
+    # ===== SESSION FIX (Fix for double-login issue) =====
+    SESSION_COOKIE_SECURE = True if os.environ.get('RENDER') else False
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
+    REMEMBER_COOKIE_SECURE = True if os.environ.get('RENDER') else False
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_DURATION = timedelta(days=7)
     
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -83,12 +90,10 @@ try:
 except Exception as e:
     print(f"⚠️ Could not create upload folder: {e}")
 
-# Create database directory if using local SQLite
 if 'sqlite:///database/' in app.config['SQLALCHEMY_DATABASE_URI']:
     os.makedirs('database', exist_ok=True)
     print("✅ Database directory created")
 
-# Initialize database
 db = SQLAlchemy(app)
 
 
@@ -104,7 +109,7 @@ class User(UserMixin, db.Model):
     mobile = db.Column(db.String(10), unique=True, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=True)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='customer')
+    role = db.Column(db.String(20), default='customer')  # admin, vendor, customer
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -118,7 +123,6 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    # Flask-Login required properties
     @property
     def is_authenticated(self):
         return True
@@ -300,11 +304,18 @@ def login():
         user = User.query.filter_by(mobile=mobile).first()
         
         if user and user.check_password(password):
-            login_user(user)
+            # LOGIN FIX: Use remember=True and permanent session
+            login_user(user, remember=True)
+            
             flash(f'🎉 Welcome back, {user.name}!', 'success')
+            
+            # Redirect based on role
             if user.role == 'admin':
                 return redirect(url_for('admin_dashboard'))
-            return redirect(url_for('index'))
+            elif user.role == 'vendor':
+                return redirect(url_for('vendor_dashboard'))
+            else:
+                return redirect(url_for('dashboard'))
         else:
             flash('❌ Invalid mobile number or password.', 'danger')
     
@@ -321,6 +332,7 @@ def register():
         email = request.form.get('email', '').strip() or None
         password = request.form.get('password', '').strip()
         confirm_password = request.form.get('confirm_password', '').strip()
+        account_type = request.form.get('account_type', 'customer')
         
         errors = []
         if not name:
@@ -344,11 +356,14 @@ def register():
                 flash(error, 'danger')
             return render_template('auth/register.html')
         
+        # Only allow customer or vendor on signup (not admin)
+        role = 'vendor' if account_type == 'vendor' else 'customer'
+        
         user = User(
             name=name,
             mobile=mobile,
             email=email,
-            role='customer'
+            role=role
         )
         user.set_password(password)
         db.session.add(user)
@@ -502,6 +517,283 @@ def dashboard():
 
 
 # ============================================
+# ROUTES - VENDOR DASHBOARD (NEW)
+# ============================================
+
+@app.route('/vendor')
+@login_required
+def vendor_dashboard():
+    """Vendor dashboard - shows their items, bookings, and stats"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied. Vendor account required.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get vendor's items
+    items = Item.query.filter_by(vendor_id=current_user.id)\
+        .order_by(Item.created_at.desc()).all()
+    
+    item_ids = [i.id for i in items]
+    
+    # Get bookings for vendor's items
+    if item_ids:
+        bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
+            .order_by(Booking.created_at.desc()).all()
+    else:
+        bookings = []
+    
+    # Calculate stats
+    total_earnings = sum(b.base_rent for b in bookings)
+    total_bookings = len(bookings)
+    active_rentals = sum(1 for b in bookings if b.booking_status == 'confirmed')
+    total_items = len(items)
+    
+    # Upcoming bookings (next 30 days)
+    today = datetime.utcnow().date()
+    thirty_days_later = today + timedelta(days=30)
+    upcoming_bookings = [
+        b for b in bookings 
+        if b.start_date >= today and b.start_date <= thirty_days_later
+        and b.booking_status == 'confirmed'
+    ]
+    
+    return render_template('vendor/dashboard.html',
+                         items=items,
+                         bookings=bookings,
+                         total_earnings=total_earnings,
+                         total_bookings=total_bookings,
+                         active_rentals=active_rentals,
+                         total_items=total_items,
+                         upcoming_bookings=upcoming_bookings)
+
+
+@app.route('/vendor/calendar')
+@login_required
+def vendor_calendar():
+    """Vendor calendar view - shows all bookings in calendar format"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied. Vendor account required.', 'danger')
+        return redirect(url_for('index'))
+    
+    items = Item.query.filter_by(vendor_id=current_user.id).all()
+    return render_template('vendor/calendar.html', items=items)
+
+
+@app.route('/api/vendor/calendar')
+@login_required
+def api_vendor_calendar():
+    """API endpoint for calendar data"""
+    if current_user.role not in ['admin', 'vendor']:
+        return jsonify([])
+    
+    items = Item.query.filter_by(vendor_id=current_user.id).all()
+    item_ids = [i.id for i in items]
+    
+    if not item_ids:
+        return jsonify([])
+    
+    # Optional filter by item
+    item_filter = request.args.get('item_id', 'all')
+    query = Booking.query.filter(Booking.item_id.in_(item_ids))
+    
+    if item_filter != 'all':
+        query = query.filter_by(item_id=int(item_filter))
+    
+    bookings = query.all()
+    
+    # Color palette for different items
+    colors = ['#2d5a3d', '#b45309', '#1e40af', '#7c2d12', '#166534', '#9a3412', '#a16207']
+    item_color_map = {}
+    for idx, item in enumerate(items):
+        item_color_map[item.id] = colors[idx % len(colors)]
+    
+    events = []
+    for b in bookings:
+        events.append({
+            'id': b.id,
+            'title': f"{b.item.title} ({b.quantity})",
+            'start': b.start_date.isoformat(),
+            'end': (b.end_date + timedelta(days=1)).isoformat(),  # FullCalendar end is exclusive
+            'backgroundColor': item_color_map.get(b.item_id, '#2d5a3d'),
+            'borderColor': item_color_map.get(b.item_id, '#2d5a3d'),
+            'extendedProps': {
+                'customer': b.customer.name,
+                'customer_mobile': b.customer.mobile,
+                'item': b.item.title,
+                'quantity': b.quantity,
+                'base_rent': b.base_rent,
+                'total': b.total_amount,
+                'status': b.booking_status,
+                'venue': b.venue_address,
+                'utr': b.utr_number,
+                'reference': b.booking_reference,
+                'start_time': b.start_time,
+                'end_time': b.end_time
+            }
+        })
+    
+    return jsonify(events)
+
+
+@app.route('/api/vendor/availability')
+@login_required
+def api_vendor_availability():
+    """Check item availability for a date range"""
+    if current_user.role not in ['admin', 'vendor']:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    item_id = request.args.get('item_id')
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    if not all([item_id, start_date_str, end_date_str]):
+        return jsonify({'error': 'Missing parameters'}), 400
+    
+    item = Item.query.get_or_404(int(item_id))
+    
+    # Check ownership
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    
+    # Get overlapping bookings
+    overlapping = Booking.query.filter(
+        Booking.item_id == item.id,
+        Booking.booking_status == 'confirmed',
+        Booking.start_date <= end_date,
+        Booking.end_date >= start_date
+    ).all()
+    
+    booked_qty = sum(b.quantity for b in overlapping)
+    available_qty = max(0, item.stock - booked_qty)
+    
+    return jsonify({
+        'item_id': item.id,
+        'item_title': item.title,
+        'total_stock': item.stock,
+        'booked_quantity': booked_qty,
+        'available_quantity': available_qty,
+        'is_available': available_qty > 0,
+        'bookings': [{
+            'reference': b.booking_reference,
+            'customer': b.customer.name,
+            'start': b.start_date.isoformat(),
+            'end': b.end_date.isoformat(),
+            'quantity': b.quantity
+        } for b in overlapping]
+    })
+
+
+@app.route('/vendor/item/add', methods=['GET', 'POST'])
+@login_required
+def vendor_add_item():
+    """Vendor can add their own items"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        category = request.form.get('category', '')
+        rate = float(request.form.get('rate', 0))
+        deposit = float(request.form.get('deposit', 0))
+        stock = int(request.form.get('stock', 1))
+        image_url = request.form.get('image_url', '').strip()
+        
+        image_filename = None
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            image_filename = save_uploaded_file(request.files['image_file'])
+        
+        if not title or rate <= 0:
+            flash('Title and rate are required.', 'danger')
+            return render_template('vendor/item_form.html')
+        
+        item = Item(
+            title=title,
+            description=description,
+            category=category,
+            rate_per_day=rate,
+            deposit_amount=deposit,
+            stock=stock,
+            image_url=image_url if image_url else None,
+            image_filename=image_filename,
+            vendor_id=current_user.id
+        )
+        
+        db.session.add(item)
+        db.session.commit()
+        
+        flash('✅ Item added successfully!', 'success')
+        return redirect(url_for('vendor_dashboard'))
+    
+    return render_template('vendor/item_form.html')
+
+
+@app.route('/vendor/item/edit/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+def vendor_edit_item(item_id):
+    """Vendor can edit their own items"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    # Check ownership
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied. This item does not belong to you.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+    
+    if request.method == 'POST':
+        item.title = request.form.get('title', '').strip()
+        item.description = request.form.get('description', '').strip()
+        item.category = request.form.get('category', '')
+        item.rate_per_day = float(request.form.get('rate', 0))
+        item.deposit_amount = float(request.form.get('deposit', 0))
+        item.stock = int(request.form.get('stock', 1))
+        item.is_available = 'is_available' in request.form
+        
+        if 'image_file' in request.files and request.files['image_file'].filename:
+            image_filename = save_uploaded_file(request.files['image_file'])
+            if image_filename:
+                item.image_filename = image_filename
+                item.image_url = None
+        
+        image_url = request.form.get('image_url', '').strip()
+        if image_url:
+            item.image_url = image_url
+            item.image_filename = None
+        
+        db.session.commit()
+        flash('✅ Item updated successfully!', 'success')
+        return redirect(url_for('vendor_dashboard'))
+    
+    return render_template('vendor/item_form.html', item=item)
+
+
+@app.route('/vendor/item/delete/<int:item_id>', methods=['POST'])
+@login_required
+def vendor_delete_item(item_id):
+    """Vendor can delete their own items"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+    
+    db.session.delete(item)
+    db.session.commit()
+    flash('Item deleted successfully.', 'success')
+    return redirect(url_for('vendor_dashboard'))
+
+
+# ============================================
 # ROUTES - ADMIN
 # ============================================
 
@@ -517,6 +809,7 @@ def admin_dashboard():
     total_revenue = db.session.query(db.func.sum(Booking.total_amount)).scalar() or 0
     total_items = Item.query.count()
     total_users = User.query.count()
+    total_vendors = User.query.filter_by(role='vendor').count()
     pending_bookings = Booking.query.filter_by(booking_status='pending').count()
     
     recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(20).all()
@@ -527,6 +820,7 @@ def admin_dashboard():
                          total_revenue=total_revenue,
                          total_items=total_items,
                          total_users=total_users,
+                         total_vendors=total_vendors,
                          pending_bookings=pending_bookings,
                          recent_bookings=recent_bookings)
 
@@ -679,7 +973,7 @@ def admin_update_user_role(user_id):
     user = User.query.get_or_404(user_id)
     new_role = request.form.get('role', '')
     
-    if new_role in ['admin', 'customer'] and user.id != current_user.id:
+    if new_role in ['admin', 'customer', 'vendor'] and user.id != current_user.id:
         user.role = new_role
         db.session.commit()
         flash('User role updated.', 'success')
@@ -715,12 +1009,10 @@ def utility_processor():
 # ============================================
 
 def init_database():
-    """Initialize database with tables and default data"""
     try:
         db.create_all()
         print("✅ Database tables created successfully!")
         
-        # Create admin user
         admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
         if not admin:
             admin = User(
@@ -734,7 +1026,6 @@ def init_database():
             db.session.commit()
             print('✅ Admin user created!')
         
-        # Create demo customer
         demo = User.query.filter_by(mobile='9876543210').first()
         if not demo:
             demo = User(
@@ -748,7 +1039,20 @@ def init_database():
             db.session.commit()
             print('✅ Demo customer created!')
         
-        # Create default items
+        # Create demo vendor
+        demo_vendor = User.query.filter_by(mobile='9999888877').first()
+        if not demo_vendor:
+            demo_vendor = User(
+                name='Demo Vendor',
+                mobile='9999888877',
+                email='vendor@vyahmandap.com',
+                role='vendor'
+            )
+            demo_vendor.set_password('123456')
+            db.session.add(demo_vendor)
+            db.session.commit()
+            print('✅ Demo vendor created!')
+        
         if Item.query.count() == 0:
             default_items = [
                 {
@@ -810,7 +1114,6 @@ def init_database():
 # RUN APP
 # ============================================
 
-# Initialize database on startup
 with app.app_context():
     print("=" * 50)
     print(f"🚀 Starting {Config.APP_NAME}...")
@@ -818,7 +1121,6 @@ with app.app_context():
     print(f"📁 Upload folder: {app.config['UPLOAD_FOLDER']}")
     print("=" * 50)
     
-    # Check if database file exists and is writable
     db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
     if db_path:
         db_dir = os.path.dirname(db_path)
