@@ -95,6 +95,9 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='customer')
     is_active = db.Column(db.Boolean, default=True)
+    # Verification fields (for feature 3 & 5 later)
+    is_verified = db.Column(db.Boolean, default=False)
+    verified_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -179,6 +182,21 @@ class Booking(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Message(db.Model):
+    __tablename__ = 'messages'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('items.id'), nullable=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
+    body = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
+
+
 # ============================================
 # LOGIN MANAGER
 # ============================================
@@ -236,6 +254,23 @@ def format_currency(amount):
 
 def validate_mobile(mobile):
     return re.match(r'^\d{10}$', mobile) is not None
+
+# ===== Chat Number Masking Helpers =====
+def mask_phone_numbers(text):
+    """Mask any 10-digit numbers to prevent sharing"""
+    return re.sub(r'\b(\d{2})\d{6}(\d{2})\b', r'\1XXXXXX\2', text)
+
+def contains_too_many_digits(text, max_consecutive=4):
+    """Check if message has more than N consecutive digits"""
+    matches = re.findall(r'\d{' + str(max_consecutive + 1) + r',}', text)
+    return len(matches) > 0
+
+def get_longest_digit_sequence(text):
+    """Get the longest digit sequence in text"""
+    sequences = re.findall(r'\d+', text)
+    if not sequences:
+        return 0
+    return max(len(s) for s in sequences)
 
 
 # ============================================
@@ -330,7 +365,8 @@ def get_items():
         'rate_with_commission': item.rate_with_commission,
         'deposit': item.deposit_amount, 'stock': item.stock,
         'image': item.get_image(), 'vendor': item.vendor.name,
-        'vendor_id': item.vendor_id
+        'vendor_id': item.vendor_id,
+        'vendor_verified': item.vendor.is_verified
     } for item in items])
 
 
@@ -346,6 +382,96 @@ def calculate():
     item = Item.query.get_or_404(item_id)
     result = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
     return jsonify(result)
+
+
+# ===== NEW: Availability Calendar APIs (Feature 1) =====
+
+@app.route('/api/item/<int:item_id>/availability-calendar')
+def item_availability_calendar(item_id):
+    """Returns all booked dates with availability status for calendar"""
+    item = Item.query.get_or_404(item_id)
+    
+    bookings = Booking.query.filter_by(item_id=item_id)\
+        .filter(Booking.booking_status.in_(['confirmed', 'pending'])).all()
+    
+    if not bookings:
+        return jsonify([])
+    
+    date_booked = {}
+    for b in bookings:
+        current = b.start_date
+        while current <= b.end_date:
+            date_booked[current] = date_booked.get(current, 0) + b.quantity
+            current += timedelta(days=1)
+    
+    events = []
+    for date, booked_qty in date_booked.items():
+        available_qty = item.stock - booked_qty
+        if available_qty <= 0:
+            status = 'booked'
+            color = '#dc2626'
+        elif available_qty < item.stock:
+            status = 'partial'
+            color = '#eab308'
+        else:
+            status = 'available'
+            color = '#16a34a'
+        
+        events.append({
+            'title': f"{available_qty}/{item.stock} available",
+            'start': date.isoformat(),
+            'allDay': True,
+            'backgroundColor': color,
+            'borderColor': color,
+            'extendedProps': {
+                'status': status,
+                'total_stock': item.stock,
+                'booked_qty': booked_qty,
+                'available_qty': max(0, available_qty)
+            }
+        })
+    
+    return jsonify(events)
+
+
+@app.route('/api/item/<int:item_id>/availability')
+def item_availability_single(item_id):
+    """Check availability for a single date"""
+    item = Item.query.get_or_404(item_id)
+    date_str = request.args.get('date')
+    
+    if not date_str:
+        return jsonify({'error': 'date required'}), 400
+    
+    try:
+        check_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except:
+        return jsonify({'error': 'invalid date'}), 400
+    
+    overlapping = Booking.query.filter(
+        Booking.item_id == item_id,
+        Booking.booking_status.in_(['confirmed', 'pending']),
+        Booking.start_date <= check_date,
+        Booking.end_date >= check_date
+    ).all()
+    
+    booked_qty = sum(b.quantity for b in overlapping)
+    available_qty = max(0, item.stock - booked_qty)
+    
+    if available_qty <= 0:
+        status = 'booked'
+    elif available_qty < item.stock:
+        status = 'partial'
+    else:
+        status = 'available'
+    
+    return jsonify({
+        'date': date_str,
+        'status': status,
+        'total_stock': item.stock,
+        'booked_qty': booked_qty,
+        'available_qty': available_qty
+    })
 
 
 @app.route('/book/<int:item_id>', methods=['GET', 'POST'])
@@ -499,6 +625,7 @@ def api_vendor_calendar():
             'extendedProps': {
                 'customer': b.customer.name,
                 'customer_mobile': b.customer.mobile,
+                'customer_id': b.customer_id,
                 'item': b.item.title,
                 'quantity': b.quantity,
                 'base_rent': b.base_rent,
@@ -592,6 +719,155 @@ def vendor_delete_item(item_id):
     db.session.commit()
     flash('Item deleted successfully.', 'success')
     return redirect(url_for('vendor_dashboard'))
+
+
+# ============================================
+# CHAT ROUTES (Feature 2 - with number masking)
+# ============================================
+
+@app.route('/chat')
+@login_required
+def chat_list():
+    """List all conversations for current user"""
+    messages = Message.query.filter(
+        (Message.sender_id == current_user.id) | (Message.receiver_id == current_user.id)
+    ).order_by(Message.created_at.desc()).all()
+    
+    conversations = {}
+    for msg in messages:
+        other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+        if other_id not in conversations:
+            other_user = User.query.get(other_id)
+            if other_user:
+                conversations[other_id] = {
+                    'user': other_user,
+                    'last_message': msg,
+                    'unread': 0
+                }
+        if not msg.is_read and msg.receiver_id == current_user.id:
+            conversations[other_id]['unread'] += 1
+    
+    return render_template('chat/list.html', conversations=conversations.values())
+
+
+@app.route('/chat/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def chat_with(user_id):
+    """Chat with a specific user"""
+    other_user = User.query.get_or_404(user_id)
+    
+    if other_user.id == current_user.id:
+        flash('You cannot chat with yourself.', 'danger')
+        return redirect(url_for('chat_list'))
+    
+    item_id = request.args.get('item_id', type=int)
+    
+    if request.method == 'POST':
+        body = request.form.get('body', '').strip()
+        
+        if not body:
+            flash('Message cannot be empty.', 'danger')
+        elif contains_too_many_digits(body, max_consecutive=4):
+            longest = get_longest_digit_sequence(body)
+            flash(f'⚠️ Message blocked! Cannot share more than 4 consecutive digits '
+                  f'(found {longest}). This prevents phone number sharing.', 'danger')
+        else:
+            masked_body = mask_phone_numbers(body)
+            msg = Message(
+                sender_id=current_user.id,
+                receiver_id=other_user.id,
+                item_id=item_id,
+                body=masked_body
+            )
+            db.session.add(msg)
+            db.session.commit()
+            if masked_body != body:
+                flash('ℹ️ Some numbers were masked for privacy.', 'info')
+            return redirect(url_for('chat_with', user_id=other_user.id))
+    
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == other_user.id)) |
+        ((Message.sender_id == other_user.id) & (Message.receiver_id == current_user.id))
+    ).order_by(Message.created_at.asc()).all()
+    
+    for msg in messages:
+        if msg.receiver_id == current_user.id and not msg.is_read:
+            msg.is_read = True
+    db.session.commit()
+    
+    item = Item.query.get(item_id) if item_id else None
+    
+    return render_template('chat/conversation.html',
+                         other_user=other_user,
+                         messages=messages,
+                         item=item)
+
+
+@app.route('/api/chat/send', methods=['POST'])
+@login_required
+def api_chat_send():
+    """AJAX endpoint to send message"""
+    data = request.get_json()
+    receiver_id = data.get('receiver_id')
+    body = data.get('body', '').strip()
+    item_id = data.get('item_id')
+    
+    if not receiver_id or not body:
+        return jsonify({'error': 'Missing fields'}), 400
+    
+    other_user = User.query.get(receiver_id)
+    if not other_user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    if contains_too_many_digits(body, max_consecutive=4):
+        longest = get_longest_digit_sequence(body)
+        return jsonify({
+            'error': f'Number masking: Cannot share more than 4 consecutive digits. Found {longest}.'
+        }), 400
+    
+    masked_body = mask_phone_numbers(body)
+    
+    msg = Message(
+        sender_id=current_user.id,
+        receiver_id=other_user.id,
+        item_id=item_id,
+        body=masked_body
+    )
+    db.session.add(msg)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': {
+            'id': msg.id,
+            'body': msg.body,
+            'masked': masked_body != body,
+            'created_at': msg.created_at.strftime('%H:%M')
+        }
+    })
+
+
+@app.route('/api/chat/messages/<int:user_id>')
+@login_required
+def api_chat_messages(user_id):
+    """Get messages with a user (for polling)"""
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id)) |
+        ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
+    ).order_by(Message.created_at.asc()).all()
+    
+    for msg in messages:
+        if msg.receiver_id == current_user.id and not msg.is_read:
+            msg.is_read = True
+    db.session.commit()
+    
+    return jsonify([{
+        'id': m.id,
+        'sender_id': m.sender_id,
+        'body': m.body,
+        'is_mine': m.sender_id == current_user.id,
+        'created_at': m.created_at.strftime('%d %b, %H:%M')
+    } for m in messages])
 
 
 # ============================================
@@ -759,12 +1035,18 @@ def admin_update_user_role(user_id):
 
 @app.context_processor
 def utility_processor():
+    def unread_count():
+        if not current_user.is_authenticated:
+            return 0
+        return Message.query.filter_by(receiver_id=current_user.id, is_read=False).count()
+    
     return dict(
         app_name=Config.APP_NAME, app_tagline=Config.APP_TAGLINE,
         business_phone=Config.BUSINESS_PHONE,
         business_phone_alt=Config.BUSINESS_PHONE_ALT,
         business_location=Config.BUSINESS_LOCATION,
         categories=Config.CATEGORIES, format_currency=format_currency,
+        unread_message_count=unread_count(),
         get_category_icon=lambda c: {
             'furniture': 'fa-couch', 'lighting': 'fa-lightbulb',
             'decor': 'fa-palette', 'mandap': 'fa-archway'
