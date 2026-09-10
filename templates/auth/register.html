@@ -25,6 +25,13 @@
                 <input type="email" name="email" placeholder="your@email.com" class="w-full border rounded-lg p-3 text-sm">
             </div>
             <div>
+                <label class="block font-semibold text-sm mb-1">Account Type *</label>
+                <select name="account_type" required class="w-full border rounded-lg p-3 text-sm bg-white">
+                    <option value="customer">Customer (I want to book equipment)</option>
+                    <option value="vendor">Vendor (I want to rent out my equipment)</option>
+                </select>
+            </div>
+            <div>
                 <label class="block font-semibold text-sm mb-1">Password *</label>
                 <input type="password" name="password" required placeholder="Min 6 characters" class="w-full border rounded-lg p-3 text-sm">
             </div>
