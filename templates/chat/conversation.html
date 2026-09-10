@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Chat with {{ other_user.name }} - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <!-- Chat Header -->
+    <div class="bg-white p-4 rounded-t-2xl border border-b-0 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('chat_list') }}" class="text-gray-500 hover:text-gray-800">←</a>
+            <div class="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center text-white font-bold">
+                {{ other_user.name[0]|upper }}
+            </div>
+            <div>
+                <h3 class="font-bold text-sm">{{ other_user.name }}
+                    {% if other_user.is_verified %}
+                        <span class="text-blue-600 text-xs">✓ Verified</span>
+                    {% endif %}
+                </h3>
+                <p class="text-xs text-gray-500">{{ other_user.role|title }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Context -->
+    {% if item %}
+    <div class="bg-green-50 p-3 border-x border-green-100 flex items-center gap-3">
+        <img src="{{ item.get_image() }}" class="w-12 h-12 rounded-lg object-cover">
+        <div class="flex-1">
+            <p class="text-xs text-gray-500">Discussing</p>
+            <p class="font-bold text-sm text-gray-800">{{ item.title }}</p>
+        </div>
+        <a href="{{ url_for('book_item', item_id=item.id) }}" class="bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Book</a>
+    </div>
+    {% endif %}
+
+    <!-- Chat Box -->
+    <div class="bg-white border border-t-0 rounded-b-2xl">
+        <!-- Messages -->
+        <div id="messagesContainer" class="p-4 space-y-3 h-96 overflow-y-auto">
+            {% if messages %}
+                {% for msg in messages %}
+                <div class="flex {% if msg.sender_id == current_user.id %}justify-end{% else %}justify-start{% endif %}">
+                    <div class="max-w-[75%]">
+                        <div class="px-3 py-2 rounded-2xl text-sm 
+                            {% if msg.sender_id == current_user.id %}
+                                bg-green-700 text-white
+                            {% else %}
+                                bg-gray-100 text-gray-800
+                            {% endif %}">
+                            {{ msg.body }}
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-0.5 {% if msg.sender_id == current_user.id %}text-right{% endif %}">
+                            {{ msg.created_at.strftime('%d %b, %H:%M') }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center text-gray-400 text-sm py-8">
+                    <i class="fa-regular fa-comment text-3xl mb-2 block"></i>
+                    Start the conversation
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Info Banner -->
+        <div class="bg-yellow-50 border-t border-yellow-100 px-4 py-2 text-xs text-yellow-800">
+            <i class="fa-solid fa-shield-halved mr-1"></i>
+            <strong>Privacy:</strong> Phone numbers are auto-masked. You cannot share more than 4 consecutive digits (e.g. 9999 ok, 99999 blocked).
+        </div>
+
+        <!-- Input -->
+        <form method="POST" class="p-3 border-t flex gap-2">
+            <input type="text" name="body" id="messageInput" required maxlength="500"
+                   placeholder="Type your message..." autocomplete="off"
+                   class="flex-1 border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-700">
+            <button type="submit" class="bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-green-600">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Auto-scroll to bottom
+const container = document.getElementById('messagesContainer');
+if (container) {
+    container.scrollTop = container.scrollHeight;
+}
+
+// Validate on client side too
+document.querySelector('form').addEventListener('submit', function(e) {
+    const input = document.getElementById('messageInput');
+    const value = input.value;
+    
+    // Check for 5+ consecutive digits
+    if (/\d{5,}/.test(value)) {
+        e.preventDefault();
+        alert('⚠️ You cannot share more than 4 consecutive digits. This is for privacy.');
+        return false;
+    }
+});
+</script>
+{% endblock %}
