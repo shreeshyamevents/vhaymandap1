@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
     {% block extra_head %}{% endblock %}
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
@@ -28,9 +27,19 @@
                         <i class="fa-regular fa-shield mr-1"></i>Admin
                     </a>
                 {% endif %}
-                <a href="{{ url_for('dashboard') }}" class="hover:text-white">
-                    <i class="fa-regular fa-gauge mr-1"></i>Dashboard
-                </a>
+                {% if current_user.role in ['admin', 'vendor'] %}
+                    <a href="{{ url_for('vendor_dashboard') }}" class="hover:text-white">
+                        <i class="fa-regular fa-store mr-1"></i>Vendor
+                    </a>
+                    <a href="{{ url_for('vendor_calendar') }}" class="hover:text-white">
+                        <i class="fa-regular fa-calendar mr-1"></i>Calendar
+                    </a>
+                {% endif %}
+                {% if current_user.role == 'customer' %}
+                    <a href="{{ url_for('dashboard') }}" class="hover:text-white">
+                        <i class="fa-regular fa-gauge mr-1"></i>Dashboard
+                    </a>
+                {% endif %}
                 <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300">
                     Logout
                 </a>
