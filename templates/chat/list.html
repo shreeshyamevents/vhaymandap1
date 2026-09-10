@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Messages - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">💬 Messages</h2>
+        <a href="{{ url_for('index') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    {% if conversations %}
+        <div class="space-y-2">
+            {% for conv in conversations %}
+            <a href="{{ url_for('chat_with', user_id=conv.user.id) }}" class="block bg-white p-4 rounded-xl border hover:border-green-500 hover:shadow-md transition">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center text-white font-bold text-lg">
+                        {{ conv.user.name[0]|upper }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-sm">{{ conv.user.name }}
+                                <span class="text-xs font-normal text-gray-500 ml-1">({{ conv.user.role|title }})</span>
+                            </h4>
+                            {% if conv.unread > 0 %}
+                                <span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ conv.unread }}</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-xs text-gray-500 truncate mt-0.5">{{ conv.last_message.body }}</p>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white p-8 rounded-xl border text-center text-gray-500">
+            <i class="fa-regular fa-comments text-4xl text-gray-300 mb-3 block"></i>
+            <p class="text-sm">No conversations yet.</p>
+            <p class="text-xs mt-1">Start chatting with a vendor from the marketplace.</p>
+            <a href="{{ url_for('index') }}" class="text-green-700 font-bold hover:underline text-sm mt-3 inline-block">Browse Marketplace →</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
