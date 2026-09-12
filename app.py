@@ -661,14 +661,14 @@ def book_item(item_id):
             # To vendor
             if item.vendor.telegram_chat_id:
                 vendor_msg = (
-                    f"📦 *New Booking Received!*\n\n"
-                    f"*Item:* {item.title}\n"
-                    f"*Customer:* {current_user.name}\n"
-                    f"*Mobile:* {current_user.mobile[:2]}XXXX{current_user.mobile[-2:]}\n"
-                    f"*Reference:* `{booking.booking_reference}`\n"
-                    f"*Dates:* {start_date} → {end_date}\n"
-                    f"*Quantity:* {quantity}\n"
-                    f"*Your Earning:* ₹{calc['base_rent']}\n\n"
+                    f"📦 New Booking Received!\n\n"
+                    f"Item: {item.title}\n"
+                    f"Customer: {current_user.name}\n"
+                    f"Mobile: {current_user.mobile[:2]}XXXX{current_user.mobile[-2:]}\n"
+                    f"Reference: {booking.booking_reference}\n"
+                    f"Dates: {start_date} → {end_date}\n"
+                    f"Quantity: {quantity}\n"
+                    f"Your Earning: ₹{calc['base_rent']}\n\n"
                     f"Please prepare the equipment. 🚚"
                 )
                 send_telegram_notification_async(item.vendor.telegram_chat_id, vendor_msg)
