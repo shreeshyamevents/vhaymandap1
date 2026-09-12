@@ -306,36 +306,26 @@ def get_longest_digit_sequence(text):
 # ============================================
 
 def send_telegram_notification(chat_id, message):
-    """Send a message via Telegram bot (runs in background thread)"""
+    """Send a message via Telegram bot"""
     token = Config.TELEGRAM_BOT_TOKEN
     if not chat_id or not token:
         return
     
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
-        "chat_id": chat_id,
+        "chat_id": str(chat_id),
         "text": message,
-        "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
     
     try:
         response = requests.post(api_url, json=payload, timeout=10)
-        response.raise_for_status()
-        print(f"✅ Telegram notification sent to {chat_id}")
-    except requests.RequestException as e:
-        print(f"❌ Telegram error: {e}")
-
-
-def send_telegram_notification_async(chat_id, message):
-    """Wrapper to send Telegram notification in a background thread"""
-    if chat_id:
-        thread = threading.Thread(
-            target=send_telegram_notification,
-            args=(chat_id, message)
-        )
-        thread.daemon = True
-        thread.start()
+        if response.status_code == 200:
+            print(f"✅ Telegram sent to {chat_id}")
+        else:
+            print(f"❌ Telegram error {response.status_code}: {response.text}")
+    except Exception as e:
+        print(f"❌ Telegram failed: {e}")
 
 
 # ============================================
