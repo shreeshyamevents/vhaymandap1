@@ -648,12 +648,12 @@ def book_item(item_id):
             # To customer
             if current_user.telegram_chat_id:
                 customer_msg = (
-                    f"🎉 *Booking Confirmed!*\n\n"
-                    f"*Item:* {item.title}\n"
-                    f"*Reference:* `{booking.booking_reference}`\n"
-                    f"*Dates:* {start_date} → {end_date}\n"
-                    f"*Quantity:* {quantity}\n"
-                    f"*Total Paid:* ₹{calc['total']}\n\n"
+                    f"🎉 Booking Confirmed!\n\n"
+                    f"Item: {item.title}\n"
+                    f"Reference: {booking.booking_reference}\n"
+                    f"Dates: {start_date} → {end_date}\n"
+                    f"Quantity: {quantity}\n"
+                    f"Total Paid: ₹{calc['total']}\n\n"
                     f"Thank you for booking with VyahMandap! 🙏"
                 )
                 send_telegram_notification_async(current_user.telegram_chat_id, customer_msg)
