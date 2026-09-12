@@ -418,14 +418,15 @@ def link_telegram():
             
             # Send a confirmation test message
             test_msg = (
-                f"✅ *VyahMandap* — Telegram linked!\n\n"
-                f"Hi *{current_user.name}*,\n\n"
+                f"✅ VyahMandap — Telegram Linked!\n\n"
+                f"Hi {current_user.name},\n\n"
                 f"You will now receive notifications here for:\n"
                 f"• New bookings\n"
                 f"• Chat messages\n"
                 f"• Payment updates\n"
-                f"• Booking status changes\n\n"
-                f"_Taiyari Hamari, Celebration Aapka!_ 🎉"
+                f"• Booking status changes\n"
+                f"• New reviews\n\n"
+                f"Taiyari Hamari, Celebration Aapka! 🎉"
             )
             send_telegram_notification_async(chat_id, test_msg)
             
