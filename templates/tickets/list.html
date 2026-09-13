@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}My Support Tickets - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+        <h2 class="text-2xl font-bold">🎫 Support Tickets</h2>
+        <p class="text-sm text-gray-500">Your support requests and replies</p>
+    </div>
+    <a href="{{ url_for('ticket_new') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
+        <i class="fa-regular fa-plus mr-1"></i>New Ticket
+    </a>
+</div>
+
+{% if tickets %}
+<div class="space-y-3">
+    {% for t in tickets %}
+    <a href="{{ url_for('ticket_detail', ticket_id=t.id) }}" 
+       class="block bg-white p-4 rounded-xl border hover:shadow-md hover:border-green-500 transition">
+        <div class="flex justify-between items-start flex-wrap gap-2">
+            <div class="flex-1 min-w-[200px]">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs font-mono text-blue-600 font-bold">{{ t.ticket_number }}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold
+                        {% if t.priority == 'urgent' %}bg-red-100 text-red-800
+                        {% elif t.priority == 'high' %}bg-orange-100 text-orange-800
+                        {% elif t.priority == 'medium' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ t.priority.upper() }}
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold
+                        {% if t.status == 'open' %}bg-blue-100 text-blue-800
+                        {% elif t.status == 'in_progress' %}bg-yellow-100 text-yellow-800
+                        {% elif t.status == 'resolved' %}bg-green-100 text-green-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ t.status.replace('_', ' ').title() }}
+                    </span>
+                </div>
+                <h3 class="font-bold text-sm">{{ t.subject }}</h3>
+                <p class="text-xs text-gray-500 mt-1">{{ t.description[:100] }}{% if t.description|length > 100 %}...{% endif %}</p>
+            </div>
+            <div class="text-right text-xs text-gray-500">
+                <div>{{ t.replies|length }} replies</div>
+                <div class="mt-1">{{ t.last_reply_at.strftime('%d %b, %H:%M') }}</div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white p-8 rounded-xl border text-center text-gray-500">
+    <i class="fa-regular fa-ticket text-4xl text-gray-300 mb-3 block"></i>
+    <p class="text-sm">No tickets yet.</p>
+    <p class="text-xs mt-1">Raise a ticket if you face any issue.</p>
+    <a href="{{ url_for('ticket_new') }}" class="text-green-700 font-bold hover:underline text-sm mt-3 inline-block">
+        Create First Ticket →
+    </a>
+</div>
+{% endif %}
+{% endblock %}
