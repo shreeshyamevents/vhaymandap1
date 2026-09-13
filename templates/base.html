@@ -29,6 +29,12 @@
                     <a href="{{ url_for('admin_dashboard') }}" class="hover:text-white">
                         <i class="fa-regular fa-shield mr-1"></i>Admin
                     </a>
+                    <a href="{{ url_for('admin_tickets') }}" class="hover:text-white relative">
+                        <i class="fa-regular fa-ticket mr-1"></i>Tickets
+                        {% if open_tickets_count > 0 %}
+                            <span class="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ open_tickets_count }}</span>
+                        {% endif %}
+                    </a>
                 {% endif %}
                 {% if current_user.role in ['admin', 'vendor'] %}
                     <a href="{{ url_for('vendor_dashboard') }}" class="hover:text-white">
@@ -48,6 +54,9 @@
                     {% if unread_message_count > 0 %}
                         <span class="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ unread_message_count }}</span>
                     {% endif %}
+                </a>
+                <a href="{{ url_for('tickets_list') }}" class="hover:text-white">
+                    <i class="fa-regular fa-ticket mr-1"></i>Support
                 </a>
                 <a href="{{ url_for('link_telegram') }}" class="hover:text-white">
                     <i class="fa-brands fa-telegram mr-1"></i>Link Telegram
