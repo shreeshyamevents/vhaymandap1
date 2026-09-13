@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.name }} - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+        <h2 class="text-2xl font-bold">{{ user.name }}</h2>
+        <p class="text-sm text-gray-500">
+            <span class="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-bold">{{ user.role|title }}</span>
+            <span class="ml-2">Mobile: {{ user.mobile }}</span>
+        </p>
+    </div>
+    <a href="{{ url_for('admin_users') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">← Back</a>
+</div>
+
+<!-- User Info -->
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div><span class="text-gray-500">Name:</span> <strong>{{ user.name }}</strong></div>
+        <div><span class="text-gray-500">Mobile:</span> <strong>{{ user.mobile }}</strong></div>
+        <div><span class="text-gray-500">Email:</span> <strong>{{ user.email or '-' }}</strong></div>
+        <div><span class="text-gray-500">Role:</span> <strong>{{ user.role|title }}</strong></div>
+        <div><span class="text-gray-500">Joined:</span> <strong>{{ user.created_at.strftime('%d %b %Y') }}</strong></div>
+        <div><span class="text-gray-500">Telegram:</span> <strong>{{ 'Linked' if user.telegram_chat_id else 'Not Linked' }}</strong></div>
+    </div>
+</div>
+
+<!-- Role Update -->
+<div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
+    <form method="POST" action="{{ url_for('admin_update_user_role', user_id=user.id) }}" class="flex gap-3 items-center">
+        <label class="font-bold text-sm">Change Role:</label>
+        <select name="role" class="border rounded-lg p-2 text-sm bg-white">
+            <option value="customer" {% if user.role == 'customer' %}selected{% endif %}>Customer</option>
+            <option value="vendor" {% if user.role == 'vendor' %}selected{% endif %}>Vendor</option>
+            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+        </select>
+        <button type="submit" class="bg-blue-700 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">Update</button>
+    </form>
+</div>
+
+<!-- User's Bookings (if customer) -->
+{% if user_bookings %}
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold text-lg mb-4">📋 Bookings ({{ user_bookings|length }})</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="p-2">Reference</th>
+                    <th class="p-2">Item</th>
+                    <th class="p-2">Dates</th>
+                    <th class="p-2">Amount</th>
+                    <th class="p-2">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in user_bookings %}
+                <tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="window.location.href='{{ url_for('admin_booking_detail', booking_id=b.id) }}'">
+                    <td class="p-2 font-mono text-blue-600">{{ b.booking_reference }}</td>
+                    <td class="p-2">{{ b.item.title[:30] }}</td>
+                    <td class="p-2">{{ b.start_date }} → {{ b.end_date }}</td>
+                    <td class="p-2 font-bold">₹{{ b.total_amount }}</td>
+                    <td class="p-2">{{ b.booking_status|title }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- User's Items (if vendor) -->
+{% if user_items %}
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold text-lg mb-4">📦 Listed Items ({{ user_items|length }})</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for item in user_items %}
+        <div class="border rounded-lg p-3 flex gap-3">
+            <img src="{{ item.get_image() }}" class="w-16 h-16 rounded object-cover" onerror="this.src='https://via.placeholder.com/100'">
+            <div class="flex-1 text-xs">
+                <p class="font-bold">{{ item.title[:20] }}</p>
+                <p class="text-gray-500">₹{{ item.rate_per_day }}/day</p>
+                <p class="text-gray-500">Stock: {{ item.stock }}</p>
+                {% if item.is_currently_verified %}
+                    <span class="text-blue-600 text-[10px] font-bold">✓ Verified</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
