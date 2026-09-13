@@ -9,10 +9,16 @@
         <p class="text-sm text-gray-500">Complete control panel</p>
     </div>
     <div class="flex gap-2 flex-wrap">
-        <a href="{{ url_for('admin_bookings') }}" class="bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-600">📋 All Bookings</a>
+        <a href="{{ url_for('admin_bookings') }}" class="bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-600">📋 Bookings</a>
         <a href="{{ url_for('admin_payments') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">💰 Payments</a>
         <a href="{{ url_for('admin_items') }}" class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-600">📦 Items</a>
         <a href="{{ url_for('admin_users') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">👥 Users</a>
+        <a href="{{ url_for('admin_tickets') }}" class="bg-orange-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-orange-600">
+            🎫 Tickets
+            {% if open_tickets_count > 0 %}
+                <span class="bg-white text-orange-700 text-[10px] font-bold px-1.5 rounded-full ml-1">{{ open_tickets_count }}</span>
+            {% endif %}
+        </a>
     </div>
 </div>
 
@@ -80,16 +86,27 @@
     </div>
 </div>
 
-<!-- KYC Stats -->
-{% if kyc_pending > 0 or kyc_completed > 0 %}
-<div class="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-6">
-    <h4 class="font-bold text-yellow-900 mb-2">🛡️ KYC Status (₹30,000+ Bookings)</h4>
-    <div class="flex gap-6 text-sm">
-        <span>✅ Completed: <strong>{{ kyc_completed }}</strong></span>
-        <span>⏳ Pending: <strong>{{ kyc_pending }}</strong></span>
+<!-- KYC + Ticket Stats -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    {% if kyc_pending > 0 or kyc_completed > 0 %}
+    <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
+        <h4 class="font-bold text-yellow-900 mb-2">🛡️ KYC Status (₹30,000+ Bookings)</h4>
+        <div class="flex gap-6 text-sm">
+            <span>✅ Completed: <strong>{{ kyc_completed }}</strong></span>
+            <span>⏳ Pending: <strong>{{ kyc_pending }}</strong></span>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl">
+        <h4 class="font-bold text-orange-900 mb-2">🎫 Support Tickets</h4>
+        <div class="flex gap-6 text-sm">
+            <span>🆕 Open: <strong>{{ tickets_open }}</strong></span>
+            <span>⏳ In Progress: <strong>{{ tickets_in_progress }}</strong></span>
+            <a href="{{ url_for('admin_tickets') }}" class="ml-auto text-orange-700 font-bold hover:underline text-xs">View All →</a>
+        </div>
     </div>
 </div>
-{% endif %}
 
 <!-- Recent Bookings -->
 <div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
