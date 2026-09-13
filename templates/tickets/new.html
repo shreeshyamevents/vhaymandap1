@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}New Ticket - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">🎫 Raise New Ticket</h2>
+        <a href="{{ url_for('tickets_list') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <form method="POST" class="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+        <div>
+            <label class="block font-semibold text-sm mb-1">Subject *</label>
+            <input type="text" name="subject" required maxlength="200"
+                   placeholder="Brief summary of your issue"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block font-semibold text-sm mb-1">Category</label>
+                <select name="category" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+                    <option value="booking">Booking Issue</option>
+                    <option value="payment">Payment Issue</option>
+                    <option value="item">Item / Quality Issue</option>
+                    <option value="account">Account Issue</option>
+                    <option value="other" selected>Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold text-sm mb-1">Priority</label>
+                <select name="priority" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block font-semibold text-sm mb-1">Describe Your Issue *</label>
+            <textarea name="description" required rows="6"
+                      placeholder="Explain your issue in detail. Include booking references if applicable."
+                      class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+            <p class="text-xs text-gray-500 mt-1">Our team will respond within 24 hours.</p>
+        </div>
+
+        <button type="submit" class="w-full bg-green-700 text-white font-bold py-3 rounded-xl hover:bg-green-600">
+            Submit Ticket
+        </button>
+    </form>
+</div>
+{% endblock %}
