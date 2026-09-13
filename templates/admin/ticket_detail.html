@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticket.ticket_number }} - Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold">{{ ticket.subject }}</h2>
+            <p class="text-xs font-mono text-blue-600 font-bold mt-1">{{ ticket.ticket_number }}</p>
+        </div>
+        <a href="{{ url_for('admin_tickets') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">← All Tickets</a>
+    </div>
+
+    <!-- Ticket Info + Admin Controls -->
+    <div class="bg-white p-4 rounded-xl border shadow-sm mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase mb-2">Ticket Info</h3>
+                <div class="text-sm space-y-1">
+                    <div><span class="text-gray-500">From:</span> <strong>{{ ticket.user.name }}</strong> ({{ ticket.user.role|title }})</div>
+                    <div><span class="text-gray-500">Mobile:</span> <strong>{{ ticket.user.mobile }}</strong></div>
+                    <div><span class="text-gray-500">Category:</span> <strong>{{ ticket.category|title }}</strong></div>
+                    <div><span class="text-gray-500">Created:</span> <strong>{{ ticket.created_at.strftime('%d %b %Y, %H:%M') }}</strong></div>
+                </div>
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-gray-500 uppercase mb-2">Admin Controls</h3>
+                <form method="POST" class="mb-2 flex gap-2">
+                    <input type="hidden" name="action" value="status">
+                    <select name="status" class="border rounded-lg p-2 text-sm bg-white flex-1">
+                        <option value="open" {% if ticket.status == 'open' %}selected{% endif %}>Open</option>
+                        <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                        <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                        <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+                    </select>
+                    <button type="submit" class="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg text-sm">Update</button>
+                </form>
+                <form method="POST" class="flex gap-2">
+                    <input type="hidden" name="action" value="priority">
+                    <select name="priority" class="border rounded-lg p-2 text-sm bg-white flex-1">
+                        <option value="low" {% if ticket.priority == 'low' %}selected{% endif %}>Low</option>
+                        <option value="medium" {% if ticket.priority == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="high" {% if ticket.priority == 'high' %}selected{% endif %}>High</option>
+                        <option value="urgent" {% if ticket.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+                    </select>
+                    <button type="submit" class="bg-orange-600 text-white font-bold px-4 py-2 rounded-lg text-sm">Set</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Original Message -->
+    <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-4">
+        <div class="flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-user text-blue-700"></i>
+            <span class="font-bold text-sm text-blue-900">{{ ticket.user.name }}</span>
+            <span class="text-xs text-gray-500">{{ ticket.created_at.strftime('%d %b, %H:%M') }}</span>
+        </div>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ ticket.description }}</p>
+    </div>
+
+    <!-- Replies -->
+    <div class="space-y-3 mb-4">
+        {% for r in replies %}
+        <div class="p-4 rounded-xl border {% if r.is_admin_reply %}bg-green-50 border-green-200{% else %}bg-white{% endif %}">
+            <div class="flex items-center gap-2 mb-2">
+                {% if r.is_admin_reply %}
+                    <i class="fa-solid fa-shield text-green-700"></i>
+                    <span class="font-bold text-sm text-green-900">{{ r.user.name }}</span>
+                    <span class="text-[10px] bg-green-200 text-green-900 px-2 py-0.5 rounded-full font-bold">ADMIN</span>
+                {% else %}
+                    <i class="fa-solid fa-user text-gray-700"></i>
+                    <span class="font-bold text-sm">{{ r.user.name }}</span>
+                    <span class="text-[10px] bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-bold">{{ r.user.role|upper }}</span>
+                {% endif %}
+                <span class="text-xs text-gray-500">{{ r.created_at.strftime('%d %b, %H:%M') }}</span>
+            </div>
+            <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ r.message }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Reply Form -->
+    <form method="POST" class="bg-white p-4 rounded-xl border shadow-sm">
+        <input type="hidden" name="action" value="reply">
+        <label class="block font-semibold text-sm mb-2">
+            <i class="fa-solid fa-shield text-green-700 mr-1"></i>Reply as Admin
+        </label>
+        <textarea name="message" required rows="4" 
+                  placeholder="Type your reply to {{ ticket.user.name }}..."
+                  class="w-full border rounded-lg p-2.5 text-sm mb-3"></textarea>
+        <button type="submit" class="bg-green-700 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-green-600 text-sm">
+            <i class="fa-solid fa-paper-plane mr-1"></i>Send Reply
+        </button>
+        <p class="text-xs text-gray-500 mt-2">
+            <i class="fa-brands fa-telegram mr-1"></i>
+            Customer will be notified on Telegram if linked.
+        </p>
+    </form>
+</div>
+{% endblock %}
