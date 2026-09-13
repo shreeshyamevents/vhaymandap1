@@ -1192,19 +1192,151 @@ def admin_dashboard():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
+    
+    # Overview stats
     total_bookings = Booking.query.count()
     total_commission = db.session.query(db.func.sum(Booking.commission)).scalar() or 0
     total_revenue = db.session.query(db.func.sum(Booking.total_amount)).scalar() or 0
     total_items = Item.query.count()
     total_users = User.query.count()
     total_vendors = User.query.filter_by(role='vendor').count()
+    total_customers = User.query.filter_by(role='customer').count()
+    total_verified_items = Item.query.filter_by(is_verified=True).count()
     pending_bookings = Booking.query.filter_by(booking_status='pending').count()
-    recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(20).all()
+    confirmed_bookings = Booking.query.filter_by(booking_status='confirmed').count()
+    completed_bookings = Booking.query.filter_by(booking_status='completed').count()
+    cancelled_bookings = Booking.query.filter_by(booking_status='cancelled').count()
+    
+    # Financial
+    total_deposits = db.session.query(db.func.sum(Booking.deposit)).scalar() or 0
+    total_transport = db.session.query(db.func.sum(Booking.transport_fee)).scalar() or 0
+    total_base_rent = db.session.query(db.func.sum(Booking.base_rent)).scalar() or 0
+    
+    # KYC stats
+    kyc_pending = Booking.query.filter_by(kyc_required=True, kyc_verified=False).count()
+    kyc_completed = Booking.query.filter_by(kyc_required=True, kyc_verified=True).count()
+    
+    # Recent activity
+    recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(10).all()
+    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
+    recent_items = Item.query.order_by(Item.created_at.desc()).limit(5).all()
+    
     return render_template('admin/dashboard.html',
-                         total_bookings=total_bookings, total_commission=total_commission,
-                         total_revenue=total_revenue, total_items=total_items,
-                         total_users=total_users, total_vendors=total_vendors,
-                         pending_bookings=pending_bookings, recent_bookings=recent_bookings)
+                         total_bookings=total_bookings,
+                         total_commission=total_commission,
+                         total_revenue=total_revenue,
+                         total_items=total_items,
+                         total_users=total_users,
+                         total_vendors=total_vendors,
+                         total_customers=total_customers,
+                         total_verified_items=total_verified_items,
+                         pending_bookings=pending_bookings,
+                         confirmed_bookings=confirmed_bookings,
+                         completed_bookings=completed_bookings,
+                         cancelled_bookings=cancelled_bookings,
+                         total_deposits=total_deposits,
+                         total_transport=total_transport,
+                         total_base_rent=total_base_rent,
+                         kyc_pending=kyc_pending,
+                         kyc_completed=kyc_completed,
+                         recent_bookings=recent_bookings,
+                         recent_users=recent_users,
+                         recent_items=recent_items)
+
+
+@app.route('/admin/bookings')
+@login_required
+def admin_bookings():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Filters
+    status_filter = request.args.get('status', 'all')
+    search = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'newest')
+    
+    query = Booking.query
+    
+    # Status filter
+    if status_filter != 'all':
+        query = query.filter_by(booking_status=status_filter)
+    
+    # Search filter
+    if search:
+        query = query.join(User, Booking.customer_id == User.id)\
+                     .join(Item, Booking.item_id == Item.id)\
+                     .filter(
+                         db.or_(
+                             Booking.booking_reference.ilike(f'%{search}%'),
+                             Booking.utr_number.ilike(f'%{search}%'),
+                             User.name.ilike(f'%{search}%'),
+                             User.mobile.ilike(f'%{search}%'),
+                             Item.title.ilike(f'%{search}%')
+                         )
+                     )
+    
+    # Sort
+    if sort == 'newest':
+        query = query.order_by(Booking.created_at.desc())
+    elif sort == 'oldest':
+        query = query.order_by(Booking.created_at.asc())
+    elif sort == 'highest':
+        query = query.order_by(Booking.total_amount.desc())
+    elif sort == 'lowest':
+        query = query.order_by(Booking.total_amount.asc())
+    
+    bookings = query.all()
+    
+    return render_template('admin/bookings.html',
+                         bookings=bookings,
+                         status_filter=status_filter,
+                         search=search,
+                         sort=sort)
+
+
+@app.route('/admin/booking/<int:booking_id>')
+@login_required
+def admin_booking_detail(booking_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    booking = Booking.query.get_or_404(booking_id)
+    return render_template('admin/booking_detail.html', booking=booking)
+
+
+@app.route('/admin/booking/<int:booking_id>/status', methods=['POST'])
+@login_required
+def admin_update_booking_status(booking_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    booking = Booking.query.get_or_404(booking_id)
+    new_status = request.form.get('status', '')
+    if new_status in ['confirmed', 'cancelled', 'completed', 'pending']:
+        old_status = booking.booking_status
+        booking.booking_status = new_status
+        db.session.commit()
+        
+        # Telegram notification
+        if booking.customer.telegram_chat_id:
+            status_emoji = {
+                'confirmed': '✅', 'cancelled': '❌',
+                'completed': '🎉', 'pending': '⏳'
+            }.get(new_status, '🔄')
+            msg = (
+                f"{status_emoji} Booking Status Updated\n\n"
+                f"Reference: {booking.booking_reference}\n"
+                f"Item: {booking.item.title}\n"
+                f"Old Status: {old_status.title()}\n"
+                f"New Status: {new_status.title()}\n\n"
+                f"Thank you for using VyahMandap!"
+            )
+            send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
+        
+        flash('Booking status updated.', 'success')
+    return redirect(request.referrer or url_for('admin_bookings'))
 
 
 @app.route('/admin/items')
@@ -1213,8 +1345,36 @@ def admin_items():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    items = Item.query.order_by(Item.created_at.desc()).all()
-    return render_template('admin/items.html', items=items)
+    
+    search = request.args.get('search', '').strip()
+    category_filter = request.args.get('category', 'all')
+    verified_filter = request.args.get('verified', 'all')
+    
+    query = Item.query
+    
+    if search:
+        query = query.filter(
+            db.or_(
+                Item.title.ilike(f'%{search}%'),
+                Item.description.ilike(f'%{search}%')
+            )
+        )
+    
+    if category_filter != 'all':
+        query = query.filter_by(category=category_filter)
+    
+    if verified_filter == 'verified':
+        query = query.filter_by(is_verified=True)
+    elif verified_filter == 'unverified':
+        query = query.filter_by(is_verified=False)
+    
+    items = query.order_by(Item.created_at.desc()).all()
+    
+    return render_template('admin/items.html',
+                         items=items,
+                         search=search,
+                         category_filter=category_filter,
+                         verified_filter=verified_filter)
 
 
 @app.route('/admin/item/add', methods=['GET', 'POST'])
@@ -1291,50 +1451,32 @@ def admin_delete_item(item_id):
     return redirect(url_for('admin_items'))
 
 
-@app.route('/admin/bookings')
+@app.route('/admin/item/<int:item_id>/verify', methods=['POST'])
 @login_required
-def admin_bookings():
+def admin_verify_item(item_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    bookings = Booking.query.order_by(Booking.created_at.desc()).all()
-    return render_template('admin/bookings.html', bookings=bookings)
+    item = Item.query.get_or_404(item_id)
+    item.is_verified = True
+    item.verified_until = datetime.utcnow() + timedelta(days=90)
+    db.session.commit()
+    flash(f'✅ {item.title} verified for 90 days.', 'success')
+    return redirect(url_for('admin_items'))
 
 
-@app.route('/admin/booking/<int:booking_id>/status', methods=['POST'])
+@app.route('/admin/item/<int:item_id>/unverify', methods=['POST'])
 @login_required
-def admin_update_booking_status(booking_id):
+def admin_unverify_item(item_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    booking = Booking.query.get_or_404(booking_id)
-    new_status = request.form.get('status', '')
-    if new_status in ['confirmed', 'cancelled', 'completed', 'pending']:
-        old_status = booking.booking_status
-        booking.booking_status = new_status
-        db.session.commit()
-        
-        # Telegram notification to customer
-        if booking.customer.telegram_chat_id:
-            status_emoji = {
-                'confirmed': '✅',
-                'cancelled': '❌',
-                'completed': '🎉',
-                'pending': '⏳'
-            }.get(new_status, '🔄')
-            
-            msg = (
-                f"{status_emoji} Booking Status Updated\n\n"
-                f"Reference: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Old Status: {old_status.title()}\n"
-                f"New Status: {new_status.title()}\n\n"
-                f"Thank you for using VyahMandap!"
-            )
-            send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
-        
-        flash('Booking status updated.', 'success')
-    return redirect(url_for('admin_bookings'))
+    item = Item.query.get_or_404(item_id)
+    item.is_verified = False
+    item.verified_until = None
+    db.session.commit()
+    flash(f'Item unverified.', 'info')
+    return redirect(url_for('admin_items'))
 
 
 @app.route('/admin/users')
@@ -1343,8 +1485,30 @@ def admin_users():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    users = User.query.order_by(User.created_at.desc()).all()
-    return render_template('admin/users.html', users=users)
+    
+    role_filter = request.args.get('role', 'all')
+    search = request.args.get('search', '').strip()
+    
+    query = User.query
+    
+    if role_filter != 'all':
+        query = query.filter_by(role=role_filter)
+    
+    if search:
+        query = query.filter(
+            db.or_(
+                User.name.ilike(f'%{search}%'),
+                User.mobile.ilike(f'%{search}%'),
+                User.email.ilike(f'%{search}%')
+            )
+        )
+    
+    users = query.order_by(User.created_at.desc()).all()
+    
+    return render_template('admin/users.html',
+                         users=users,
+                         role_filter=role_filter,
+                         search=search)
 
 
 @app.route('/admin/user/<int:user_id>/role', methods=['POST'])
@@ -1358,8 +1522,105 @@ def admin_update_user_role(user_id):
     if new_role in ['admin', 'customer', 'vendor'] and user.id != current_user.id:
         user.role = new_role
         db.session.commit()
-        flash('User role updated.', 'success')
+        flash(f'{user.name} role updated to {new_role}.', 'success')
     return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/user/<int:user_id>')
+@login_required
+def admin_user_detail(user_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # If customer: bookings
+    user_bookings = Booking.query.filter_by(customer_id=user.id)\
+        .order_by(Booking.created_at.desc()).all() if user.role == 'customer' else []
+    
+    # If vendor: items
+    user_items = Item.query.filter_by(vendor_id=user.id)\
+        .order_by(Item.created_at.desc()).all() if user.role in ['vendor', 'admin'] else []
+    
+    # If vendor: bookings for their items
+    vendor_bookings = []
+    if user.role in ['vendor', 'admin'] and user_items:
+        item_ids = [i.id for i in user_items]
+        vendor_bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
+            .order_by(Booking.created_at.desc()).all()
+    
+    return render_template('admin/user_detail.html',
+                         user=user,
+                         user_bookings=user_bookings,
+                         user_items=user_items,
+                         vendor_bookings=vendor_bookings)
+
+
+@app.route('/admin/payments')
+@login_required
+def admin_payments():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    # All bookings with payment details
+    bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+    
+    total_utr_count = len(bookings)
+    total_collected = sum(b.total_amount for b in bookings)
+    total_commission = sum(b.commission for b in bookings)
+    total_deposits = sum(b.deposit for b in bookings)
+    total_transport = sum(b.transport_fee for b in bookings)
+    
+    return render_template('admin/payments.html',
+                         bookings=bookings,
+                         total_utr_count=total_utr_count,
+                         total_collected=total_collected,
+                         total_commission=total_commission,
+                         total_deposits=total_deposits,
+                         total_transport=total_transport)
+
+
+@app.route('/admin/export/bookings')
+@login_required
+def admin_export_bookings():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    import csv
+    import io
+    
+    bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow([
+        'Reference', 'Date', 'Customer', 'Mobile', 'Item', 'Vendor',
+        'Start Date', 'End Date', 'Qty', 'Base Rent', 'Commission',
+        'Deposit', 'Transport', 'Total', 'UTR', 'Status', 'KYC'
+    ])
+    
+    for b in bookings:
+        writer.writerow([
+            b.booking_reference, b.created_at.strftime('%Y-%m-%d %H:%M'),
+            b.customer.name, b.customer.mobile,
+            b.item.title, b.item.vendor.name,
+            b.start_date, b.end_date, b.quantity,
+            b.base_rent, b.commission, b.deposit, b.transport_fee,
+            b.total_amount, b.utr_number, b.booking_status,
+            'Yes' if b.kyc_verified else 'No'
+        ])
+    
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=vyahmandap_bookings.csv'}
+    )
 
 
 # ============================================
