@@ -1,11 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Users - Admin{% endblock %}
+{% block title %}All Users - Admin{% endblock %}
 
 {% block content %}
-<div class="flex justify-between items-center mb-6">
-    <h2 class="text-2xl font-bold">👥 Users</h2>
-    <span class="text-sm text-gray-500">Total: {{ users|length }}</span>
+<div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+        <h2 class="text-2xl font-bold">👥 All Users</h2>
+        <p class="text-sm text-gray-500">Total: {{ users|length }} users</p>
+    </div>
+    <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">← Dashboard</a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
+    <form method="GET" class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-bold mb-1">🔍 Search</label>
+            <input type="text" name="search" value="{{ search }}" placeholder="Name, mobile, email..." class="w-full border rounded-lg p-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-bold mb-1">Role</label>
+            <select name="role" class="border rounded-lg p-2 text-sm bg-white">
+                <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All</option>
+                <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="vendor" {% if role_filter == 'vendor' %}selected{% endif %}>Vendor</option>
+                <option value="customer" {% if role_filter == 'customer' %}selected{% endif %}>Customer</option>
+            </select>
+        </div>
+        <button type="submit" class="bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-blue-600">Apply</button>
+        <a href="{{ url_for('admin_users') }}" class="text-gray-600 hover:text-gray-800 text-sm px-2 py-2">Reset</a>
+    </form>
 </div>
 
 <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -13,42 +37,44 @@
         <table class="w-full text-left text-sm">
             <thead class="bg-gray-50">
                 <tr>
-                    <th class="p-3">ID</th>
                     <th class="p-3">Name</th>
                     <th class="p-3">Mobile</th>
                     <th class="p-3">Email</th>
                     <th class="p-3">Role</th>
                     <th class="p-3">Bookings</th>
                     <th class="p-3">Joined</th>
-                    <th class="p-3">Action</th>
+                    <th class="p-3">Telegram</th>
+                    <th class="p-3"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr class="border-b hover:bg-gray-50">
-                    <td class="p-3 text-xs text-gray-500">#{{ user.id }}</td>
                     <td class="p-3 font-medium">{{ user.name }}</td>
-                    <td class="p-3">{{ user.mobile }}</td>
+                    <td class="p-3 text-xs">{{ user.mobile }}</td>
                     <td class="p-3 text-xs">{{ user.email or '-' }}</td>
                     <td class="p-3">
-                        <span class="text-xs px-2 py-0.5 rounded-full {% if user.role == 'admin' %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-bold
+                            {% if user.role == 'admin' %}bg-purple-100 text-purple-800
+                            {% elif user.role == 'vendor' %}bg-green-100 text-green-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
                             {{ user.role|title }}
                         </span>
                     </td>
                     <td class="p-3 text-center">{{ user.bookings|length }}</td>
-                    <td class="p-3 text-xs">{{ user.created_at.strftime('%d/%m/%Y') if user.created_at else '-' }}</td>
-                    <td class="p-3">
-                        {% if user.id != current_user.id %}
-                        <form method="POST" action="{{ url_for('admin_update_user_role', user_id=user.id) }}" class="flex gap-1">
-                            <select name="role" class="text-xs border rounded p-1">
-                                <option value="customer" {% if user.role == 'customer' %}selected{% endif %}>Customer</option>
-                                <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-                            </select>
-                            <button type="submit" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Update</button>
-                        </form>
+                    <td class="p-3 text-xs">{{ user.created_at.strftime('%d %b %Y') }}</td>
+                    <td class="p-3 text-xs">
+                        {% if user.telegram_chat_id %}
+                            <span class="text-blue-600 font-bold"><i class="fa-brands fa-telegram"></i> Yes</span>
                         {% else %}
-                        <span class="text-xs text-gray-400">You</span>
+                            <span class="text-gray-400">No</span>
                         {% endif %}
+                    </td>
+                    <td class="p-3">
+                        <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" 
+                           class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded hover:bg-blue-700">
+                            View
+                        </a>
                     </td>
                 </tr>
                 {% endfor %}
