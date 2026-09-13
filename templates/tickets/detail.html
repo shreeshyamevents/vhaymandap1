@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticket.ticket_number }} - Support{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">{{ ticket.subject }}</h2>
+            <p class="text-xs font-mono text-blue-600 font-bold mt-1">{{ ticket.ticket_number }}</p>
+        </div>
+        <a href="{{ url_for('tickets_list') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <!-- Ticket Header -->
+    <div class="bg-white p-4 rounded-xl border shadow-sm mb-4">
+        <div class="flex flex-wrap gap-2 mb-3">
+            <span class="text-[10px] px-2 py-1 rounded-full font-bold
+                {% if ticket.priority == 'urgent' %}bg-red-100 text-red-800
+                {% elif ticket.priority == 'high' %}bg-orange-100 text-orange-800
+                {% elif ticket.priority == 'medium' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                {{ ticket.priority.upper() }} PRIORITY
+            </span>
+            <span class="text-[10px] px-2 py-1 rounded-full font-bold
+                {% if ticket.status == 'open' %}bg-blue-100 text-blue-800
+                {% elif ticket.status == 'in_progress' %}bg-yellow-100 text-yellow-800
+                {% elif ticket.status == 'resolved' %}bg-green-100 text-green-800
+                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                {{ ticket.status.replace('_', ' ').upper() }}
+            </span>
+            <span class="text-[10px] px-2 py-1 rounded-full font-bold bg-purple-100 text-purple-800">
+                {{ ticket.category.upper() }}
+            </span>
+        </div>
+        <div class="text-xs text-gray-500">
+            Created by <strong>{{ ticket.user.name }}</strong> on {{ ticket.created_at.strftime('%d %b %Y, %H:%M') }}
+        </div>
+    </div>
+
+    <!-- Original Description -->
+    <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-4">
+        <div class="flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-user text-blue-700"></i>
+            <span class="font-bold text-sm text-blue-900">{{ ticket.user.name }}</span>
+            <span class="text-xs text-gray-500">{{ ticket.created_at.strftime('%d %b, %H:%M') }}</span>
+        </div>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ ticket.description }}</p>
+    </div>
+
+    <!-- Replies -->
+    <div class="space-y-3 mb-4">
+        {% for r in replies %}
+        <div class="p-4 rounded-xl border {% if r.is_admin_reply %}bg-green-50 border-green-200{% else %}bg-white{% endif %}">
+            <div class="flex items-center gap-2 mb-2">
+                {% if r.is_admin_reply %}
+                    <i class="fa-solid fa-shield text-green-700"></i>
+                    <span class="font-bold text-sm text-green-900">{{ r.user.name }}</span>
+                    <span class="text-[10px] bg-green-200 text-green-900 px-2 py-0.5 rounded-full font-bold">ADMIN</span>
+                {% else %}
+                    <i class="fa-solid fa-user text-gray-700"></i>
+                    <span class="font-bold text-sm">{{ r.user.name }}</span>
+                {% endif %}
+                <span class="text-xs text-gray-500">{{ r.created_at.strftime('%d %b, %H:%M') }}</span>
+            </div>
+            <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ r.message }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Reply Form -->
+    {% if ticket.status != 'closed' %}
+    <form method="POST" class="bg-white p-4 rounded-xl border shadow-sm">
+        <label class="block font-semibold text-sm mb-2">Your Reply</label>
+        <textarea name="message" required rows="3" 
+                  placeholder="Type your reply..."
+                  class="w-full border rounded-lg p-2.5 text-sm mb-3"></textarea>
+        <div class="flex gap-2">
+            <button type="submit" class="bg-green-700 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-green-600 text-sm">
+                <i class="fa-solid fa-paper-plane mr-1"></i>Send Reply
+            </button>
+            <form method="POST" action="{{ url_for('ticket_close', ticket_id=ticket.id) }}" class="inline" onsubmit="return confirm('Close this ticket?')">
+                <button type="submit" class="bg-gray-200 text-gray-700 font-bold px-4 py-2.5 rounded-lg hover:bg-gray-300 text-sm">
+                    Close Ticket
+                </button>
+            </form>
+        </div>
+    </form>
+    {% else %}
+    <div class="bg-gray-100 p-4 rounded-xl border text-center">
+        <i class="fa-solid fa-lock text-gray-400 text-2xl mb-2"></i>
+        <p class="text-sm text-gray-600">This ticket is closed.</p>
+        <a href="{{ url_for('ticket_new') }}" class="text-green-700 font-bold text-xs hover:underline">Create new ticket →</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
