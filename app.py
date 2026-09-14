@@ -1181,7 +1181,7 @@ def report_view(booking_id):
 # VENDOR ROUTES
 # ============================================
 
-app.route('/vendor')
+@app.route('/vendor')
 @login_required
 def vendor_dashboard():
     if current_user.role not in ['admin', 'vendor']:
