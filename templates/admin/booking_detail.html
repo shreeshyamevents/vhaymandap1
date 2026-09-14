@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Booking {{ booking.booking_reference }} - Admin{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+        <h2 class="text-2xl font-bold">📋 Booking Detail</h2>
+        <p class="text-sm font-mono text-blue-600 font-bold">{{ booking.booking_reference }}</p>
+    </div>
+    <a href="{{ url_for('admin_bookings') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">← Back</a>
+</div>
+
+<!-- Equipment Condition Reports -->
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <h3 class="font-bold text-lg">📸 Equipment Condition Reports</h3>
+        {% if booking.dispatch_report_done or booking.return_report_done %}
+            <a href="{{ url_for('report_view', booking_id=booking.id) }}" 
+               class="bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700">
+                View Full Comparison →
+            </a>
+        {% endif %}
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div class="{% if booking.dispatch_report_done %}bg-green-50 border-green-200{% else %}bg-red-50 border-red-200{% endif %} p-4 rounded-lg border">
+            <div class="font-bold mb-2 {% if booking.dispatch_report_done %}text-green-800{% else %}text-red-800{% endif %}">
+                {% if booking.dispatch_report_done %}
+                    ✅ Dispatch Report Done
+                {% else %}
+                    ❌ Dispatch Report Pending
+                {% endif %}
+            </div>
+            <p class="text-xs {% if booking.dispatch_report_done %}text-green-700{% else %}text-red-700{% endif %}">
+                {% if booking.dispatch_report_done %}
+                    Vendor uploaded equipment condition proof before dispatch.
+                {% else %}
+                    Vendor has not uploaded yet. Booking cannot proceed to dispatch.
+                {% endif %}
+            </p>
+        </div>
+        <div class="{% if booking.return_report_done %}bg-green-50 border-green-200{% else %}bg-red-50 border-red-200{% endif %} p-4 rounded-lg border">
+            <div class="font-bold mb-2 {% if booking.return_report_done %}text-green-800{% else %}text-red-800{% endif %}">
+                {% if booking.return_report_done %}
+                    ✅ Return Report Done
+                {% else %}
+                    ❌ Return Report Pending
+                {% endif %}
+            </div>
+            <p class="text-xs {% if booking.return_report_done %}text-green-700{% else %}text-red-700{% endif %}">
+                {% if booking.return_report_done %}
+                    Customer uploaded equipment condition proof before return.
+                {% else %}
+                    Customer has not uploaded yet.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <!-- Booking Info -->
+    <div class="bg-white p-6 rounded-xl border shadow-sm">
+        <h3 class="font-bold text-lg mb-4">📅 Booking Information</h3>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-500">Reference:</span><strong class="font-mono">{{ booking.booking_reference }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Booked On:</span><strong>{{ booking.created_at.strftime('%d %b %Y, %H:%M') }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Start Date:</span><strong>{{ booking.start_date }} @ {{ booking.start_time }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">End Date:</span><strong>{{ booking.end_date }} @ {{ booking.end_time }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Quantity:</span><strong>{{ booking.quantity }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Delivery Area:</span><strong>{{ booking.delivery_area|title }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Weight Category:</span><strong>{{ booking.weight_category.replace('_', ' ')|title }}</strong></div>
+            <div class="pt-2 border-t"><span class="text-gray-500">Venue Address:</span><p class="font-medium mt-1">{{ booking.venue_address }}</p></div>
+        </div>
+    </div>
+    
+    <!-- Payment Info -->
+    <div class="bg-white p-6 rounded-xl border shadow-sm">
+        <h3 class="font-bold text-lg mb-4">💰 Payment Breakdown</h3>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-500">Base Rent:</span><strong>₹{{ booking.base_rent }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Platform Commission (5%):</span><strong class="text-green-700">₹{{ booking.commission }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Security Deposit:</span><strong>₹{{ booking.deposit }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Transport Fee:</span><strong>₹{{ booking.transport_fee }}</strong></div>
+            <hr class="my-2">
+            <div class="flex justify-between text-base"><span class="font-bold">Total Amount:</span><strong class="text-green-700">₹{{ booking.total_amount }}</strong></div>
+            <div class="pt-2 border-t">
+                <div class="flex justify-between"><span class="text-gray-500">UTR Number:</span><strong class="font-mono text-green-700">{{ booking.utr_number }}</strong></div>
+                <div class="flex justify-between mt-1"><span class="text-gray-500">Payment Status:</span><strong>{{ booking.payment_status|title }}</strong></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <!-- Customer Info -->
+    <div class="bg-white p-6 rounded-xl border shadow-sm">
+        <h3 class="font-bold text-lg mb-4">👤 Customer</h3>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-500">Name:</span><strong>{{ booking.customer.name }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Mobile:</span><strong>{{ booking.customer.mobile }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Email:</span><strong>{{ booking.customer.email or '-' }}</strong></div>
+            <div class="pt-2 border-t">
+                <a href="{{ url_for('admin_user_detail', user_id=booking.customer.id) }}" 
+                   class="text-blue-600 hover:underline text-xs font-bold">View Full Profile →</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Item / Vendor Info -->
+    <div class="bg-white p-6 rounded-xl border shadow-sm">
+        <h3 class="font-bold text-lg mb-4">📦 Item & Vendor</h3>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-500">Item:</span><strong>{{ booking.item.title }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Category:</span><strong>{{ booking.item.category|title }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Vendor:</span><strong>{{ booking.item.vendor.name }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Vendor Mobile:</span><strong>{{ booking.item.vendor.mobile }}</strong></div>
+            <div class="pt-2 border-t">
+                <a href="{{ url_for('admin_user_detail', user_id=booking.item.vendor.id) }}" 
+                   class="text-blue-600 hover:underline text-xs font-bold">View Vendor Profile →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KYC Info (if applicable) -->
+{% if booking.kyc_required %}
+<div class="bg-yellow-50 border border-yellow-200 p-6 rounded-xl shadow-sm mb-6">
+    <h3 class="font-bold text-lg mb-4 text-yellow-900">🛡️ KYC Information</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div class="flex justify-between"><span class="text-gray-600">Aadhaar Number:</span><strong class="font-mono">{{ booking.aadhaar_number or 'N/A' }}</strong></div>
+        <div class="flex justify-between"><span class="text-gray-600">PAN Number:</span><strong class="font-mono">{{ booking.pan_number or 'N/A' }}</strong></div>
+        <div class="flex justify-between md:col-span-2"><span class="text-gray-600">KYC Status:</span>
+            <strong class="{% if booking.kyc_verified %}text-green-700{% else %}text-orange-700{% endif %}">
+                {% if booking.kyc_verified %}✅ Verified{% else %}⏳ Pending{% endif %}
+            </strong>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Status Update -->
+<div class="bg-white p-6 rounded-xl border shadow-sm">
+    <h3 class="font-bold text-lg mb-4">⚙️ Update Status</h3>
+    <form method="POST" action="{{ url_for('admin_update_booking_status', booking_id=booking.id) }}" class="flex gap-3 items-center flex-wrap">
+        <select name="status" class="border rounded-lg p-2 text-sm bg-white">
+            <option value="pending" {% if booking.booking_status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+            <option value="confirmed" {% if booking.booking_status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
+            <option value="dispatched" {% if booking.booking_status == 'dispatched' %}selected{% endif %}>🚚 Dispatched</option>
+            <option value="return_initiated" {% if booking.booking_status == 'return_initiated' %}selected{% endif %}>📦 Return Initiated</option>
+            <option value="completed" {% if booking.booking_status == 'completed' %}selected{% endif %}>🎉 Completed</option>
+            <option value="cancelled" {% if booking.booking_status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+        </select>
+        <button type="submit" class="bg-blue-700 text-white font-bold px-6 py-2 rounded-lg hover:bg-blue-600 text-sm">Update Status</button>
+        <span class="text-xs text-gray-500 ml-auto">Current: <strong>{{ booking.booking_status.replace('_', ' ')|title }}</strong></span>
+    </form>
+</div>
+{% endblock %}
