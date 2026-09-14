@@ -2371,9 +2371,58 @@ def utility_processor():
 
 def init_database():
     try:
+        # ============================================
+        # AUTO-MIGRATION: Add missing columns to existing tables
+        # This handles the case where new columns are added to models
+        # but the existing DB tables don't have them yet.
+        # Uses "IF NOT EXISTS" so it's safe to run every time.
+        # ============================================
+        try:
+            from sqlalchemy import text
+            
+            migrations = [
+                # Bookings table - Condition Report columns
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatch_report_done BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_report_done BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS damage_flagged BOOLEAN DEFAULT FALSE",
+                # Bookings table - Advance/Remaining payment columns
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_utr VARCHAR(50)",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_paid BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS advance_paid BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_paid_at TIMESTAMP",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS advance_amount FLOAT DEFAULT 0",
+                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_amount FLOAT DEFAULT 0",
+                # Items table - Verification columns
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE items ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
+                # Users table - Telegram column
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
+            ]
+            
+            with db.engine.connect() as conn:
+                for sql in migrations:
+                    try:
+                        conn.execute(text(sql))
+                    except Exception as col_err:
+                        # Column may already exist or table may not exist yet
+                        print(f"⚠️ Migration note: {str(col_err)[:80]}")
+                conn.commit()
+            print("✅ Auto-migration: All columns verified/added")
+        except Exception as mig_err:
+            print(f"⚠️ Auto-migration skipped: {mig_err}")
+            # Continue anyway - db.create_all() will handle new tables
+        
+        # ============================================
+        # CREATE TABLES (if not exist)
+        # ============================================
         db.create_all()
         print("✅ Database tables created!")
         
+        # ============================================
+        # SEED DEFAULT USERS
+        # ============================================
         admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
         if not admin:
             admin = User(name='VyahMandap Admin', mobile=Config.ADMIN_MOBILE,
@@ -2401,6 +2450,9 @@ def init_database():
             db.session.commit()
             print('✅ Demo vendor created!')
         
+        # ============================================
+        # SEED DEFAULT ITEMS
+        # ============================================
         if Item.query.count() == 0:
             default_items = [
                 {'title': 'Maharaja Gold Carved Wedding Sofa',
@@ -2428,17 +2480,25 @@ def init_database():
                 db.session.add(Item(**item_data))
             db.session.commit()
             print('✅ Default items created!')
+        
         return True
     except Exception as e:
         print(f"❌ DB init error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
+
+# ============================================
+# STARTUP
+# ============================================
 
 with app.app_context():
     print("=" * 50)
     print(f"🚀 Starting {Config.APP_NAME}...")
     print(f"📱 Telegram Bot: {'Enabled' if Config.TELEGRAM_BOT_TOKEN else 'Disabled'}")
     print(f"📷 Cloudinary: {'Configured' if Config.CLOUDINARY_CLOUD_NAME else 'Not configured'}")
+    print(f"🗄️  Database: {'PostgreSQL' if 'postgres' in Config.SQLALCHEMY_DATABASE_URI else 'SQLite'}")
     print("=" * 50)
     init_database()
 
