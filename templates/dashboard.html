@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}My Dashboard - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold">👤 My Dashboard</h2>
+        <p class="text-sm text-gray-500">Welcome back, {{ current_user.name }}!</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
+        ← Browse Marketplace
+    </a>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Total Bookings</span>
+        <h3 class="text-2xl font-bold">{{ bookings|length }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Total Spent</span>
+        <h3 class="text-2xl font-bold text-green-700">{{ format_currency(total_spent) }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Active Bookings</span>
+        <h3 class="text-2xl font-bold">{{ active_bookings }}</h3>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <span class="text-xs text-gray-500">Member Since</span>
+        <h3 class="text-lg font-bold">{{ current_user.created_at.strftime('%b %Y') if current_user.created_at else '-' }}</h3>
+    </div>
+</div>
+
+<!-- Action Required: Return Reports -->
+{% if pending_return %}
+<div class="bg-orange-50 border-2 border-orange-300 p-5 rounded-xl mb-6">
+    <div class="flex items-start gap-3 mb-4">
+        <div class="text-3xl">📸</div>
+        <div>
+            <h4 class="font-bold text-orange-900 text-lg">Action Required — Return Report</h4>
+            <p class="text-xs text-orange-800 mt-1">
+                Upload equipment condition photos before returning these bookings. This protects you from any damage disputes.
+            </p>
+        </div>
+    </div>
+    {% for b in pending_return %}
+    <div class="bg-white p-4 rounded-lg mb-2 flex justify-between items-center flex-wrap gap-3">
+        <div class="flex-1 min-w-[200px]">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-mono text-blue-600 font-bold">{{ b.booking_reference }}</span>
+                {% if b.booking_status == 'dispatched' %}
+                    <span class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">🚚 Dispatched</span>
+                {% endif %}
+            </div>
+            <p class="font-bold text-sm">{{ b.item.title }}</p>
+            <p class="text-xs text-gray-500">
+                Vendor: {{ b.item.vendor.name }} · 
+                Dates: {{ b.start_date.strftime('%d %b') }} → {{ b.end_date.strftime('%d %b') }}
+            </p>
+        </div>
+        <a href="{{ url_for('report_return', booking_id=b.id) }}" 
+           class="bg-orange-600 text-white font-bold text-xs px-4 py-2.5 rounded-lg hover:bg-orange-700 whitespace-nowrap">
+            📸 Upload Return Report
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Bookings -->
+<h3 class="font-bold text-lg mb-4">My Bookings</h3>
+<div class="space-y-4">
+    {% if bookings %}
+        {% for booking in bookings %}
+        <div class="bg-white p-5 rounded-xl border shadow-sm hover:shadow-md transition">
+            <div class="flex flex-wrap justify-between items-start">
+                <div>
+                    <span class="text-[10px] font-bold text-gray-500 uppercase">#{{ booking.booking_reference }}</span>
+                    <h4 class="font-bold text-lg">{{ booking.item.title }}
+                        {% if booking.item.is_currently_verified %}
+                            <i class="fa-solid fa-circle-check text-blue-600 text-sm ml-1" title="Verified Item"></i>
+                        {% endif %}
+                    </h4>
+                    <p class="text-xs text-gray-500">Vendor: {{ booking.item.vendor.name }}</p>
+                </div>
+                <span class="text-xs px-3 py-0.5 rounded-full font-bold 
+                    {% if booking.booking_status == 'confirmed' %}bg-green-100 text-green-800
+                    {% elif booking.booking_status == 'dispatched' %}bg-blue-100 text-blue-800
+                    {% elif booking.booking_status == 'return_initiated' %}bg-orange-100 text-orange-800
+                    {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
+                    {% elif booking.booking_status == 'completed' %}bg-gray-100 text-gray-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {% if booking.booking_status == 'return_initiated' %}
+                        Return Initiated
+                    {% else %}
+                        {{ booking.booking_status|title }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mt-3 text-gray-500">
+                <span><i class="fa-regular fa-calendar mr-1"></i> {{ booking.start_date }} → {{ booking.end_date }}</span>
+                <span><i class="fa-regular fa-clock mr-1"></i> {{ booking.start_time }} - {{ booking.end_time }}</span>
+                <span><i class="fa-regular fa-location-dot mr-1"></i> {{ booking.venue_address[:25] }}{% if booking.venue_address|length > 25 %}...{% endif %}</span>
+                <span class="font-bold text-green-700">₹{{ booking.total_amount }}</span>
+            </div>
+            <div class="flex justify-between items-center mt-3 pt-3 border-t text-xs gap-2 flex-wrap">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span class="font-mono text-green-700"><i class="fa-regular fa-receipt mr-1"></i>UTR: {{ booking.utr_number }}</span>
+                    {% if booking.kyc_verified %}
+                        <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                            <i class="fa-solid fa-shield-halved mr-1"></i>KYC
+                        </span>
+                    {% endif %}
+                    {% if booking.dispatch_report_done %}
+                        <span class="bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-bold text-[10px]" title="Vendor uploaded condition proof">
+                            ✓ Dispatch
+                        </span>
+                    {% endif %}
+                    {% if booking.return_report_done %}
+                        <span class="bg-orange-100 text-orange-800 px-2 py-0.5 rounded-full font-bold text-[10px]" title="Customer uploaded condition proof">
+                            ✓ Return
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-gray-500">Booked: {{ booking.created_at.strftime('%d/%m/%Y') }}</span>
+                    
+                    <!-- Condition Reports -->
+                    {% if booking.dispatch_report_done or booking.return_report_done %}
+                        <a href="{{ url_for('report_view', booking_id=booking.id) }}" 
+                           class="bg-purple-600 text-white font-bold px-3 py-1 rounded-lg hover:bg-purple-700 transition">
+                            <i class="fa-regular fa-images mr-1"></i>Reports
+                        </a>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('chat_with', user_id=booking.item.vendor_id) }}?item_id={{ booking.item_id }}" 
+                       class="bg-blue-600 text-white font-bold px-3 py-1 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fa-regular fa-comment mr-1"></i>Chat
+                    </a>
+                    
+                    {% if booking.booking_status in ['completed', 'confirmed'] %}
+                        <a href="{{ url_for('submit_review', booking_id=booking.id) }}" 
+                           class="bg-yellow-500 text-white font-bold px-3 py-1 rounded-lg hover:bg-yellow-600 transition">
+                            ⭐ Review
+                        </a>
+                    {% endif %}
+                    
+                    {% if booking.dispatch_report_done and not booking.return_report_done and booking.booking_status in ['dispatched', 'confirmed'] %}
+                        <a href="{{ url_for('report_return', booking_id=booking.id) }}" 
+                           class="bg-orange-600 text-white font-bold px-3 py-1 rounded-lg hover:bg-orange-700 transition">
+                            📸 Return
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="bg-white p-6 rounded-xl border text-gray-500 text-sm text-center py-12">
+            <i class="fa-regular fa-calendar-xmark text-4xl text-gray-300 mb-3 block"></i>
+            You have no bookings yet. 
+            <a href="{{ url_for('index') }}" class="text-green-700 font-bold hover:underline">Browse the marketplace!</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
