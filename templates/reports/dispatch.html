@@ -292,6 +292,15 @@ function resetVideo() {
     updateProgress();
 }
 
+function previewVideo() {
+    const video = document.getElementById('recordedVideo');
+    if (video.paused) {
+        video.play();
+    } else {
+        video.pause();
+    }
+}    
+    
 function toggleDamageNotes() {
     const checkbox = document.getElementById('damageFlag');
     const div = document.getElementById('damageNotesDiv');
