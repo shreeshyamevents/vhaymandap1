@@ -81,14 +81,28 @@
             </div>
             
             <div id="videoReady" class="hidden">
-                <video id="recordedVideo" controls playsinline class="w-full h-64 object-cover rounded-xl bg-black mb-3"></video>
-                <div class="flex gap-2">
-                    <button type="button" onclick="resetVideo()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-2.5 rounded-lg hover:bg-gray-300 text-sm">🔄 Retake</button>
-                    <div class="flex-1 bg-green-100 text-green-800 font-bold py-2.5 rounded-lg text-center text-sm">✅ Video Ready</div>
-                </div>
-                <p class="text-xs text-gray-500 mt-2 text-center" id="videoSize"></p>
+    <div class="bg-green-50 border-2 border-green-300 rounded-xl p-3 mb-3">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">✅</span>
+            <div class="flex-1">
+                <p class="font-bold text-green-900 text-sm">Video Recorded Successfully!</p>
+                <p class="text-xs text-green-700" id="videoSize"></p>
             </div>
         </div>
+        <video id="recordedVideo" controls playsinline class="w-full h-64 object-cover rounded-lg bg-black"></video>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-2">
+        <button type="button" onclick="resetVideo()" 
+                class="bg-orange-500 text-white font-bold py-3 rounded-lg hover:bg-orange-600 text-sm">
+            🔄 Retake Video
+        </button>
+        <button type="button" onclick="previewVideo()" 
+                class="bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 text-sm">
+            ▶️ Play / Preview
+        </button>
+    </div>
+</div>
 
         <hr class="border-gray-200">
 
