@@ -1181,7 +1181,7 @@ def report_view(booking_id):
 # VENDOR ROUTES
 # ============================================
 
-@app.route('/vendor')
+app.route('/vendor')
 @login_required
 def vendor_dashboard():
     if current_user.role not in ['admin', 'vendor']:
@@ -1211,6 +1211,7 @@ def vendor_dashboard():
         and b.booking_status in ['confirmed', 'dispatched']
     ]
     
+    # ===== NEW: Bookings needing dispatch report =====
     pending_dispatch = [b for b in bookings 
                        if not b.dispatch_report_done 
                        and b.booking_status == 'confirmed']
@@ -1223,6 +1224,7 @@ def vendor_dashboard():
                          total_items=total_items,
                          upcoming_bookings=upcoming_bookings,
                          pending_dispatch=pending_dispatch)
+    
 
 
 @app.route('/vendor/calendar')
