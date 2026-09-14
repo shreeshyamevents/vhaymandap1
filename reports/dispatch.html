@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}Equipment Condition Report - Dispatch{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">📸 Equipment Condition Report</h2>
+            <p class="text-sm text-gray-500 font-mono">{{ booking.booking_reference }}</p>
+        </div>
+        <a href="{{ url_for('vendor_dashboard') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-6">
+        <h4 class="font-bold text-blue-900 mb-2">🚚 Dispatch Report — Before Sending Equipment</h4>
+        <p class="text-sm text-blue-800">
+            Take <strong>photos</strong> and record a <strong>15-second video</strong> of each item before dispatching.
+            This protects you if any dispute arises later.
+        </p>
+    </div>
+
+    <div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
+        <div class="flex gap-3">
+            <img src="{{ booking.item.get_image() }}" class="w-20 h-20 rounded-lg object-cover">
+            <div class="flex-1">
+                <h3 class="font-bold">{{ booking.item.title }}</h3>
+                <p class="text-xs text-gray-500">Customer: {{ booking.customer.name }}</p>
+                <p class="text-xs text-gray-500">Dates: {{ booking.start_date }} → {{ booking.end_date }}</p>
+                <p class="text-xs text-gray-500">Quantity: {{ booking.quantity }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl border shadow-sm space-y-6">
+        
+        <!-- STEP 1: Photos -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-8 h-8 rounded-full bg-green-700 text-white flex items-center justify-center font-bold text-sm">1</span>
+                <h4 class="font-bold text-lg">Take Photos</h4>
+                <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
+            </div>
+            <button type="button" onclick="capturePhoto()" class="w-full bg-green-700 text-white font-bold py-4 rounded-xl hover:bg-green-600 text-sm mb-3">
+                <i class="fa-solid fa-camera mr-2"></i>📸 Take Photo (Camera)
+            </button>
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
+            <div id="photosGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+            <p class="text-xs text-gray-500 mt-2 text-center" id="photoCount">0 photos added</p>
+        </div>
+
+        <hr class="border-gray-200">
+
+        <!-- STEP 2: Video -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-sm">2</span>
+                <h4 class="font-bold text-lg">Record 15-Second Video</h4>
+                <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
+            </div>
+            
+            <!-- Before recording -->
+            <div id="videoIdle">
+                <button type="button" onclick="startRecording()" class="w-full bg-blue-700 text-white font-bold py-4 rounded-xl hover:bg-blue-600 text-sm">
+                    <i class="fa-solid fa-video mr-2"></i>🎥 Start Recording (15 sec)
+                </button>
+                <p class="text-xs text-gray-500 text-center mt-2">
+                    Show all items clearly. Move slowly from left to right.
+                </p>
+            </div>
+            
+            <!-- Recording in progress -->
+            <div id="videoRecording" class="hidden">
+                <div class="relative bg-black rounded-xl overflow-hidden mb-3">
+                    <video id="recordingPreview" autoplay muted playsinline class="w-full h-64 object-cover"></video>
+                    <div class="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-full">
+                        <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                        <span class="font-bold text-sm">REC</span>
+                        <span id="countdown" class="font-bold text-sm">15</span>
+                    </div>
+                </div>
+                <button type="button" onclick="stopRecording()" class="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 text-sm">
+                    ⏹️ Stop Recording
+                </button>
+            </div>
+            
+            <!-- Video ready -->
+            <div id="videoReady" class="hidden">
+                <video id="recordedVideo" controls playsinline class="w-full h-64 object-cover rounded-xl bg-black mb-3"></video>
+                <div class="flex gap-2">
+                    <button type="button" onclick="resetVideo()" class="flex-1 bg-gray-200 text-gray-700 font-bold py-2.5 rounded-lg hover:bg-gray-300 text-sm">
+                        🔄 Retake
+                    </button>
+                    <div class="flex-1 bg-green-100 text-green-800 font-bold py-2.5 rounded-lg text-center text-sm">
+                        ✅ Video Ready
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2 text-center" id="videoSize">Size: calculating...</p>
+            </div>
+        </div>
+
+        <hr class="border-gray-200">
+
+        <!-- STEP 3: Condition -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-8 h-8 rounded-full bg-purple-700 text-white flex items-center justify-center font-bold text-sm">3</span>
+                <h4 class="font-bold text-lg">Rate Condition</h4>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <label class="cursor-pointer">
+                    <input type="radio" name="condition" value="excellent" class="peer sr-only" checked>
+                    <div class="border-2 rounded-lg p-3 text-center peer-checked:border-green-600 peer-checked:bg-green-50">
+                        <div class="text-2xl">✨</div>
+                        <div class="text-xs font-bold">Excellent</div>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="condition" value="good" class="peer sr-only">
+                    <div class="border-2 rounded-lg p-3 text-center peer-checked:border-blue-600 peer-checked:bg-blue-50">
+                        <div class="text-2xl">👍</div>
+                        <div class="text-xs font-bold">Good</div>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="condition" value="fair" class="peer sr-only">
+                    <div class="border-2 rounded-lg p-3 text-center peer-checked:border-yellow-600 peer-checked:bg-yellow-50">
+                        <div class="text-2xl">⚠️</div>
+                        <div class="text-xs font-bold">Fair</div>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="condition" value="damaged" class="peer sr-only">
+                    <div class="border-2 rounded-lg p-3 text-center peer-checked:border-red-600 peer-checked:bg-red-50">
+                        <div class="text-2xl">🔴</div>
+                        <div class="text-xs font-bold">Has Damage</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <hr class="border-gray-200">
+
+        <!-- STEP 4: Damage Flag -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="w-8 h-8 rounded-full bg-red-700 text-white flex items-center justify-center font-bold text-sm">4</span>
+                <h4 class="font-bold text-lg">Damage Flag (Optional)</h4>
+            </div>
+            <label class="flex items-center gap-3 cursor-pointer p-3 bg-red-50 rounded-lg border border-red-200">
+                <input type="checkbox" id="damageFlag" class="w-5 h-5" onchange="toggleDamageNotes()">
+                <span class="text-sm font-bold text-red-800">
+                    ⚠️ This item has pre-existing damage (I want to flag it)
+                </span>
+            </label>
+            <div id="damageNotesDiv" class="hidden mt-3">
+                <label class="block text-sm font-bold mb-1 text-red-800">Describe the damage *</label>
+                <textarea id="damageNotes" rows="3" placeholder="e.g. Small scratch on left side, torn fabric on cushion..."
+                          class="w-full border-2 border-red-300 rounded-lg p-2.5 text-sm"></textarea>
+                <p class="text-xs text-red-700 mt-1">⚠️ Admin will be notified automatically.</p>
+            </div>
+        </div>
+
+        <hr class="border-gray-200">
+
+        <!-- Notes -->
+        <div>
+            <label class="block font-semibold text-sm mb-1">Additional Notes (optional)</label>
+            <textarea id="notesInput" rows="2" placeholder="Any other info..."
+                      class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+        </div>
+
+        <!-- Status -->
+        <div id="uploadStatus" class="hidden p-3 rounded-lg text-sm"></div>
+
+        <!-- Submit -->
+        <button id="submitBtn" onclick="submitReport()" disabled
+                class="w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed">
+            Complete Photos + Video to Submit
+        </button>
+        <p class="text-xs text-gray-500 text-center">
+            <span id="progressText">0/2 completed (Photos + Video)</span>
+        </p>
+    </div>
+</div>
+
+<script>
+let photos = [];
+let recordedVideoBlob = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingTimer = null;
+let recordingSeconds = 15;
+let gpsLat = '', gpsLng = '';
+
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+        (pos) => { gpsLat = pos.coords.latitude; gpsLng = pos.coords.longitude; },
+        () => console.log('GPS denied')
+    );
+}
+
+// ===== PHOTOS =====
+function capturePhoto() {
+    document.getElementById('cameraInput').click();
+}
+
+function handlePhoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const MAX = 1200;
+            let w = img.width, h = img.height;
+            if (w > h) { if (w > MAX) { h *= MAX / w; w = MAX; } }
+            else { if (h > MAX) { w *= MAX / h; h = MAX; } }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            
+            const compressed = canvas.toDataURL('image/jpeg', 0.75);
+            photos.push({ base64: compressed, caption: 'Photo ' + (photos.length + 1) });
+            renderPhotos();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+}
+
+function renderPhotos() {
+    const grid = document.getElementById('photosGrid');
+    grid.innerHTML = photos.map((p, i) => `
+        <div class="relative group">
+            <img src="${p.base64}" class="w-full h-32 object-cover rounded-lg border-2 border-green-300">
+            <button onclick="removePhoto(${i})" class="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full text-xs font-bold">×</button>
+            <span class="absolute bottom-1 left-1 bg-black bg-opacity-60 text-white text-[10px] px-1.5 py-0.5 rounded">${i+1}</span>
+        </div>
+    `).join('');
+    
+    document.getElementById('photoCount').textContent = photos.length + ' photos added';
+    updateProgress();
+}
+
+function removePhoto(idx) {
+    photos.splice(idx, 1);
+    renderPhotos();
+}
+
+// ===== VIDEO =====
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: true
+        });
+        
+        const preview = document.getElementById('recordingPreview');
+        preview.srcObject = stream;
+        preview.muted = true;
+        await preview.play();
+        
+        let mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/mp4';
+            }
+        }
+        
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        recordedChunks = [];
+        
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(recordedChunks, { type: mimeType });
+            recordedVideoBlob = blob;
+            
+            const url = URL.createObjectURL(blob);
+            document.getElementById('recordedVideo').src = url;
+            
+            document.getElementById('videoRecording').classList.add('hidden');
+            document.getElementById('videoReady').classList.remove('hidden');
+            
+            const mb = (blob.size / (1024 * 1024)).toFixed(2);
+            document.getElementById('videoSize').textContent = 'Size: ' + mb + ' MB';
+            
+            updateProgress();
+        };
+        
+        mediaRecorder.start();
+        document.getElementById('videoIdle').classList.add('hidden');
+        document.getElementById('videoRecording').classList.remove('hidden');
+        
+        recordingSeconds = 15;
+        document.getElementById('countdown').textContent = recordingSeconds;
+        
+        recordingTimer = setInterval(() => {
+            recordingSeconds--;
+            document.getElementById('countdown').textContent = recordingSeconds;
+            if (recordingSeconds <= 0) stopRecording();
+        }, 1000);
+        
+    } catch (err) {
+        alert('Camera access denied: ' + err.message);
+    }
+}
+
+function stopRecording() {
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+function resetVideo() {
+    recordedVideoBlob = null;
+    document.getElementById('videoReady').classList.add('hidden');
+    document.getElementById('videoIdle').classList.remove('hidden');
+    document.getElementById('recordedVideo').src = '';
+    updateProgress();
+}
+
+// ===== DAMAGE FLAG =====
+function toggleDamageNotes() {
+    const checkbox = document.getElementById('damageFlag');
+    const div = document.getElementById('damageNotesDiv');
+    if (checkbox.checked) div.classList.remove('hidden');
+    else div.classList.add('hidden');
+}
+
+// ===== PROGRESS =====
+function updateProgress() {
+    let done = 0;
+    if (photos.length > 0) done++;
+    if (recordedVideoBlob) done++;
+    
+    document.getElementById('progressText').textContent = done + '/2 completed (Photos + Video)';
+    
+    const btn = document.getElementById('submitBtn');
+    if (done === 2) {
+        btn.disabled = false;
+        btn.className = 'w-full bg-green-700 text-white font-bold py-4 rounded-xl hover:bg-green-600';
+        btn.textContent = '✅ Submit Report';
+    } else {
+        btn.disabled = true;
+        btn.className = 'w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed';
+        btn.textContent = 'Complete Photos + Video to Submit';
+    }
+}
+
+// ===== SUBMIT =====
+async function submitReport() {
+    if (photos.length === 0 || !recordedVideoBlob) {
+        alert('Please add photos and video first');
+        return;
+    }
+    
+    const damageFlag = document.getElementById('damageFlag').checked;
+    const damageNotes = document.getElementById('damageNotes').value.trim();
+    
+    if (damageFlag && !damageNotes) {
+        alert('Please describe the damage');
+        return;
+    }
+    
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading video...';
+    
+    const status = document.getElementById('uploadStatus');
+    status.className = 'p-3 rounded-lg text-sm bg-blue-100 text-blue-800';
+    status.textContent = 'Uploading video...';
+    status.classList.remove('hidden');
+    
+    try {
+        // Step 1: Upload video
+        const videoFormData = new FormData();
+        videoFormData.append('video', recordedVideoBlob, 'report.webm');
+        videoFormData.append('booking_id', '{{ booking.id }}');
+        videoFormData.append('report_type', 'dispatch');
+        
+        const videoRes = await fetch('/api/report/upload-video', {
+            method: 'POST',
+            body: videoFormData
+        });
+        
+        const videoData = await videoRes.json();
+        
+        if (!videoData.success) {
+            throw new Error(videoData.error || 'Video upload failed');
+        }
+        
+        status.textContent = 'Video uploaded. Uploading photos...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading photos...';
+        
+        // Step 2: Submit report
+        const condition = document.querySelector('input[name="condition"]:checked').value;
+        const notes = document.getElementById('notesInput').value.trim();
+        
+        const reportRes = await fetch('/api/report/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                booking_id: {{ booking.id }},
+                report_type: 'dispatch',
+                photos: photos,
+                video_url: videoData.video_url,
+                video_public_id: videoData.video_public_id,
+                condition_rating: condition,
+                damage_flagged: damageFlag,
+                damage_notes: damageNotes,
+                notes: notes,
+                gps_lat: gpsLat,
+                gps_lng: gpsLng
+            })
+        });
+        
+        const data = await reportRes.json();
+        
+        if (data.success) {
+            status.className = 'p-3 rounded-lg text-sm bg-green-100 text-green-800';
+            status.textContent = '✅ Report submitted successfully!';
+            btn.innerHTML = '✅ Submitted!';
+            setTimeout(() => window.location.href = '{{ url_for("vendor_dashboard") }}', 1500);
+        } else {
+            throw new Error(data.error || 'Submit failed');
+        }
+    } catch (err) {
+        status.className = 'p-3 rounded-lg text-sm bg-red-100 text-red-800';
+        status.textContent = '❌ ' + err.message;
+        btn.disabled = false;
+        btn.innerHTML = 'Retry Submit';
+    }
+}
+
+updateProgress();
+</script>
+{% endblock %}
