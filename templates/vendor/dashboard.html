@@ -18,6 +18,41 @@
     </div>
 </div>
 
+<!-- ⚠️ ACTION REQUIRED: DISPATCH REPORTS -->
+{% if pending_dispatch %}
+<div class="bg-red-50 border-2 border-red-300 p-5 rounded-xl mb-6">
+    <div class="flex items-start gap-3 mb-4">
+        <div class="text-3xl">🚨</div>
+        <div>
+            <h4 class="font-bold text-red-900 text-lg">Action Required — Dispatch Report</h4>
+            <p class="text-xs text-red-800 mt-1">
+                Upload equipment photos + 15-sec video before dispatching these bookings. This protects you from any damage disputes.
+            </p>
+        </div>
+    </div>
+    {% for b in pending_dispatch %}
+    <div class="bg-white p-4 rounded-lg mb-2 flex justify-between items-center flex-wrap gap-3 border border-red-200">
+        <div class="flex-1 min-w-[200px]">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-mono text-blue-600 font-bold">{{ b.booking_reference }}</span>
+                <span class="bg-yellow-100 text-yellow-800 text-[10px] px-2 py-0.5 rounded-full font-bold">⏳ Awaiting Dispatch</span>
+            </div>
+            <p class="font-bold text-sm">{{ b.item.title }}</p>
+            <p class="text-xs text-gray-500">
+                Customer: {{ b.customer.name }} · 
+                Dates: {{ b.start_date.strftime('%d %b') }} → {{ b.end_date.strftime('%d %b') }} · 
+                Qty: {{ b.quantity }}
+            </p>
+        </div>
+        <a href="{{ url_for('report_dispatch', booking_id=b.id) }}" 
+           class="bg-red-600 text-white font-bold text-xs px-4 py-2.5 rounded-lg hover:bg-red-700 whitespace-nowrap">
+            📸 Upload Report
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Stats Cards -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
     <div class="bg-white p-4 rounded-xl border shadow-sm">
@@ -110,7 +145,7 @@
                 <tr class="border-b hover:bg-gray-50">
                     <td class="p-3">
                         <div class="w-12 h-12 bg-gray-100 rounded overflow-hidden">
-                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='/static/images/default-item.jpg'">
+                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='https://via.placeholder.com/100'">
                         </div>
                     </td>
                     <td class="p-3 font-medium">
@@ -171,13 +206,14 @@
                     <th class="p-2">Dates</th>
                     <th class="p-2">Qty</th>
                     <th class="p-2">Earnings</th>
+                    <th class="p-2">Reports</th>
                     <th class="p-2">Status</th>
                     <th class="p-2">Chat</th>
                 </tr>
             </thead>
             <tbody>
                 {% for booking in bookings %}
-                <tr class="border-b hover:bg-gray-50">
+                <tr class="border-b hover:bg-gray-50 {% if not booking.dispatch_report_done and booking.booking_status == 'confirmed' %}bg-red-50{% endif %}">
                     <td class="p-2 font-mono text-xs">{{ booking.booking_reference }}</td>
                     <td class="p-2">
                         {{ booking.customer.name }}
@@ -187,13 +223,25 @@
                     <td class="p-2 text-xs">{{ booking.start_date }} → {{ booking.end_date }}</td>
                     <td class="p-2">{{ booking.quantity }}</td>
                     <td class="p-2 font-bold text-green-700">₹{{ booking.base_rent }}</td>
+                    <td class="p-2 text-xs">
+                        {% if booking.dispatch_report_done %}
+                            <span class="text-green-700" title="Dispatch done">✅📤</span>
+                        {% else %}
+                            <a href="{{ url_for('report_dispatch', booking_id=booking.id) }}" class="text-red-600 font-bold" title="Upload dispatch report">📸</a>
+                        {% endif %}
+                        {% if booking.return_report_done %}
+                            <span class="text-green-700" title="Return done">✅📥</span>
+                        {% endif %}
+                    </td>
                     <td class="p-2">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-bold
                             {% if booking.booking_status == 'confirmed' %}bg-green-100 text-green-800
+                            {% elif booking.booking_status == 'dispatched' %}bg-blue-100 text-blue-800
+                            {% elif booking.booking_status == 'return_initiated' %}bg-orange-100 text-orange-800
                             {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
-                            {% elif booking.booking_status == 'completed' %}bg-blue-100 text-blue-800
-                            {% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ booking.booking_status|title }}
+                            {% elif booking.booking_status == 'completed' %}bg-gray-100 text-gray-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ booking.booking_status.replace('_', ' ')|title }}
                         </span>
                     </td>
                     <td class="p-2">
