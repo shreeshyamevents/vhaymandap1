@@ -14,6 +14,17 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+
+# ============================================
+# SAFETY: Clear invalid CLOUDINARY_URL before importing cloudinary
+# The cloudinary library reads CLOUDINARY_URL at import time and crashes if invalid.
+# We use CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET instead.
+# ============================================
+_env_cl_url = os.environ.get('CLOUDINARY_URL', '')
+if _env_cl_url and not _env_cl_url.startswith('cloudinary://'):
+    print(f"⚠️ Invalid CLOUDINARY_URL detected and removed: {_env_cl_url[:40]}...")
+    os.environ.pop('CLOUDINARY_URL', None)
+
 import cloudinary
 import cloudinary.uploader
 
