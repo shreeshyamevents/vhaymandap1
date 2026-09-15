@@ -15,33 +15,25 @@
     <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-6">
         <h4 class="font-bold text-orange-900 mb-2">📦 Return Report — Before Sending Equipment Back</h4>
         <p class="text-sm text-orange-800">
-            Take <strong>photos</strong> and record a <strong>15-second video</strong> before returning.
-            If you find any damage, flag it so admin can review.
+            Take <strong>live photos</strong> and record a <strong>15-second live video</strong> before returning.
+            Live capture protects both you and the vendor from any damage disputes.
         </p>
     </div>
 
-    <!-- WhatsApp Fallback -->
-    <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-6">
+    <!-- Important Notice -->
+    <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6">
         <div class="flex items-start gap-3">
-            <div class="text-2xl">📱</div>
+            <div class="text-2xl">⚠️</div>
             <div class="flex-1">
-                <h4 class="font-bold text-yellow-900 text-sm">Camera or network issue?</h4>
-                <p class="text-xs text-yellow-800 mt-1">
-                    WhatsApp your photos and video to <strong>8319337063</strong> with booking reference
-                    <strong class="font-mono">{{ booking.booking_reference }}</strong>. 
-                    Admin will update the report manually.
+                <h4 class="font-bold text-amber-900 text-sm">Live Camera Only</h4>
+                <p class="text-xs text-amber-800 mt-1">
+                    Photos and video must be captured <strong>live from camera</strong> — gallery upload not allowed.
+                    This ensures authenticity and prevents fraud.
                 </p>
-                <div class="flex gap-2 mt-3 flex-wrap">
-                    <a href="https://wa.me/918319337063?text=Booking%20{{ booking.booking_reference }}%20-%20Return%20Report%20upload%20help" 
-                       target="_blank"
-                       class="bg-green-600 text-white font-bold text-xs px-3 py-2 rounded-lg hover:bg-green-700">
-                        💬 WhatsApp Admin
-                    </a>
-                    <a href="tel:+918319337063"
-                       class="bg-gray-700 text-white font-bold text-xs px-3 py-2 rounded-lg hover:bg-gray-800">
-                        📞 Call Admin
-                    </a>
-                </div>
+                <p class="text-xs text-amber-700 mt-2">
+                    <strong>Camera not working?</strong> Try using another device to login and submit the report.
+                    For urgent issues, contact admin: <strong>8319337063</strong>
+                </p>
             </div>
         </div>
     </div>
@@ -64,11 +56,11 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-sm">1</span>
-                <h4 class="font-bold text-lg">Take Photos</h4>
+                <h4 class="font-bold text-lg">Take Live Photos</h4>
                 <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
             </div>
             <button type="button" onclick="capturePhoto()" class="w-full bg-orange-600 text-white font-bold py-4 rounded-xl hover:bg-orange-700 text-sm mb-3">
-                <i class="fa-solid fa-camera mr-2"></i>📸 Take Photo (Camera)
+                <i class="fa-solid fa-camera mr-2"></i>📸 Take Photo (Live Camera)
             </button>
             <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
             <div id="photosGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
@@ -81,7 +73,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-sm">2</span>
-                <h4 class="font-bold text-lg">Record 15-Second Video</h4>
+                <h4 class="font-bold text-lg">Record 15-Second Live Video</h4>
                 <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
             </div>
             
@@ -106,7 +98,6 @@
                 </button>
             </div>
             
-            <!-- Video Ready - FIXED UI -->
             <div id="videoReady" class="hidden">
                 <div class="bg-green-50 border-2 border-green-300 rounded-xl p-3 mb-3">
                     <div class="flex items-center gap-2 mb-2">
@@ -270,162 +261,4 @@ async function startRecording() {
             audio: true
         });
         const preview = document.getElementById('recordingPreview');
-        preview.srcObject = stream;
-        preview.muted = true;
-        await preview.play();
-        
-        let mimeType = 'video/webm;codecs=vp8,opus';
-        if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'video/webm';
-            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
-        }
-        
-        mediaRecorder = new MediaRecorder(stream, { mimeType });
-        recordedChunks = [];
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.onstop = () => {
-            stream.getTracks().forEach(t => t.stop());
-            const blob = new Blob(recordedChunks, { type: mimeType });
-            recordedVideoBlob = blob;
-            document.getElementById('recordedVideo').src = URL.createObjectURL(blob);
-            document.getElementById('videoRecording').classList.add('hidden');
-            document.getElementById('videoReady').classList.remove('hidden');
-            document.getElementById('videoSize').textContent = 'Size: ' + (blob.size / (1024*1024)).toFixed(2) + ' MB';
-            updateProgress();
-        };
-        mediaRecorder.start();
-        document.getElementById('videoIdle').classList.add('hidden');
-        document.getElementById('videoRecording').classList.remove('hidden');
-        recordingSeconds = 15;
-        document.getElementById('countdown').textContent = recordingSeconds;
-        recordingTimer = setInterval(() => {
-            recordingSeconds--;
-            document.getElementById('countdown').textContent = recordingSeconds;
-            if (recordingSeconds <= 0) stopRecording();
-        }, 1000);
-    } catch (err) {
-        alert('Camera access denied: ' + err.message);
-    }
-}
-
-function stopRecording() {
-    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-}
-
-function resetVideo() {
-    recordedVideoBlob = null;
-    document.getElementById('videoReady').classList.add('hidden');
-    document.getElementById('videoIdle').classList.remove('hidden');
-    document.getElementById('recordedVideo').src = '';
-    updateProgress();
-}
-
-function previewVideo() {
-    const video = document.getElementById('recordedVideo');
-    if (video.paused) {
-        video.play();
-    } else {
-        video.pause();
-    }
-}
-
-function toggleDamageNotes() {
-    const checkbox = document.getElementById('damageFlag');
-    const div = document.getElementById('damageNotesDiv');
-    if (checkbox.checked) div.classList.remove('hidden');
-    else div.classList.add('hidden');
-}
-
-function updateProgress() {
-    let done = 0;
-    if (photos.length > 0) done++;
-    if (recordedVideoBlob) done++;
-    
-    document.getElementById('progressText').textContent = done + '/2 completed (Photos + Video)';
-    
-    const btn = document.getElementById('submitBtn');
-    if (done === 2) {
-        btn.disabled = false;
-        btn.className = 'w-full bg-orange-600 text-white font-bold py-4 rounded-xl hover:bg-orange-700';
-        btn.textContent = '✅ Submit Return Report';
-    } else {
-        btn.disabled = true;
-        btn.className = 'w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed';
-        btn.textContent = 'Complete Photos + Video to Submit';
-    }
-}
-
-async function submitReport() {
-    if (photos.length === 0 || !recordedVideoBlob) { 
-        alert('Please add photos and video first'); 
-        return; 
-    }
-    
-    const damageFlag = document.getElementById('damageFlag').checked;
-    const damageNotes = document.getElementById('damageNotes').value.trim();
-    if (damageFlag && !damageNotes) { 
-        alert('Please describe the damage'); 
-        return; 
-    }
-    
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading video...';
-    
-    const status = document.getElementById('uploadStatus');
-    status.className = 'p-3 rounded-lg text-sm bg-blue-100 text-blue-800';
-    status.textContent = 'Uploading video...';
-    status.classList.remove('hidden');
-    
-    try {
-        const videoFormData = new FormData();
-        videoFormData.append('video', recordedVideoBlob, 'report.webm');
-        videoFormData.append('booking_id', '{{ booking.id }}');
-        videoFormData.append('report_type', 'return');
-        const videoRes = await fetch('/api/report/upload-video', { method: 'POST', body: videoFormData });
-        const videoData = await videoRes.json();
-        if (!videoData.success) throw new Error(videoData.error || 'Video upload failed');
-        
-        status.textContent = 'Video uploaded. Uploading photos...';
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading photos...';
-        
-        const condition = document.querySelector('input[name="condition"]:checked').value;
-        const notes = document.getElementById('notesInput').value.trim();
-        const reportRes = await fetch('/api/report/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                booking_id: {{ booking.id }},
-                report_type: 'return',
-                photos: photos,
-                video_url: videoData.video_url,
-                video_public_id: videoData.video_public_id,
-                condition_rating: condition,
-                damage_flagged: damageFlag,
-                damage_notes: damageNotes,
-                notes: notes,
-                gps_lat: gpsLat,
-                gps_lng: gpsLng
-            })
-        });
-        const data = await reportRes.json();
-        if (data.success) {
-            status.className = 'p-3 rounded-lg text-sm bg-green-100 text-green-800';
-            status.textContent = '✅ Report submitted successfully!';
-            btn.innerHTML = '✅ Submitted!';
-            setTimeout(() => window.location.href = '{{ url_for("dashboard") }}', 1500);
-        } else {
-            throw new Error(data.error || 'Submit failed');
-        }
-    } catch (err) {
-        status.className = 'p-3 rounded-lg text-sm bg-red-100 text-red-800';
-        status.textContent = '❌ ' + err.message;
-        btn.disabled = false;
-        btn.innerHTML = 'Retry Submit';
-    }
-}
-
-updateProgress();
-</script>
-{% endblock %}
+        preview.srcObject =
