@@ -17,8 +17,6 @@ from werkzeug.utils import secure_filename
 
 # ============================================
 # SAFETY: Clear invalid CLOUDINARY_URL before importing cloudinary
-# The cloudinary library reads CLOUDINARY_URL at import time and crashes if invalid.
-# We use CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET instead.
 # ============================================
 _env_cl_url = os.environ.get('CLOUDINARY_URL', '')
 if _env_cl_url and not _env_cl_url.startswith('cloudinary://'):
@@ -77,7 +75,7 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_DURATION = timedelta(days=7)
     
-    MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB (for video)
+    MAX_CONTENT_LENGTH = 100 * 1024 * 1024
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     
     TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN') or ''
@@ -85,6 +83,10 @@ class Config:
     CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME') or ''
     CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
     CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
+    
+    # Auto-delete configuration
+    REPORT_RETENTION_DAYS = 30
+    CRON_SECRET = os.environ.get('CRON_SECRET') or 'vyahmandap-cron-secret-2026'
     
     BUSINESS_NAME = "VyahMandap"
     BUSINESS_PHONE = "8319337063"
@@ -268,8 +270,34 @@ class EquipmentReport(db.Model):
     ip_address = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Auto-delete fields
+    expired = db.Column(db.Boolean, default=False)
+    expired_at = db.Column(db.DateTime, nullable=True)
+    keep_forever = db.Column(db.Boolean, default=False)
+    
     reporter = db.relationship('User', foreign_keys=[reporter_id])
     booking = db.relationship('Booking', backref='equipment_reports')
+    
+    @property
+    def age_in_days(self):
+        if not self.created_at:
+            return 0
+        return (datetime.utcnow() - self.created_at).days
+    
+    @property
+    def is_expired(self):
+        if self.keep_forever:
+            return False
+        if self.expired:
+            return True
+        return self.age_in_days >= Config.REPORT_RETENTION_DAYS
+    
+    @property
+    def days_until_expiry(self):
+        if self.keep_forever:
+            return -1
+        remaining = Config.REPORT_RETENTION_DAYS - self.age_in_days
+        return max(0, remaining)
 
 
 class Message(db.Model):
@@ -345,6 +373,79 @@ login_manager.init_app(app)
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+# ============================================
+# AUTO-DELETE OLD REPORTS
+# ============================================
+
+def cleanup_old_reports(dry_run=False):
+    """Delete reports older than REPORT_RETENTION_DAYS days"""
+    cutoff_date = datetime.utcnow() - timedelta(days=Config.REPORT_RETENTION_DAYS)
+    
+    eligible_reports = EquipmentReport.query.filter(
+        EquipmentReport.created_at < cutoff_date,
+        EquipmentReport.expired == False,
+        EquipmentReport.keep_forever == False,
+        EquipmentReport.damage_flagged == False
+    ).all()
+    
+    stats = {
+        'total_checked': EquipmentReport.query.count(),
+        'eligible': len(eligible_reports),
+        'deleted_photos': 0,
+        'deleted_videos': 0,
+        'failed': 0,
+        'dry_run': dry_run
+    }
+    
+    if dry_run:
+        print(f"🔍 DRY RUN: {len(eligible_reports)} reports would be deleted")
+        return stats
+    
+    for report in eligible_reports:
+        try:
+            photos = json_lib.loads(report.photos_json) if report.photos_json else []
+            for photo in photos:
+                try:
+                    if photo.get('url'):
+                        url = photo['url']
+                        if 'cloudinary.com' in url and '/upload/' in url:
+                            after_upload = url.split('/upload/')[-1]
+                            if after_upload.startswith('v'):
+                                parts = after_upload.split('/', 1)
+                                if len(parts) > 1:
+                                    after_upload = parts[1]
+                            public_id = after_upload.rsplit('.', 1)[0]
+                            cloudinary.uploader.destroy(public_id)
+                            stats['deleted_photos'] += 1
+                except Exception as e:
+                    print(f"⚠️ Photo delete failed: {e}")
+                    stats['failed'] += 1
+            
+            if report.video_public_id:
+                try:
+                    cloudinary.uploader.destroy(
+                        report.video_public_id,
+                        resource_type='video'
+                    )
+                    stats['deleted_videos'] += 1
+                except Exception as e:
+                    print(f"⚠️ Video delete failed: {e}")
+                    stats['failed'] += 1
+            
+            report.expired = True
+            report.expired_at = datetime.utcnow()
+            report.video_url = None
+            report.video_public_id = None
+            
+        except Exception as e:
+            print(f"❌ Report {report.id} cleanup failed: {e}")
+            stats['failed'] += 1
+    
+    db.session.commit()
+    print(f"✅ Cleanup done: {stats}")
+    return stats
 
 
 # ============================================
@@ -437,39 +538,49 @@ def upload_base64_to_cloudinary(base64_string, folder='vyahmandap/reports'):
 
 
 def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
-    """Upload video file to Cloudinary. Returns (url, public_id) or (None, None)"""
     if not Config.CLOUDINARY_CLOUD_NAME:
         print("⚠️ Cloudinary not configured")
         return None, None
     
+    temp_path = None
     try:
-        # Save to temp file first
         with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp:
             file_obj.save(tmp.name)
             temp_path = tmp.name
         
-        # Upload to Cloudinary with compression
+        file_size = os.path.getsize(temp_path)
+        print(f"📹 Video file size: {file_size / (1024*1024):.2f} MB")
+        
         result = cloudinary.uploader.upload(
             temp_path,
             folder=folder,
             resource_type='video',
+            timeout=120,
+            chunk_size=6000000,
             transformation=[
-                {'width': 640, 'height': 480, 'crop': 'limit'},
+                {'width': 480, 'height': 360, 'crop': 'limit'},
                 {'quality': 60},
                 {'fetch_format': 'mp4'}
             ]
         )
         
-        # Clean up temp file
-        try:
-            os.remove(temp_path)
-        except:
-            pass
+        video_url = result.get('secure_url')
+        public_id = result.get('public_id')
         
-        return result.get('secure_url'), result.get('public_id')
+        print(f"✅ Video uploaded: {video_url}")
+        return video_url, public_id
+        
     except Exception as e:
-        print(f"❌ Cloudinary video upload failed: {e}")
+        print(f"❌ Cloudinary video upload failed: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return None, None
+    finally:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except:
+                pass
 
 
 def get_client_info(request_obj):
@@ -940,7 +1051,6 @@ def report_return(booking_id):
 @app.route('/api/report/upload-video', methods=['POST'])
 @login_required
 def api_report_upload_video():
-    """Upload video for a report"""
     if 'video' not in request.files:
         return jsonify({'error': 'No video file'}), 400
     
@@ -956,7 +1066,6 @@ def api_report_upload_video():
     
     booking = Booking.query.get_or_404(booking_id)
     
-    # Permission check
     if report_type == 'dispatch':
         if booking.item.vendor_id != current_user.id and current_user.role != 'admin':
             return jsonify({'error': 'Access denied'}), 403
@@ -966,11 +1075,14 @@ def api_report_upload_video():
     else:
         return jsonify({'error': 'Invalid report type'}), 400
     
+    if not Config.CLOUDINARY_CLOUD_NAME:
+        return jsonify({'error': 'Cloudinary not configured. Contact admin.'}), 500
+    
     folder = f'vyahmandap/reports/videos/booking_{booking_id}_{report_type}'
     url, public_id = upload_video_to_cloudinary(video, folder=folder)
     
     if not url:
-        return jsonify({'error': 'Video upload failed. Try again.'}), 500
+        return jsonify({'error': 'Video upload to cloud failed. Check server logs.'}), 500
     
     return jsonify({
         'success': True,
@@ -1015,7 +1127,6 @@ def api_report_submit():
     if len(photos) < 1:
         return jsonify({'error': 'At least 1 photo required'}), 400
     
-    # Upload photos
     uploaded = []
     for idx, photo in enumerate(photos):
         url = upload_base64_to_cloudinary(
@@ -1063,7 +1174,6 @@ def api_report_submit():
     
     db.session.commit()
     
-    # If damage flagged, create ticket
     if damage_flagged:
         ticket = Ticket(
             ticket_number=generate_ticket_number(),
@@ -1085,7 +1195,6 @@ def api_report_submit():
         db.session.add(ticket)
         db.session.commit()
         
-        # Notify admins
         admins = User.query.filter_by(role='admin').all()
         for admin_user in admins:
             if admin_user.telegram_chat_id:
@@ -1099,7 +1208,6 @@ def api_report_submit():
                 )
                 send_telegram_notification_async(admin_user.telegram_chat_id, msg)
     
-    # Regular Telegram notifications
     if report_type == 'dispatch':
         if booking.customer.telegram_chat_id:
             msg = (
@@ -1211,7 +1319,6 @@ def vendor_dashboard():
         and b.booking_status in ['confirmed', 'dispatched']
     ]
     
-    # ===== NEW: Bookings needing dispatch report =====
     pending_dispatch = [b for b in bookings 
                        if not b.dispatch_report_done 
                        and b.booking_status == 'confirmed']
@@ -1224,7 +1331,6 @@ def vendor_dashboard():
                          total_items=total_items,
                          upcoming_bookings=upcoming_bookings,
                          pending_dispatch=pending_dispatch)
-    
 
 
 @app.route('/vendor/calendar')
@@ -1884,6 +1990,100 @@ def admin_ticket_detail(ticket_id):
 
 
 # ============================================
+# ADMIN — STORAGE MANAGEMENT
+# ============================================
+
+@app.route('/admin/storage')
+@login_required
+def admin_storage():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    all_reports = EquipmentReport.query.all()
+    total_reports = len(all_reports)
+    active_reports = sum(1 for r in all_reports if not r.expired and not r.keep_forever)
+    expired_reports = sum(1 for r in all_reports if r.expired)
+    protected_reports = sum(1 for r in all_reports if r.keep_forever)
+    disputed_reports = sum(1 for r in all_reports if r.damage_flagged)
+    
+    expiring_soon = []
+    for r in all_reports:
+        if not r.expired and not r.keep_forever and not r.damage_flagged:
+            if 0 <= r.days_until_expiry <= 7:
+                expiring_soon.append(r)
+    
+    eligible_now = [r for r in all_reports 
+                    if not r.expired and not r.keep_forever 
+                    and not r.damage_flagged and r.is_expired]
+    
+    recent_expired = EquipmentReport.query.filter_by(expired=True)\
+        .order_by(EquipmentReport.expired_at.desc()).limit(20).all()
+    
+    return render_template('admin/storage.html',
+                         total_reports=total_reports,
+                         active_reports=active_reports,
+                         expired_reports=expired_reports,
+                         protected_reports=protected_reports,
+                         disputed_reports=disputed_reports,
+                         expiring_soon=expiring_soon,
+                         eligible_now=eligible_now,
+                         recent_expired=recent_expired)
+
+
+@app.route('/admin/storage/cleanup', methods=['POST'])
+@login_required
+def admin_storage_cleanup():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    dry_run = request.form.get('dry_run') == 'true'
+    stats = cleanup_old_reports(dry_run=dry_run)
+    
+    if dry_run:
+        flash(f"🔍 Dry run: {stats['eligible']} reports would be deleted. "
+              f"{stats['deleted_photos']} photos + {stats['deleted_videos']} videos.", 'info')
+    else:
+        flash(f"✅ Cleanup complete: {stats['deleted_photos']} photos + "
+              f"{stats['deleted_videos']} videos deleted. "
+              f"({stats['failed']} failures)", 'success')
+    
+    return redirect(url_for('admin_storage'))
+
+
+@app.route('/admin/report/<int:report_id>/toggle-protect', methods=['POST'])
+@login_required
+def admin_toggle_report_protection(report_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    report = EquipmentReport.query.get_or_404(report_id)
+    report.keep_forever = not report.keep_forever
+    db.session.commit()
+    
+    if report.keep_forever:
+        flash(f'🔒 Report #{report.id} protected from auto-delete.', 'success')
+    else:
+        flash(f'🔓 Report #{report.id} protection removed.', 'info')
+    
+    return redirect(request.referrer or url_for('admin_storage'))
+
+
+@app.route('/api/cron/cleanup', methods=['GET', 'POST'])
+def cron_cleanup():
+    token = request.args.get('token') or request.form.get('token')
+    expected = Config.CRON_SECRET
+    
+    if token != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    stats = cleanup_old_reports(dry_run=False)
+    return jsonify({'success': True, 'stats': stats})
+
+
+# ============================================
 # ADMIN ROUTES
 # ============================================
 
@@ -1924,6 +2124,14 @@ def admin_dashboard():
     
     damage_flagged_count = Booking.query.filter_by(damage_flagged=True).count()
     
+    # Storage stats
+    all_reports = EquipmentReport.query.all()
+    total_reports = len(all_reports)
+    active_reports = sum(1 for r in all_reports if not r.expired and not r.keep_forever)
+    expired_reports = sum(1 for r in all_reports if r.expired)
+    protected_reports = sum(1 for r in all_reports if r.keep_forever)
+    disputed_reports = sum(1 for r in all_reports if r.damage_flagged)
+    
     recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(10).all()
     recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
     recent_items = Item.query.order_by(Item.created_at.desc()).limit(5).all()
@@ -1951,6 +2159,11 @@ def admin_dashboard():
                          reports_pending_dispatch=reports_pending_dispatch,
                          reports_pending_return=reports_pending_return,
                          damage_flagged_count=damage_flagged_count,
+                         total_reports=total_reports,
+                         active_reports=active_reports,
+                         expired_reports=expired_reports,
+                         protected_reports=protected_reports,
+                         disputed_reports=disputed_reports,
                          recent_bookings=recent_bookings,
                          recent_users=recent_users,
                          recent_items=recent_items)
@@ -2373,31 +2586,21 @@ def utility_processor():
 
 def init_database():
     try:
-        # ============================================
-        # AUTO-MIGRATION: Add missing columns to existing tables
-        # This handles the case where new columns are added to models
-        # but the existing DB tables don't have them yet.
-        # Uses "IF NOT EXISTS" so it's safe to run every time.
-        # ============================================
+        # Auto-migration: Add missing columns
         try:
             from sqlalchemy import text
             
             migrations = [
-                # Bookings table - Condition Report columns
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatch_report_done BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_report_done BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS damage_flagged BOOLEAN DEFAULT FALSE",
-                # Bookings table - Advance/Remaining payment columns
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_utr VARCHAR(50)",
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_paid BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS advance_paid BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_paid_at TIMESTAMP",
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS advance_amount FLOAT DEFAULT 0",
-                "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS remaining_amount FLOAT DEFAULT 0",
-                # Items table - Verification columns
+                "ALTER TABLE equipment_reports ADD COLUMN IF NOT EXISTS expired BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE equipment_reports ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP",
+                "ALTER TABLE equipment_reports ADD COLUMN IF NOT EXISTS keep_forever BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE equipment_reports ADD COLUMN IF NOT EXISTS video_url VARCHAR(500)",
+                "ALTER TABLE equipment_reports ADD COLUMN IF NOT EXISTS video_public_id VARCHAR(200)",
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
-                # Users table - Telegram column
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
@@ -2408,23 +2611,15 @@ def init_database():
                     try:
                         conn.execute(text(sql))
                     except Exception as col_err:
-                        # Column may already exist or table may not exist yet
-                        print(f"⚠️ Migration note: {str(col_err)[:80]}")
+                        pass
                 conn.commit()
             print("✅ Auto-migration: All columns verified/added")
         except Exception as mig_err:
             print(f"⚠️ Auto-migration skipped: {mig_err}")
-            # Continue anyway - db.create_all() will handle new tables
         
-        # ============================================
-        # CREATE TABLES (if not exist)
-        # ============================================
         db.create_all()
         print("✅ Database tables created!")
         
-        # ============================================
-        # SEED DEFAULT USERS
-        # ============================================
         admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
         if not admin:
             admin = User(name='VyahMandap Admin', mobile=Config.ADMIN_MOBILE,
@@ -2452,9 +2647,6 @@ def init_database():
             db.session.commit()
             print('✅ Demo vendor created!')
         
-        # ============================================
-        # SEED DEFAULT ITEMS
-        # ============================================
         if Item.query.count() == 0:
             default_items = [
                 {'title': 'Maharaja Gold Carved Wedding Sofa',
@@ -2482,7 +2674,6 @@ def init_database():
                 db.session.add(Item(**item_data))
             db.session.commit()
             print('✅ Default items created!')
-        
         return True
     except Exception as e:
         print(f"❌ DB init error: {e}")
@@ -2501,6 +2692,7 @@ with app.app_context():
     print(f"📱 Telegram Bot: {'Enabled' if Config.TELEGRAM_BOT_TOKEN else 'Disabled'}")
     print(f"📷 Cloudinary: {'Configured' if Config.CLOUDINARY_CLOUD_NAME else 'Not configured'}")
     print(f"🗄️  Database: {'PostgreSQL' if 'postgres' in Config.SQLALCHEMY_DATABASE_URI else 'SQLite'}")
+    print(f"⏰ Report Retention: {Config.REPORT_RETENTION_DAYS} days")
     print("=" * 50)
     init_database()
 
