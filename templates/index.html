@@ -36,58 +36,6 @@
     <div class="absolute right-0 bottom-0 opacity-10 text-[180px] leading-none font-black select-none">VM</div>
 </div>
 
-<!-- Top Vendors Showcase -->
-<div class="mb-8">
-    <div class="flex justify-between items-center mb-4">
-        <div>
-            <h3 class="text-xl font-bold">🏆 Top Rated Vendors</h3>
-            <p class="text-xs text-gray-500">Trusted by customers</p>
-        </div>
-        <a href="{{ url_for('leaderboard') }}" class="text-sm text-green-700 font-bold hover:underline">
-            View Full Leaderboard →
-        </a>
-    </div>
-    
-    <div id="topVendorsShowcase" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Loaded via API -->
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    fetch('/api/leaderboard/top3')
-        .then(res => res.json())
-        .then(data => {
-            const container = document.getElementById('topVendorsShowcase');
-            if (!data.vendors || data.vendors.length === 0) {
-                container.innerHTML = `<div class="col-span-3 text-center text-gray-500 text-sm py-4">Vendors will appear here once they get bookings.</div>`;
-                return;
-            }
-            
-            const medals = ['🥇', '🥈', '🥉'];
-            container.innerHTML = data.vendors.map((v, i) => `
-                <a href="{{ url_for('leaderboard') }}" class="bg-white rounded-xl border shadow-sm p-4 hover:shadow-md transition">
-                    <div class="flex items-center gap-3">
-                        <div class="text-3xl">${medals[i]}</div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="font-bold text-sm truncate">${v.name}</h4>
-                            <div class="flex gap-2 text-xs text-gray-500 mt-0.5">
-                                <span>⭐ ${v.rating}</span>
-                                <span>📦 ${v.bookings}</span>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-xs text-gray-500">Score</div>
-                            <strong class="text-green-700">${v.score}</strong>
-                        </div>
-                    </div>
-                </a>
-            `).join('');
-        })
-        .catch(err => console.error('Top vendors error:', err));
-});
-</script>
-
 <!-- Marketplace -->
 <div id="marketplace">
     <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
@@ -129,7 +77,7 @@ function filterItems(category) {
 }
 
 function loadItems() {
-    const url = `/api/items?category=${currentCategory}`;
+    const url = `/api/items?category=${currentCategory}&show_unavailable=true`;
     const grid = document.getElementById('productGrid');
     const count = document.getElementById('itemCount');
     
@@ -142,7 +90,14 @@ function loadItems() {
     fetch(url)
         .then(res => res.json())
         .then(items => {
-            count.textContent = items.length + ' items available';
+            // Sort: available items first, then unavailable
+            items.sort((a, b) => {
+                if (a.is_available === b.is_available) return 0;
+                return a.is_available ? -1 : 1;
+            });
+            
+            const availableCount = items.filter(i => i.is_available).length;
+            count.textContent = availableCount + ' of ' + items.length + ' items available';
             
             if (!items.length) {
                 grid.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12 text-sm">No items in this category yet.</div>`;
@@ -150,7 +105,6 @@ function loadItems() {
             }
             
             grid.innerHTML = items.map(item => {
-                // Rating display
                 let ratingHtml = '';
                 if (item.review_count > 0) {
                     ratingHtml = `
@@ -170,13 +124,20 @@ function loadItems() {
                 }
                 
                 return `
-                <div class="bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-lg transition flex flex-col">
-                    <div class="h-48 bg-gray-100 overflow-hidden">
+                <div class="bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-lg transition flex flex-col ${!item.is_available ? 'opacity-90' : ''}">
+                    <div class="h-48 bg-gray-100 overflow-hidden relative">
                         <img src="${item.image || '/static/images/default-item.jpg'}" 
-                             class="w-full h-full object-cover" 
+                             class="w-full h-full object-cover ${!item.is_available ? 'grayscale' : ''}" 
                              alt="${item.title}" 
                              loading="lazy"
                              onerror="this.src='/static/images/default-item.jpg'">
+                        ${!item.is_available ? `
+                            <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
+                                <span class="bg-gray-800 text-white text-xs font-bold px-3 py-2 rounded-full">
+                                    ⚪ Currently Unavailable
+                                </span>
+                            </div>
+                        ` : ''}
                     </div>
                     <div class="p-4 flex-1 flex flex-col">
                         <div class="flex justify-between text-[10px] font-semibold text-gray-500 uppercase">
@@ -200,10 +161,18 @@ function loadItems() {
                                    class="bg-blue-600 text-white text-xs font-bold px-2 py-2 rounded-lg hover:bg-blue-700 transition text-center">
                                     <i class="fa-regular fa-comment mr-1"></i>Chat
                                 </a>
-                                <a href="/book/${item.id}" 
-                                   class="bg-green-700 text-white text-xs font-bold px-2 py-2 rounded-lg hover:bg-green-600 transition text-center">
-                                    Book Now
-                                </a>
+                                ${item.is_available ? `
+                                    <a href="/book/${item.id}" 
+                                       class="bg-green-700 text-white text-xs font-bold px-2 py-2 rounded-lg hover:bg-green-600 transition text-center">
+                                        Book Now
+                                    </a>
+                                ` : `
+                                    <button disabled 
+                                            class="bg-gray-300 text-gray-500 text-xs font-bold px-2 py-2 rounded-lg cursor-not-allowed text-center"
+                                            title="This item is currently unavailable">
+                                        Not Available
+                                    </button>
+                                `}
                             </div>
                             <a href="/item/${item.id}/reviews" class="block text-center text-xs text-gray-500 hover:text-green-700 mt-2">
                                 <i class="fa-regular fa-star mr-1"></i>View Reviews
