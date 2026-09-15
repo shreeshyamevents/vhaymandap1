@@ -15,33 +15,25 @@
     <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-6">
         <h4 class="font-bold text-blue-900 mb-2">🚚 Dispatch Report — Before Sending Equipment</h4>
         <p class="text-sm text-blue-800">
-            Take <strong>photos</strong> and record a <strong>15-second video</strong> before dispatching.
-            This protects you from any damage disputes.
+            Take <strong>live photos</strong> and record a <strong>15-second live video</strong> before dispatching.
+            Live capture protects both you and the customer from any damage disputes.
         </p>
     </div>
 
-    <!-- WhatsApp Fallback -->
-    <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-6">
+    <!-- Important Notice -->
+    <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6">
         <div class="flex items-start gap-3">
-            <div class="text-2xl">📱</div>
+            <div class="text-2xl">⚠️</div>
             <div class="flex-1">
-                <h4 class="font-bold text-yellow-900 text-sm">Camera or network issue?</h4>
-                <p class="text-xs text-yellow-800 mt-1">
-                    WhatsApp your photos and video to <strong>8319337063</strong> with booking reference
-                    <strong class="font-mono">{{ booking.booking_reference }}</strong>. 
-                    Admin will update the report manually.
+                <h4 class="font-bold text-amber-900 text-sm">Live Camera Only</h4>
+                <p class="text-xs text-amber-800 mt-1">
+                    Photos and video must be captured <strong>live from camera</strong> — gallery upload not allowed.
+                    This ensures authenticity and prevents fraud.
                 </p>
-                <div class="flex gap-2 mt-3 flex-wrap">
-                    <a href="https://wa.me/918319337063?text=Booking%20{{ booking.booking_reference }}%20-%20Dispatch%20Report%20upload%20help" 
-                       target="_blank"
-                       class="bg-green-600 text-white font-bold text-xs px-3 py-2 rounded-lg hover:bg-green-700">
-                        💬 WhatsApp Admin
-                    </a>
-                    <a href="tel:+918319337063"
-                       class="bg-gray-700 text-white font-bold text-xs px-3 py-2 rounded-lg hover:bg-gray-800">
-                        📞 Call Admin
-                    </a>
-                </div>
+                <p class="text-xs text-amber-700 mt-2">
+                    <strong>Camera not working?</strong> Try using another device to login and submit the report.
+                    For urgent issues, contact admin: <strong>8319337063</strong>
+                </p>
             </div>
         </div>
     </div>
@@ -64,11 +56,11 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-8 h-8 rounded-full bg-green-700 text-white flex items-center justify-center font-bold text-sm">1</span>
-                <h4 class="font-bold text-lg">Take Photos</h4>
+                <h4 class="font-bold text-lg">Take Live Photos</h4>
                 <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
             </div>
             <button type="button" onclick="capturePhoto()" class="w-full bg-green-700 text-white font-bold py-4 rounded-xl hover:bg-green-600 text-sm mb-3">
-                <i class="fa-solid fa-camera mr-2"></i>📸 Take Photo (Camera)
+                <i class="fa-solid fa-camera mr-2"></i>📸 Take Photo (Live Camera)
             </button>
             <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event)">
             <div id="photosGrid" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
@@ -81,7 +73,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-sm">2</span>
-                <h4 class="font-bold text-lg">Record 15-Second Video</h4>
+                <h4 class="font-bold text-lg">Record 15-Second Live Video</h4>
                 <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Required</span>
             </div>
             
@@ -303,7 +295,7 @@ async function startRecording() {
             if (recordingSeconds <= 0) stopRecording();
         }, 1000);
     } catch (err) {
-        alert('Camera access denied: ' + err.message);
+        alert('Camera access denied: ' + err.message + '\n\nPlease allow camera permission in your browser settings.');
     }
 }
 
