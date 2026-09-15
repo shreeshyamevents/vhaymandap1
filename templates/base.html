@@ -7,7 +7,175 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    {% block extra_head %}{% endblock %}
+    <style>
+        /* Dropdown base styles */
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            min-width: 220px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+            padding: 8px;
+            z-index: 100;
+            margin-top: 8px;
+        }
+        
+        .dropdown-menu.open {
+            display: block;
+            animation: dropdownFade 0.15s ease-out;
+        }
+        
+        @keyframes dropdownFade {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #374151;
+            transition: all 0.15s ease;
+            position: relative;
+            text-decoration: none;
+        }
+        
+        .dropdown-item:hover {
+            background: #f3f4f6;
+            color: #2d5a3d;
+        }
+        
+        .dropdown-item.danger {
+            color: #dc2626;
+        }
+        
+        .dropdown-item.danger:hover {
+            background: #fee2e2;
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background: #e5e7eb;
+            margin: 6px 0;
+        }
+        
+        .dropdown-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            padding: 6px 12px 2px;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-count {
+            background: #dc2626;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: auto;
+        }
+        
+        .nav-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+        }
+        
+        .nav-btn:hover {
+            background: #f3f4f6;
+            color: #2d5a3d;
+        }
+        
+        .nav-btn .chevron {
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+        
+        .nav-btn.open .chevron {
+            transform: rotate(180deg);
+        }
+        
+        /* Mobile sidebar */
+        .mobile-sidebar {
+            position: fixed;
+            top: 0;
+            right: -320px;
+            width: 320px;
+            height: 100vh;
+            background: white;
+            z-index: 200;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .mobile-sidebar.open {
+            right: 0;
+        }
+        
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 190;
+        }
+        
+        .mobile-overlay.open {
+            display: block;
+        }
+        
+        .mobile-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #9ca3af;
+            text-transform: uppercase;
+            padding: 12px 20px 6px;
+            letter-spacing: 0.5px;
+        }
+        
+        .mobile-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+        
+        .mobile-link:hover {
+            background: #f9fafb;
+            border-left-color: #2d5a3d;
+            color: #2d5a3d;
+        }
+        
+        .mobile-link.danger {
+            color: #dc2626;
+        }
+    </style>
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
     
@@ -19,89 +187,319 @@
         </span>
         <div class="flex gap-3 items-center flex-wrap">
             {% if current_user.is_authenticated %}
-                <span class="text-gray-400">👋 {{ current_user.name }} 
+                <span class="text-gray-400 hidden sm:inline">
+                    👋 {{ current_user.name }} 
                     <span class="text-xs bg-gray-700 px-2 py-0.5 rounded">{{ current_user.role|title }}</span>
                     {% if current_user.is_verified %}
-                        <span class="text-blue-400 text-xs ml-1"><i class="fa-solid fa-circle-check"></i> Verified</span>
+                        <i class="fa-solid fa-circle-check text-blue-400"></i>
                     {% endif %}
                 </span>
-                {% if current_user.role == 'admin' %}
-                    <a href="{{ url_for('admin_dashboard') }}" class="hover:text-white">
-                        <i class="fa-regular fa-shield mr-1"></i>Admin
-                    </a>
-                    <a href="{{ url_for('admin_tickets') }}" class="hover:text-white relative">
-                        <i class="fa-regular fa-ticket mr-1"></i>Tickets
-                        {% if open_tickets_count > 0 %}
-                            <span class="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ open_tickets_count }}</span>
-                        {% endif %}
-                    </a>
-                {% endif %}
-                {% if current_user.role in ['admin', 'vendor'] %}
-                    <a href="{{ url_for('vendor_dashboard') }}" class="hover:text-white">
-                        <i class="fa-regular fa-store mr-1"></i>Vendor
-                    </a>
-                    <a href="{{ url_for('vendor_calendar') }}" class="hover:text-white">
-                        <i class="fa-regular fa-calendar mr-1"></i>Calendar
-                    </a>
-                {% endif %}
-                {% if current_user.role == 'customer' %}
-                    <a href="{{ url_for('dashboard') }}" class="hover:text-white">
-                        <i class="fa-regular fa-gauge mr-1"></i>Dashboard
-                    </a>
-                {% endif %}
-                <a href="{{ url_for('chat_list') }}" class="hover:text-white relative">
-                    <i class="fa-regular fa-comments mr-1"></i>Messages
-                    {% if unread_message_count > 0 %}
-                        <span class="absolute -top-2 -right-3 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ unread_message_count }}</span>
-                    {% endif %}
-                </a>
-                <a href="{{ url_for('tickets_list') }}" class="hover:text-white">
-                    <i class="fa-regular fa-ticket mr-1"></i>Support
-                </a>
-                <a href="{{ url_for('link_telegram') }}" class="hover:text-white">
-                    <i class="fa-brands fa-telegram mr-1"></i>Link Telegram
-                </a>
                 <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300">
-                    Logout
+                    <i class="fa-solid fa-right-from-bracket mr-1"></i>Logout
                 </a>
             {% else %}
                 <a href="{{ url_for('login') }}" class="hover:text-white">Login</a>
-                <a href="{{ url_for('register') }}" class="bg-green-700 px-3 py-0.5 rounded hover:bg-green-600">
-                    Register
-                </a>
+                <a href="{{ url_for('register') }}" class="bg-green-700 px-3 py-0.5 rounded hover:bg-green-600">Register</a>
             {% endif %}
         </div>
     </div>
 
-    <!-- Header -->
+    <!-- Main Header -->
     <header class="bg-white border-b sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <a href="{{ url_for('index') }}" class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-green-700 flex items-center justify-center text-white font-bold text-sm">
-                    VM
-                </div>
-                <div>
-                    <h1 class="text-xl font-extrabold tracking-tight">
-                        Vyah<span class="text-green-700">Mandap</span>
-                    </h1>
-                    <span class="text-[9px] font-medium text-gray-500 uppercase tracking-wider">
-                        Wedding Equipment Marketplace
-                    </span>
+            
+            <!-- Logo -->
+            <a href="{{ url_for('index') }}" class="flex items-center gap-3 flex-shrink-0">
+                <div class="w-9 h-9 rounded-lg bg-green-700 flex items-center justify-center text-white font-bold text-sm">VM</div>
+                <div class="hidden sm:block">
+                    <h1 class="text-lg font-extrabold tracking-tight leading-none">Vyah<span class="text-green-700">Mandap</span></h1>
+                    <span class="text-[9px] font-medium text-gray-500 uppercase tracking-wider">Wedding Equipment</span>
                 </div>
             </a>
-            <div class="flex items-center gap-3">
+
+            <!-- Desktop Navigation -->
+            {% if current_user.is_authenticated %}
+            <nav class="hidden md:flex items-center gap-1">
+                
+                <!-- Browse Dropdown -->
+                <div class="relative">
+                    <button onclick="toggleDropdown(event, 'browseMenu')" class="nav-btn" data-dropdown="browseMenu">
+                        <i class="fa-solid fa-compass"></i>Browse
+                        <i class="fa-solid fa-chevron-down chevron"></i>
+                    </button>
+                    <div id="browseMenu" class="dropdown-menu">
+                        <a href="{{ url_for('index') }}" class="dropdown-item">
+                            <i class="fa-solid fa-home w-4 text-gray-400"></i>Home
+                        </a>
+                        <a href="{{ url_for('index') }}#marketplace" class="dropdown-item">
+                            <i class="fa-solid fa-boxes-stacked w-4 text-gray-400"></i>Marketplace
+                        </a>
+                        <a href="{{ url_for('leaderboard') }}" class="dropdown-item">
+                            <i class="fa-solid fa-trophy w-4 text-yellow-500"></i>Leaderboard
+                        </a>
+                        <a href="{{ url_for('vendor_calendar') if current_user.role in ['admin', 'vendor'] else '#' }}" 
+                           class="dropdown-item {% if current_user.role not in ['admin', 'vendor'] %}opacity-50 pointer-events-none{% endif %}">
+                            <i class="fa-regular fa-calendar w-4 text-gray-400"></i>Availability Calendar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- My Account Dropdown -->
+                <div class="relative">
+                    <button onclick="toggleDropdown(event, 'accountMenu')" class="nav-btn" data-dropdown="accountMenu">
+                        <i class="fa-solid fa-user"></i>My Account
+                        <i class="fa-solid fa-chevron-down chevron"></i>
+                    </button>
+                    <div id="accountMenu" class="dropdown-menu">
+                        {% if current_user.role == 'customer' %}
+                            <a href="{{ url_for('dashboard') }}" class="dropdown-item">
+                                <i class="fa-solid fa-gauge w-4 text-green-700"></i>My Dashboard
+                            </a>
+                        {% endif %}
+                        
+                        {% if current_user.role in ['admin', 'vendor'] %}
+                            <div class="dropdown-label">Vendor</div>
+                            <a href="{{ url_for('vendor_dashboard') }}" class="dropdown-item">
+                                <i class="fa-solid fa-store w-4 text-green-700"></i>Vendor Dashboard
+                            </a>
+                            <a href="{{ url_for('vendor_sales') }}" class="dropdown-item" style="padding-left: 34px;">
+                                <i class="fa-solid fa-arrow-up w-3 text-blue-600"></i>My Sales
+                            </a>
+                            <a href="{{ url_for('vendor_rentals') }}" class="dropdown-item" style="padding-left: 34px;">
+                                <i class="fa-solid fa-arrow-down w-3 text-orange-600"></i>My Rentals
+                            </a>
+                            <div class="dropdown-divider"></div>
+                        {% endif %}
+                        
+                        {% if current_user.role == 'customer' %}
+                            <a href="{{ url_for('dashboard') }}" class="dropdown-item">
+                                <i class="fa-regular fa-calendar-check w-4 text-gray-400"></i>My Bookings
+                            </a>
+                        {% endif %}
+                        
+                        <a href="{{ url_for('chat_list') }}" class="dropdown-item">
+                            <i class="fa-regular fa-comments w-4 text-gray-400"></i>Messages
+                            {% if unread_message_count > 0 %}
+                                <span class="badge-count">{{ unread_message_count }}</span>
+                            {% endif %}
+                        </a>
+                        
+                        <a href="{{ url_for('tickets_list') }}" class="dropdown-item">
+                            <i class="fa-regular fa-ticket w-4 text-gray-400"></i>Support
+                            {% if current_user.role == 'admin' and open_tickets_count > 0 %}
+                                <span class="badge-count">{{ open_tickets_count }}</span>
+                            {% endif %}
+                        </a>
+                        
+                        <div class="dropdown-divider"></div>
+                        
+                        <a href="{{ url_for('link_telegram') }}" class="dropdown-item">
+                            <i class="fa-brands fa-telegram w-4 text-blue-500"></i>Link Telegram
+                        </a>
+                        
+                        <div class="dropdown-divider"></div>
+                        
+                        <a href="{{ url_for('logout') }}" class="dropdown-item danger">
+                            <i class="fa-solid fa-right-from-bracket w-4"></i>Logout
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Tools Dropdown (Vendor/Admin) -->
+                {% if current_user.role in ['admin', 'vendor'] %}
+                <div class="relative">
+                    <button onclick="toggleDropdown(event, 'toolsMenu')" class="nav-btn" data-dropdown="toolsMenu">
+                        <i class="fa-solid fa-screwdriver-wrench"></i>Tools
+                        <i class="fa-solid fa-chevron-down chevron"></i>
+                    </button>
+                    <div id="toolsMenu" class="dropdown-menu">
+                        <a href="{{ url_for('vendor_calendar') }}" class="dropdown-item">
+                            <i class="fa-regular fa-calendar w-4 text-blue-600"></i>Booking Calendar
+                        </a>
+                        <a href="{{ url_for('vendor_add_item') }}" class="dropdown-item">
+                            <i class="fa-solid fa-plus w-4 text-green-600"></i>Add New Item
+                        </a>
+                        <a href="{{ url_for('vendor_dashboard') }}#items" class="dropdown-item">
+                            <i class="fa-solid fa-box w-4 text-gray-400"></i>Manage Items
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="https://wa.me/918319337063" target="_blank" class="dropdown-item">
+                            <i class="fa-brands fa-whatsapp w-4 text-green-600"></i>WhatsApp Support
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Admin Dropdown -->
+                {% if current_user.role == 'admin' %}
+                <div class="relative">
+                    <button onclick="toggleDropdown(event, 'adminMenu')" class="nav-btn" data-dropdown="adminMenu">
+                        <i class="fa-solid fa-shield"></i>Admin
+                        <i class="fa-solid fa-chevron-down chevron"></i>
+                    </button>
+                    <div id="adminMenu" class="dropdown-menu">
+                        <a href="{{ url_for('admin_dashboard') }}" class="dropdown-item">
+                            <i class="fa-solid fa-gauge w-4 text-purple-600"></i>Admin Dashboard
+                        </a>
+                        <a href="{{ url_for('admin_bookings') }}" class="dropdown-item">
+                            <i class="fa-solid fa-clipboard-list w-4 text-blue-600"></i>All Bookings
+                        </a>
+                        <a href="{{ url_for('admin_payments') }}" class="dropdown-item">
+                            <i class="fa-solid fa-indian-rupee-sign w-4 text-green-600"></i>Payments
+                        </a>
+                        <a href="{{ url_for('admin_items') }}" class="dropdown-item">
+                            <i class="fa-solid fa-box w-4 text-gray-400"></i>All Items
+                        </a>
+                        <a href="{{ url_for('admin_users') }}" class="dropdown-item">
+                            <i class="fa-solid fa-users w-4 text-gray-400"></i>All Users
+                        </a>
+                        <a href="{{ url_for('admin_tickets') }}" class="dropdown-item">
+                            <i class="fa-regular fa-ticket w-4 text-orange-500"></i>Tickets
+                            {% if open_tickets_count > 0 %}
+                                <span class="badge-count">{{ open_tickets_count }}</span>
+                            {% endif %}
+                        </a>
+                        <a href="{{ url_for('admin_storage') }}" class="dropdown-item">
+                            <i class="fa-solid fa-database w-4 text-purple-500"></i>Storage
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </nav>
+            {% endif %}
+
+            <!-- Right side: Add Item Button + Mobile Menu -->
+            <div class="flex items-center gap-2">
                 {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                    <a href="{{ url_for('admin_add_item') }}" class="bg-green-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-green-600">
+                    <a href="{{ url_for('admin_add_item') }}" class="hidden lg:flex bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
                         <i class="fa-regular fa-plus mr-1"></i>Add Item
                     </a>
                 {% endif %}
-                <a href="{{ url_for('index') }}" class="text-sm font-medium text-gray-600 hover:text-green-700">
-                    Browse
+                
+                <a href="{{ url_for('leaderboard') }}" class="hidden lg:flex text-xs font-bold px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 hover:bg-yellow-100">
+                    <i class="fa-solid fa-trophy mr-1"></i>Top Vendors
                 </a>
-                <span class="text-xs text-gray-400 hidden md:inline">| 📞 {{ business_phone }}</span>
+
+                <!-- Mobile Hamburger -->
+                {% if current_user.is_authenticated %}
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2 rounded-lg hover:bg-gray-100">
+                    <i class="fa-solid fa-bars text-gray-700 text-xl"></i>
+                </button>
+                {% endif %}
             </div>
         </div>
     </header>
+
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" onclick="closeMobileMenu()" class="mobile-overlay"></div>
+
+    <!-- Mobile Sidebar -->
+    {% if current_user.is_authenticated %}
+    <aside id="mobileSidebar" class="mobile-sidebar">
+        
+        <!-- Sidebar Header -->
+        <div class="bg-green-700 text-white p-5">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs opacity-90">Welcome back</p>
+                    <h3 class="font-bold text-lg">{{ current_user.name }}</h3>
+                    <span class="text-xs bg-white/20 px-2 py-0.5 rounded mt-1 inline-block">{{ current_user.role|title }}</span>
+                </div>
+                <button onclick="closeMobileMenu()" class="text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Browse Section -->
+        <div class="mobile-section-title">Browse</div>
+        <a href="{{ url_for('index') }}" class="mobile-link">
+            <i class="fa-solid fa-home w-5"></i>Home
+        </a>
+        <a href="{{ url_for('index') }}#marketplace" class="mobile-link">
+            <i class="fa-solid fa-boxes-stacked w-5"></i>Marketplace
+        </a>
+        <a href="{{ url_for('leaderboard') }}" class="mobile-link">
+            <i class="fa-solid fa-trophy w-5 text-yellow-500"></i>Leaderboard
+        </a>
+
+        <!-- Vendor Section (if applicable) -->
+        {% if current_user.role in ['admin', 'vendor'] %}
+        <div class="mobile-section-title">Vendor Tools</div>
+        <a href="{{ url_for('vendor_dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-store w-5 text-green-700"></i>Vendor Dashboard
+        </a>
+        <a href="{{ url_for('vendor_sales') }}" class="mobile-link" style="padding-left: 40px;">
+            <i class="fa-solid fa-arrow-up w-4 text-blue-600"></i>My Sales
+        </a>
+        <a href="{{ url_for('vendor_rentals') }}" class="mobile-link" style="padding-left: 40px;">
+            <i class="fa-solid fa-arrow-down w-4 text-orange-600"></i>My Rentals
+        </a>
+        <a href="{{ url_for('vendor_calendar') }}" class="mobile-link">
+            <i class="fa-regular fa-calendar w-5 text-blue-600"></i>Booking Calendar
+        </a>
+        <a href="{{ url_for('vendor_add_item') }}" class="mobile-link">
+            <i class="fa-solid fa-plus w-5 text-green-600"></i>Add New Item
+        </a>
+        {% endif %}
+
+        <!-- Customer Section -->
+        {% if current_user.role == 'customer' %}
+        <div class="mobile-section-title">My Account</div>
+        <a href="{{ url_for('dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-gauge w-5 text-green-700"></i>My Dashboard
+        </a>
+        {% endif %}
+
+        <!-- Messages & Support -->
+        <div class="mobile-section-title">Communication</div>
+        <a href="{{ url_for('chat_list') }}" class="mobile-link">
+            <i class="fa-regular fa-comments w-5"></i>Messages
+            {% if unread_message_count > 0 %}
+                <span class="badge-count ml-auto">{{ unread_message_count }}</span>
+            {% endif %}
+        </a>
+        <a href="{{ url_for('tickets_list') }}" class="mobile-link">
+            <i class="fa-regular fa-ticket w-5"></i>Support
+            {% if current_user.role == 'admin' and open_tickets_count > 0 %}
+                <span class="badge-count ml-auto">{{ open_tickets_count }}</span>
+            {% endif %}
+        </a>
+
+        <!-- Admin Section -->
+        {% if current_user.role == 'admin' %}
+        <div class="mobile-section-title">Admin</div>
+        <a href="{{ url_for('admin_dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-gauge w-5 text-purple-600"></i>Admin Dashboard
+        </a>
+        <a href="{{ url_for('admin_bookings') }}" class="mobile-link">
+            <i class="fa-solid fa-clipboard-list w-5 text-blue-600"></i>All Bookings
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="mobile-link">
+            <i class="fa-solid fa-users w-5"></i>All Users
+        </a>
+        <a href="{{ url_for('admin_storage') }}" class="mobile-link">
+            <i class="fa-solid fa-database w-5 text-purple-500"></i>Storage
+        </a>
+        {% endif %}
+
+        <!-- Settings -->
+        <div class="mobile-section-title">Settings</div>
+        <a href="{{ url_for('link_telegram') }}" class="mobile-link">
+            <i class="fa-brands fa-telegram w-5 text-blue-500"></i>Link Telegram
+        </a>
+        <a href="https://wa.me/918319337063" target="_blank" class="mobile-link">
+            <i class="fa-brands fa-whatsapp w-5 text-green-600"></i>WhatsApp Support
+        </a>
+
+        <div class="mobile-section-title">Account</div>
+        <a href="{{ url_for('logout') }}" class="mobile-link danger">
+            <i class="fa-solid fa-right-from-bracket w-5"></i>Logout
+        </a>
+
+        <div class="h-8"></div>
+    </aside>
+    {% endif %}
 
     <!-- Flash Messages -->
     <div class="max-w-7xl mx-auto px-4 pt-4">
@@ -130,7 +528,7 @@
         <div class="max-w-7xl mx-auto px-4 flex flex-wrap justify-between gap-6">
             <div>
                 <span class="font-bold text-white text-sm">VyahMandap</span>
-                <p class="mt-1 max-w-xs">B2B Wedding Equipment Rental Marketplace. Taiyari Hamari, Celebration Aapka!</p>
+                <p class="mt-1 max-w-xs">B2B Wedding Equipment Rental Marketplace.</p>
             </div>
             <div class="flex gap-8">
                 <div>
@@ -150,6 +548,74 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // ===== Dropdown Toggle =====
+        let currentDropdown = null;
+        
+        function toggleDropdown(event, menuId) {
+            event.stopPropagation();
+            const menu = document.getElementById(menuId);
+            const button = event.currentTarget;
+            const isOpen = menu.classList.contains('open');
+            
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('open'));
+            
+            // Toggle this one
+            if (!isOpen) {
+                menu.classList.add('open');
+                button.classList.add('open');
+                currentDropdown = menuId;
+            } else {
+                currentDropdown = null;
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.relative')) {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('open'));
+                currentDropdown = null;
+            }
+        });
+        
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('open'));
+                currentDropdown = null;
+            }
+        });
+        
+        // ===== Mobile Sidebar =====
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('mobileSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+            document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+        }
+        
+        function closeMobileMenu() {
+            const sidebar = document.getElementById('mobileSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            sidebar.classList.remove('open');
+            overlay.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        
+        // ===== Auto-dismiss flash messages =====
+        document.querySelectorAll('.flash-message').forEach(msg => {
+            setTimeout(() => {
+                msg.style.transition = 'opacity 0.5s';
+                msg.style.opacity = '0';
+                setTimeout(() => msg.remove(), 500);
+            }, 4000);
+        });
+    </script>
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
