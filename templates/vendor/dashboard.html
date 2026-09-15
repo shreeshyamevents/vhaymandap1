@@ -155,10 +155,10 @@
             </thead>
             <tbody>
                 {% for item in items %}
-                <tr class="border-b hover:bg-gray-50">
+                <tr class="border-b hover:bg-gray-50 {% if not item.is_available %}bg-gray-50 opacity-80{% endif %}">
                     <td class="p-3">
                         <div class="w-12 h-12 bg-gray-100 rounded overflow-hidden">
-                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="{{ item.title }}" onerror="this.src='https://via.placeholder.com/100'">
+                            <img src="{{ item.get_image() }}" class="w-full h-full object-cover {% if not item.is_available %}grayscale{% endif %}" alt="{{ item.title }}" onerror="this.src='https://via.placeholder.com/100'">
                         </div>
                     </td>
                     <td class="p-3 font-medium">
@@ -171,13 +171,20 @@
                     <td class="p-3 font-bold text-green-700">₹{{ item.rate_per_day }}</td>
                     <td class="p-3">{{ item.stock }}</td>
                     <td class="p-3">
-                        <span class="text-xs px-2 py-0.5 rounded-full {% if item.is_available %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                            {{ 'Available' if item.is_available else 'Unavailable' }}
-                        </span>
+                        {% if item.is_available %}
+                            <span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 font-bold inline-flex items-center gap-1">
+                                🟢 Available
+                            </span>
+                        {% else %}
+                            <span class="text-xs px-2 py-1 rounded-full bg-gray-200 text-gray-700 font-bold inline-flex items-center gap-1" title="Hidden from marketplace">
+                                ⚪ Unavailable
+                            </span>
+                        {% endif %}
                     </td>
                     <td class="p-3">
                         <div class="flex gap-2 items-center flex-wrap">
                             <a href="{{ url_for('vendor_edit_item', item_id=item.id) }}" class="text-blue-600 hover:text-blue-800 text-xs font-bold">Edit</a>
+                            
                             {% if not item.is_currently_verified %}
                                 <a href="{{ url_for('vendor_verify_item', item_id=item.id) }}" class="text-yellow-600 hover:text-yellow-800 text-xs font-bold">✨ Verify</a>
                             {% else %}
@@ -185,7 +192,25 @@
                                     <i class="fa-solid fa-circle-check"></i> Verified
                                 </span>
                             {% endif %}
-                            <form method="POST" action="{{ url_for('vendor_delete_item', item_id=item.id) }}" onsubmit="return confirm('Delete this item?')" class="inline">
+                            
+                            <!-- Toggle Availability -->
+                            <form method="POST" action="{{ url_for('vendor_toggle_availability', item_id=item.id) }}" class="inline">
+                                {% if item.is_available %}
+                                    <button type="submit" 
+                                            class="text-gray-700 hover:text-gray-900 text-xs font-bold"
+                                            onclick="return confirm('Mark this item as UNAVAILABLE?\n\nIt will be hidden from customers and they won\'t be able to book it.')">
+                                        ⚪ Unavailable
+                                    </button>
+                                {% else %}
+                                    <button type="submit" 
+                                            class="text-green-600 hover:text-green-800 text-xs font-bold"
+                                            onclick="return confirm('Mark this item as AVAILABLE?\n\nCustomers will be able to see and book it again.')">
+                                        🟢 Available
+                                    </button>
+                                {% endif %}
+                            </form>
+                            
+                            <form method="POST" action="{{ url_for('vendor_delete_item', item_id=item.id) }}" onsubmit="return confirm('Delete this item permanently?\n\nThis action cannot be undone.')" class="inline">
                                 <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-bold">Delete</button>
                             </form>
                         </div>
