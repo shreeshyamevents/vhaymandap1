@@ -1,11 +1,24 @@
 {% extends "base.html" %}
 
-{% block title %}Vendor Dashboard - VyahMandap{% endblock %}
+{% block title %}Vendor Sales Dashboard - VyahMandap{% endblock %}
 
 {% block content %}
+
+<!-- Tabs -->
+<div class="flex gap-2 mb-6 border-b border-gray-200">
+    <a href="{{ url_for('vendor_dashboard') }}" 
+       class="px-4 py-3 font-bold text-sm text-green-700 border-b-2 border-green-700">
+        📤 My Sales
+    </a>
+    <a href="{{ url_for('vendor_rentals') }}" 
+       class="px-4 py-3 font-bold text-sm text-gray-500 hover:text-green-700 transition">
+        📥 My Rentals
+    </a>
+</div>
+
 <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
     <div>
-        <h2 class="text-2xl font-bold">🏪 Vendor Dashboard</h2>
+        <h2 class="text-2xl font-bold">📤 My Sales Dashboard</h2>
         <p class="text-sm text-gray-500">Welcome, {{ current_user.name }}!</p>
     </div>
     <div class="flex gap-2 flex-wrap">
@@ -118,7 +131,7 @@
 {% endif %}
 
 <!-- My Items -->
-<div class="bg-white p-6 rounded-xl border shadow-sm mb-8">
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-8" id="items">
     <div class="flex justify-between items-center mb-4">
         <h4 class="font-bold">📦 My Listed Items</h4>
         <a href="{{ url_for('vendor_add_item') }}" class="text-xs bg-green-700 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-green-600">
