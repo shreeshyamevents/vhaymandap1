@@ -1990,6 +1990,155 @@ def admin_ticket_detail(ticket_id):
 
 
 # ============================================
+# LEADERBOARD ROUTES
+# ============================================
+
+def calculate_leaderboard(period='all_time', category='all'):
+    """
+    Calculate vendor rankings based on:
+    - Rating (40%)
+    - Bookings count (30%)
+    - Earnings (20%)
+    - Verification (10%)
+    
+    period: 'all_time' or 'monthly' (last 30 days)
+    category: 'all' or specific category
+    """
+    from datetime import timedelta
+    from sqlalchemy import func
+    
+    # Date filter
+    cutoff_date = None
+    if period == 'monthly':
+        cutoff_date = datetime.utcnow() - timedelta(days=30)
+    
+    # Get all vendors
+    vendors = User.query.filter_by(role='vendor').all()
+    
+    rankings = []
+    
+    for vendor in vendors:
+        # Get vendor's items
+        vendor_items = Item.query.filter_by(vendor_id=vendor.id).all()
+        if not vendor_items:
+            continue
+        
+        # Apply category filter
+        if category != 'all':
+            vendor_items = [i for i in vendor_items if i.category == category]
+            if not vendor_items:
+                continue
+        
+        vendor_item_ids = [i.id for i in vendor_items]
+        
+        # Get bookings for these items
+        booking_query = Booking.query.filter(
+            Booking.item_id.in_(vendor_item_ids),
+            Booking.booking_status.in_(['completed', 'return_initiated'])
+        )
+        
+        if cutoff_date:
+            booking_query = booking_query.filter(Booking.created_at >= cutoff_date)
+        
+        vendor_bookings = booking_query.all()
+        
+        # Total bookings
+        total_bookings = len(vendor_bookings)
+        
+        # Minimum 5 bookings required
+        if total_bookings < 5:
+            continue
+        
+        # Total earnings (base rent only)
+        total_earnings = sum(b.base_rent for b in vendor_bookings)
+        
+        # Average rating from reviews
+        booking_ids = [b.id for b in vendor_bookings]
+        reviews = Review.query.filter(Review.booking_id.in_(booking_ids)).all() if booking_ids else []
+        
+        avg_rating = 0
+        review_count = len(reviews)
+        if reviews:
+            avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
+        
+        # Check if any item is verified
+        has_verified_item = any(i.is_currently_verified for i in vendor_items)
+        
+        # Composite Score Calculation
+        # Rating: 40% (max 100 if 5-star)
+        rating_score = (avg_rating / 5) * 100 if avg_rating > 0 else 0
+        
+        # Bookings: 30% (50 bookings = full 100)
+        bookings_score = min(100, total_bookings * 2)
+        
+        # Earnings: 20% (₹1,00,000 = full 100)
+        earnings_score = min(100, total_earnings / 1000)
+        
+        # Verification: 10%
+        verification_score = 100 if has_verified_item else 0
+        
+        # Composite Score
+        trust_score = round(
+            (rating_score * 0.4) +
+            (bookings_score * 0.3) +
+            (earnings_score * 0.2) +
+            (verification_score * 0.1),
+            1
+        )
+        
+        # Top category (most items)
+        category_counts = {}
+        for item in vendor_items:
+            category_counts[item.category] = category_counts.get(item.category, 0) + 1
+        top_category = max(category_counts, key=category_counts.get) if category_counts else 'other'
+        
+        rankings.append({
+            'vendor': vendor,
+            'trust_score': trust_score,
+            'total_bookings': total_bookings,
+            'total_earnings': total_earnings,
+            'avg_rating': avg_rating,
+            'review_count': review_count,
+            'has_verified_item': has_verified_item,
+            'top_category': top_category,
+            'total_items': len(vendor_items)
+        })
+    
+    # Sort by trust_score (highest first)
+    rankings.sort(key=lambda x: x['trust_score'], reverse=True)
+    
+    # Add rank
+    for idx, r in enumerate(rankings):
+        r['rank'] = idx + 1
+    
+    return rankings
+
+
+@app.route('/leaderboard')
+def leaderboard():
+    """Public leaderboard page"""
+    period = request.args.get('period', 'all_time')
+    category = request.args.get('category', 'all')
+    
+    if period not in ['all_time', 'monthly']:
+        period = 'all_time'
+    if category not in ['all', 'furniture', 'lighting', 'decor', 'mandap']:
+        category = 'all'
+    
+    rankings = calculate_leaderboard(period=period, category=category)
+    
+    top_3 = rankings[:3] if len(rankings) >= 3 else rankings
+    rest = rankings[3:] if len(rankings) > 3 else []
+    
+    return render_template('leaderboard.html',
+                         top_3=top_3,
+                         rest=rest,
+                         total_vendors=len(rankings),
+                         period=period,
+                         category_filter=category)
+
+
+# ============================================
 # ADMIN — STORAGE MANAGEMENT
 # ============================================
 
