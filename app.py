@@ -445,6 +445,34 @@ def cleanup_old_reports(dry_run=False):
 
 
 # ============================================
+# AVAILABILITY HELPERS
+# ============================================
+
+def get_next_available_date(item_id):
+    """Get the earliest date this item can be booked again (next day after last booking end)"""
+    latest_booking = Booking.query.filter(
+        Booking.item_id == item_id,
+        Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])
+    ).order_by(Booking.end_date.desc()).first()
+    
+    if not latest_booking:
+        return None
+    
+    return latest_booking.end_date + timedelta(days=1)
+
+
+def check_availability_conflict(item_id, start_date):
+    """Check if item can be booked on the given start date. Returns (has_conflict, conflict_booking)"""
+    conflict = Booking.query.filter(
+        Booking.item_id == item_id,
+        Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
+        Booking.end_date >= start_date
+    ).first()
+    
+    return (conflict is not None, conflict)
+
+
+# ============================================
 # UTILITY FUNCTIONS
 # ============================================
 
@@ -758,7 +786,6 @@ def get_items():
     
     query = Item.query
     if not show_unavailable:
-        # Default: show only available (for booking page)
         query = query.filter_by(is_available=True)
     
     if category != 'all':
@@ -778,6 +805,8 @@ def get_items():
         except:
             pass
         
+        next_available = get_next_available_date(item.id)
+        
         result.append({
             'id': item.id, 'title': item.title, 'description': item.description,
             'category': item.category, 'rate': item.rate_per_day,
@@ -789,7 +818,8 @@ def get_items():
             'item_verified': item.is_currently_verified,
             'avg_rating': avg_rating,
             'review_count': review_count,
-            'is_available': item.is_available  # ← NEW
+            'is_available': item.is_available,
+            'next_available': next_available.strftime('%Y-%m-%d') if next_available else None
         })
     return jsonify(result)
 
@@ -803,7 +833,22 @@ def calculate():
     quantity = int(data.get('quantity', 1))
     area = data.get('area', 'city')
     weight = data.get('weight', 'till_20')
+    
     item = Item.query.get_or_404(item_id)
+    
+    # ===== NEW: Next-day availability check =====
+    has_conflict, conflict_booking = check_availability_conflict(item.id, start_date)
+    
+    if has_conflict:
+        next_available = conflict_booking.end_date + timedelta(days=1)
+        return jsonify({
+            'error': True,
+            'message': f'Item is booked until {conflict_booking.end_date.strftime("%d %b %Y")}. '
+                       f'Booking available from {next_available.strftime("%d %b %Y")} onwards (next day).',
+            'next_available': next_available.strftime('%Y-%m-%d'),
+            'existing_booking_end': conflict_booking.end_date.strftime('%Y-%m-%d')
+        }), 400
+    
     result = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
     return jsonify(result)
 
@@ -818,7 +863,9 @@ def item_availability_calendar(item_id):
         return jsonify([])
     
     date_booked = {}
+    end_dates = set()
     for b in bookings:
+        end_dates.add(b.end_date)
         current = b.start_date
         while current <= b.end_date:
             date_booked[current] = date_booked.get(current, 0) + b.quantity
@@ -834,6 +881,8 @@ def item_availability_calendar(item_id):
         else:
             status = 'available'; color = '#16a34a'
         
+        is_end_date = date in end_dates
+        
         events.append({
             'title': f"{available_qty}/{item.stock} available",
             'start': date.isoformat(),
@@ -841,8 +890,12 @@ def item_availability_calendar(item_id):
             'backgroundColor': color,
             'borderColor': color,
             'extendedProps': {
-                'status': status, 'total_stock': item.stock,
-                'booked_qty': booked_qty, 'available_qty': max(0, available_qty)
+                'status': status, 
+                'total_stock': item.stock,
+                'booked_qty': booked_qty, 
+                'available_qty': max(0, available_qty),
+                'is_end_date': is_end_date,
+                'note': 'Return day — Bookable from next day' if is_end_date else ''
             }
         })
     return jsonify(events)
@@ -887,7 +940,6 @@ def item_availability_single(item_id):
 def book_item(item_id):
     item = Item.query.get_or_404(item_id)
     
-    # NEW: Check if item is available
     if not item.is_available:
         flash('⚠️ This item is currently unavailable for booking.', 'warning')
         return redirect(url_for('index'))
@@ -895,7 +947,7 @@ def book_item(item_id):
     if item.stock <= 0:
         flash('This item is out of stock.', 'danger')
         return redirect(url_for('index'))
-
+    
     if request.method == 'POST':
         try:
             start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
@@ -914,6 +966,17 @@ def book_item(item_id):
                 return render_template('booking.html', item=item)
             if quantity > item.stock:
                 flash(f'Only {item.stock} items available.', 'danger')
+                return render_template('booking.html', item=item)
+            
+            # ===== NEW: Server-side next-day check =====
+            has_conflict, conflict_booking = check_availability_conflict(item.id, start_date)
+            if has_conflict:
+                next_available = conflict_booking.end_date + timedelta(days=1)
+                flash(
+                    f'⚠️ This item is booked until {conflict_booking.end_date.strftime("%d %b %Y")}. '
+                    f'You can book it from {next_available.strftime("%d %b %Y")} onwards (next day).',
+                    'warning'
+                )
                 return render_template('booking.html', item=item)
             
             calc = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
@@ -1303,7 +1366,6 @@ def report_view(booking_id):
 @app.route('/vendor/sales')
 @login_required
 def vendor_sales():
-    """Vendor's sales view — bookings on their items"""
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
@@ -1355,7 +1417,6 @@ def vendor_sales():
 @app.route('/vendor/rentals')
 @login_required
 def vendor_rentals():
-    """Vendor's rentals view — bookings they made as customer"""
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
@@ -1389,13 +1450,12 @@ def vendor_rentals():
 
 
 # ============================================
-# VENDOR MAIN DASHBOARD (Backwards compatible)
+# VENDOR MAIN DASHBOARD
 # ============================================
 
 @app.route('/vendor')
 @login_required
 def vendor_dashboard():
-    """Vendor's main dashboard — same as sales view"""
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied. Vendor account required.', 'danger')
         return redirect(url_for('index'))
@@ -1562,33 +1622,6 @@ def vendor_edit_item(item_id):
     return render_template('vendor/item_form.html', item=item)
 
 
-@app.route('/vendor/item/<int:item_id>/toggle-availability', methods=['POST'])
-@login_required
-def vendor_toggle_availability(item_id):
-    """One-click toggle between available and unavailable for rental"""
-    if current_user.role not in ['admin', 'vendor']:
-        flash('Access denied.', 'danger')
-        return redirect(url_for('index'))
-    
-    item = Item.query.get_or_404(item_id)
-    
-    # Check ownership
-    if item.vendor_id != current_user.id and current_user.role != 'admin':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('vendor_dashboard'))
-    
-    # Toggle availability
-    item.is_available = not item.is_available
-    db.session.commit()
-    
-    if item.is_available:
-        flash(f'✅ "{item.title}" is now available for rent.', 'success')
-    else:
-        flash(f'⚪ "{item.title}" is now unavailable. Customers won\'t see it in marketplace.', 'info')
-    
-    return redirect(request.referrer or url_for('vendor_dashboard'))
-
-
 @app.route('/vendor/item/delete/<int:item_id>', methods=['POST'])
 @login_required
 def vendor_delete_item(item_id):
@@ -1603,6 +1636,30 @@ def vendor_delete_item(item_id):
     db.session.commit()
     flash('Item deleted successfully.', 'success')
     return redirect(url_for('vendor_dashboard'))
+
+
+@app.route('/vendor/item/<int:item_id>/toggle-availability', methods=['POST'])
+@login_required
+def vendor_toggle_availability(item_id):
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+    
+    item.is_available = not item.is_available
+    db.session.commit()
+    
+    if item.is_available:
+        flash(f'✅ "{item.title}" is now available for rent.', 'success')
+    else:
+        flash(f'⚪ "{item.title}" is now unavailable. Customers won\'t see it in marketplace.', 'info')
+    
+    return redirect(request.referrer or url_for('vendor_dashboard'))
 
 
 # ============================================
