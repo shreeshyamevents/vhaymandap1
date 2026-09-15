@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Leaderboard - VyahMandap{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-2xl overflow-hidden px-6 py-8 mb-6">
+    <div class="relative z-10">
+        <h1 class="text-3xl md:text-4xl font-extrabold">🏆 Vendor Leaderboard</h1>
+        <p class="text-sm text-white/90 mt-2">Top performing vendors based on bookings, ratings & earnings</p>
+    </div>
+</div>
+
+<!-- Info Banner -->
+<div class="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-6">
+    <p class="text-xs text-blue-800">
+        <strong>ℹ️ How ranking works:</strong>
+        Trust Score = Rating (40%) + Bookings (30%) + Earnings (20%) + Verification (10%)
+        · Minimum 5 bookings required to be listed
+    </p>
+</div>
+
+<!-- Filters -->
+<div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
+    <div class="flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex gap-2 flex-wrap">
+            <a href="{{ url_for('leaderboard', period='all_time', category=category_filter) }}" 
+               class="px-4 py-2 rounded-lg text-xs font-bold transition
+                      {% if period == 'all_time' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                📅 All-Time
+            </a>
+            <a href="{{ url_for('leaderboard', period='monthly', category=category_filter) }}" 
+               class="px-4 py-2 rounded-lg text-xs font-bold transition
+                      {% if period == 'monthly' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                📆 Last 30 Days
+            </a>
+        </div>
+        
+        <div class="flex gap-2 flex-wrap">
+            <a href="{{ url_for('leaderboard', period=period, category='all') }}" 
+               class="px-3 py-1.5 rounded-lg text-xs font-bold transition
+                      {% if category_filter == 'all' %}bg-blue-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                All Categories
+            </a>
+            <a href="{{ url_for('leaderboard', period=period, category='furniture') }}" 
+               class="px-3 py-1.5 rounded-lg text-xs font-bold transition
+                      {% if category_filter == 'furniture' %}bg-blue-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                🪑 Furniture
+            </a>
+            <a href="{{ url_for('leaderboard', period=period, category='lighting') }}" 
+               class="px-3 py-1.5 rounded-lg text-xs font-bold transition
+                      {% if category_filter == 'lighting' %}bg-blue-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                💡 Lighting
+            </a>
+            <a href="{{ url_for('leaderboard', period=period, category='decor') }}" 
+               class="px-3 py-1.5 rounded-lg text-xs font-bold transition
+                      {% if category_filter == 'decor' %}bg-blue-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                🎨 Decor
+            </a>
+            <a href="{{ url_for('leaderboard', period=period, category='mandap') }}" 
+               class="px-3 py-1.5 rounded-lg text-xs font-bold transition
+                      {% if category_filter == 'mandap' %}bg-blue-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
+                🏛️ Mandap
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if top_3 %}
+    <!-- Top 3 Showcase -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {% for r in top_3 %}
+        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden 
+                    {% if r.rank == 1 %}border-yellow-400 ring-2 ring-yellow-200 md:scale-105{% endif %}">
+            
+            <!-- Rank Banner -->
+            <div class="{% if r.rank == 1 %}bg-gradient-to-r from-yellow-400 to-yellow-500{% elif r.rank == 2 %}bg-gradient-to-r from-gray-300 to-gray-400{% else %}bg-gradient-to-r from-orange-300 to-orange-400{% endif %} p-3 text-center">
+                <span class="text-3xl">
+                    {% if r.rank == 1 %}🥇{% elif r.rank == 2 %}🥈{% else %}🥉{% endif %}
+                </span>
+                <div class="font-bold text-white text-sm mt-1">Rank #{{ r.rank }}</div>
+            </div>
+            
+            <div class="p-4">
+                <!-- Vendor Header -->
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                        {{ r.vendor.name[0]|upper }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-bold text-base truncate">{{ r.vendor.name }}</h3>
+                        {% if r.has_verified_item %}
+                            <span class="text-blue-600 text-xs"><i class="fa-solid fa-circle-check"></i> Verified Vendor</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Trust Score -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3 text-center">
+                    <span class="text-xs text-gray-500">Trust Score</span>
+                    <h2 class="text-3xl font-black text-green-700">{{ r.trust_score }}</h2>
+                    <span class="text-xs text-gray-500">out of 100</span>
+                </div>
+                
+                <!-- Stats -->
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">📦 Bookings</span>
+                        <strong>{{ r.total_bookings }}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">💰 Earned</span>
+                        <strong class="text-green-700">₹{{ '{:,}'.format(r.total_earnings|int) }}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">⭐ Rating</span>
+                        <strong>
+                            {% if r.review_count > 0 %}
+                                {{ r.avg_rating }} ({{ r.review_count }})
+                            {% else %}
+                                <span class="text-gray-400">No reviews</span>
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">🏷️ Category</span>
+                        <strong class="text-xs">{{ r.top_category|title }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Rest of Rankings -->
+    {% if rest %}
+    <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <div class="bg-gray-50 p-4 border-b">
+            <h3 class="font-bold text-sm">📊 Full Rankings ({{ total_vendors }} vendors)</h3>
+        </div>
+        <div class="divide-y">
+            {% for r in rest %}
+            <div class="p-4 hover:bg-gray-50 transition">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <!-- Rank -->
+                    <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-700 flex-shrink-0">
+                        #{{ r.rank }}
+                    </div>
+                    
+                    <!-- Info -->
+                    <div class="flex-1 min-w-[150px]">
+                        <h4 class="font-bold text-sm">
+                            {{ r.vendor.name }}
+                            {% if r.has_verified_item %}
+                                <i class="fa-solid fa-circle-check text-blue-600 text-xs ml-1"></i>
+                            {% endif %}
+                        </h4>
+                        <div class="flex gap-3 text-xs text-gray-500 mt-0.5 flex-wrap">
+                            <span>📦 {{ r.total_bookings }} bookings</span>
+                            <span>💰 ₹{{ '{:,}'.format(r.total_earnings|int) }}</span>
+                            <span>
+                                {% if r.review_count > 0 %}⭐ {{ r.avg_rating }}{% else %}⭐ -{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Trust Score -->
+                    <div class="text-right">
+                        <span class="text-[10px] text-gray-500 block">Trust Score</span>
+                        <strong class="text-xl text-green-700">{{ r.trust_score }}</strong>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+{% else %}
+    <!-- Empty State -->
+    <div class="bg-white p-12 rounded-2xl border text-center">
+        <div class="text-6xl mb-4">🏆</div>
+        <h3 class="font-bold text-lg text-gray-700">No vendors qualified yet</h3>
+        <p class="text-sm text-gray-500 mt-2">
+            Vendors with minimum 5 completed bookings will appear here.
+        </p>
+        <p class="text-xs text-gray-400 mt-1">
+            {% if period == 'monthly' %}Try switching to All-Time view.{% endif %}
+        </p>
+    </div>
+{% endif %}
+
+<!-- Info Note -->
+<div class="mt-6 text-center text-xs text-gray-500">
+    <p>Trust Score updates in real-time based on completed bookings.</p>
+    <p class="mt-1">Vendors need minimum 5 bookings to appear on leaderboard.</p>
+</div>
+
+{% endblock %}
