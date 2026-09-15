@@ -445,11 +445,11 @@ def cleanup_old_reports(dry_run=False):
 
 
 # ============================================
-# AVAILABILITY HELPERS
+# AVAILABILITY HELPERS (STOCK-AWARE + RETURN DAY)
 # ============================================
 
 def get_next_available_date(item_id):
-    """Get the earliest date this item can be booked again (next day after last booking end)"""
+    """Get the earliest date this item can be booked again"""
     latest_booking = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])
@@ -463,20 +463,22 @@ def get_next_available_date(item_id):
 
 def check_availability_conflict(item_id, start_date, requested_quantity=1):
     """
-    Check if item can be booked on given start date with requested quantity.
-    Returns (has_conflict, conflict_booking, available_qty)
+    Stock-aware availability check with return-day detection.
     
-    Logic: 
-    1. Check stock availability for start_date
-    2. If sufficient stock → allow (even if returns happening same day)
-    3. If insufficient → conflict with details
+    Returns (has_conflict, conflict_booking, available_qty, conflict_type)
+    
+    conflict_type:
+    - None: No conflict
+    - 'fully_booked': All stock booked (no return that day)
+    - 'return_day_full': Item returning that day + no stock available
+    - 'insufficient_stock': Partial stock, requested more
+    - 'return_day_partial': Return day + partial stock available but insufficient
     """
     item = Item.query.get(item_id)
     if not item:
-        return (True, None, 0)
+        return (True, None, 0, 'fully_booked')
     
-    # ===== Stock check for start_date =====
-    # Find all bookings that cover start_date
+    # Find overlapping bookings for start_date
     overlapping = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
@@ -487,12 +489,30 @@ def check_availability_conflict(item_id, start_date, requested_quantity=1):
     booked_qty = sum(b.quantity for b in overlapping)
     available_qty = max(0, item.stock - booked_qty)
     
-    # Conflict only if requested quantity exceeds available
-    if requested_quantity > available_qty:
-        conflict_booking = overlapping[0] if overlapping else None
-        return (True, conflict_booking, available_qty)
+    # Check if any booking is RETURNING on start_date
+    returning_booking = None
+    for b in overlapping:
+        if b.end_date == start_date:
+            returning_booking = b
+            break
     
-    return (False, None, available_qty)
+    has_conflict = requested_quantity > available_qty
+    
+    # Determine conflict type
+    conflict_type = None
+    if has_conflict:
+        if available_qty == 0:
+            if returning_booking:
+                conflict_type = 'return_day_full'
+            else:
+                conflict_type = 'fully_booked'
+        else:
+            if returning_booking:
+                conflict_type = 'return_day_partial'
+            else:
+                conflict_type = 'insufficient_stock'
+    
+    return (has_conflict, returning_booking, available_qty, conflict_type)
 
 
 # ============================================
@@ -859,45 +879,60 @@ def calculate():
     
     item = Item.query.get_or_404(item_id)
     
-    # ===== Stock-aware availability check =====
-    has_conflict, conflict_booking, available_qty = check_availability_conflict(
+    # Stock-aware check
+    has_conflict, conflict_booking, available_qty, conflict_type = check_availability_conflict(
         item.id, start_date, quantity
     )
     
     if has_conflict:
-        # Get the latest end date among overlapping bookings
-        overlapping = Booking.query.filter(
-            Booking.item_id == item.id,
-            Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-            Booking.start_date <= start_date,
-            Booking.end_date >= start_date
-        ).all()
+        next_available = None
         
-        latest_end = max([b.end_date for b in overlapping], default=start_date)
-        next_available = latest_end + timedelta(days=1)
-        
-        # Check if it's a same-day buffer conflict
-        same_day_booking = Booking.query.filter(
-            Booking.item_id == item.id,
-            Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-            Booking.end_date == start_date
-        ).first()
-        
-        if same_day_booking:
-            message = f'Item is returning on {start_date.strftime("%d %b %Y")}. Booking available from next day onwards (transport + setup time).'
+        if conflict_type == 'return_day_full':
             next_available = start_date + timedelta(days=1)
-        elif available_qty == 0:
-            message = f'Item is fully booked on {start_date.strftime("%d %b %Y")}. Next available: {next_available.strftime("%d %b %Y")}'
-        else:
-            message = f'Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}. You requested {quantity}. Please reduce quantity or try {next_available.strftime("%d %b %Y")} onwards.'
+            message = (
+                f'This item is returning on {start_date.strftime("%d %b %Y")} '
+                f'(from another booking). Booking available from next day onwards.'
+            )
+        elif conflict_type == 'fully_booked':
+            latest_end = Booking.query.filter(
+                Booking.item_id == item.id,
+                Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
+                Booking.start_date <= start_date,
+                Booking.end_date >= start_date
+            ).order_by(Booking.end_date.desc()).first()
+            if latest_end:
+                next_available = latest_end.end_date + timedelta(days=1)
+            message = (
+                f'Item is fully booked on {start_date.strftime("%d %b %Y")}. '
+                f'Please select different dates.'
+            )
+        elif conflict_type == 'return_day_partial':
+            next_available = start_date + timedelta(days=1)
+            message = (
+                f'Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")} '
+                f'(some units are returning that day). You requested {quantity}.'
+            )
+        else:  # insufficient_stock
+            latest_end = Booking.query.filter(
+                Booking.item_id == item.id,
+                Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
+                Booking.start_date <= start_date,
+                Booking.end_date >= start_date
+            ).order_by(Booking.end_date.desc()).first()
+            if latest_end:
+                next_available = latest_end.end_date + timedelta(days=1)
+            message = (
+                f'Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}. '
+                f'You requested {quantity}.'
+            )
         
         return jsonify({
             'error': True,
             'message': message,
+            'conflict_type': conflict_type,
             'available_qty': available_qty,
             'requested_qty': quantity,
-            'next_available': next_available.strftime('%Y-%m-%d'),
-            'existing_booking_end': latest_end.strftime('%Y-%m-%d')
+            'next_available': next_available.strftime('%Y-%m-%d') if next_available else None
         }), 400
     
     result = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
@@ -976,6 +1011,7 @@ def item_availability_single(item_id):
     
     booked_qty = sum(b.quantity for b in overlapping)
     available_qty = max(0, item.stock - booked_qty)
+    
     if available_qty <= 0:
         status = 'booked'
     elif available_qty < item.stock:
@@ -983,12 +1019,7 @@ def item_availability_single(item_id):
     else:
         status = 'available'
     
-    # Check if it's a return day
-    is_end_date = any(b.end_date == check_date for b in 
-                      Booking.query.filter(
-                          Booking.item_id == item_id,
-                          Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])
-                      ).all())
+    is_end_date = any(b.end_date == check_date for b in overlapping)
     
     return jsonify({
         'date': date_str, 'status': status,
@@ -1031,37 +1062,34 @@ def book_item(item_id):
                 flash(f'Only {item.stock} items available.', 'danger')
                 return render_template('booking.html', item=item)
             
-            # ===== Stock-aware availability check =====
-            has_conflict, conflict_booking, available_qty = check_availability_conflict(
+            # Stock-aware check
+            has_conflict, conflict_booking, available_qty, conflict_type = check_availability_conflict(
                 item.id, start_date, quantity
             )
             
             if has_conflict:
-                same_day_booking = Booking.query.filter(
-                    Booking.item_id == item.id,
-                    Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-                    Booking.end_date == start_date
-                ).first()
-                
-                if same_day_booking:
-                    next_available = start_date + timedelta(days=1)
+                if conflict_type == 'return_day_full':
                     flash(
-                        f'⚠️ Item is returning on {start_date.strftime("%d %b %Y")}. '
-                        f'Please book from {next_available.strftime("%d %b %Y")} onwards (next day).',
+                        f'⚠️ This item is returning on {start_date.strftime("%d %b %Y")}. '
+                        f'Please book from {(start_date + timedelta(days=1)).strftime("%d %b %Y")} onwards.',
+                        'warning'
+                    )
+                elif conflict_type == 'fully_booked':
+                    flash(
+                        f'⚠️ Item is fully booked on {start_date.strftime("%d %b %Y")}. '
+                        f'Please select different dates.',
+                        'warning'
+                    )
+                elif conflict_type == 'return_day_partial':
+                    flash(
+                        f'⚠️ Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")} '
+                        f'(some units are returning that day). You requested {quantity}.',
                         'warning'
                     )
                 else:
-                    overlapping = Booking.query.filter(
-                        Booking.item_id == item.id,
-                        Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-                        Booking.start_date <= start_date,
-                        Booking.end_date >= start_date
-                    ).all()
-                    latest_end = max([b.end_date for b in overlapping], default=start_date)
-                    next_available = latest_end + timedelta(days=1)
                     flash(
                         f'⚠️ Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}. '
-                        f'You requested {quantity}. Please reduce quantity or try from {next_available.strftime("%d %b %Y")}.',
+                        f'You requested {quantity}.',
                         'warning'
                     )
                 return render_template('booking.html', item=item)
