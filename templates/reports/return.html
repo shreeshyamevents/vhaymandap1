@@ -261,4 +261,162 @@ async function startRecording() {
             audio: true
         });
         const preview = document.getElementById('recordingPreview');
-        preview.srcObject =
+        preview.srcObject = stream;
+        preview.muted = true;
+        await preview.play();
+        
+        let mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'video/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4';
+        }
+        
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(recordedChunks, { type: mimeType });
+            recordedVideoBlob = blob;
+            document.getElementById('recordedVideo').src = URL.createObjectURL(blob);
+            document.getElementById('videoRecording').classList.add('hidden');
+            document.getElementById('videoReady').classList.remove('hidden');
+            document.getElementById('videoSize').textContent = 'Size: ' + (blob.size / (1024*1024)).toFixed(2) + ' MB';
+            updateProgress();
+        };
+        mediaRecorder.start();
+        document.getElementById('videoIdle').classList.add('hidden');
+        document.getElementById('videoRecording').classList.remove('hidden');
+        recordingSeconds = 15;
+        document.getElementById('countdown').textContent = recordingSeconds;
+        recordingTimer = setInterval(() => {
+            recordingSeconds--;
+            document.getElementById('countdown').textContent = recordingSeconds;
+            if (recordingSeconds <= 0) stopRecording();
+        }, 1000);
+    } catch (err) {
+        alert('Camera access denied: ' + err.message + '\n\nPlease allow camera permission in your browser settings.');
+    }
+}
+
+function stopRecording() {
+    if (recordingTimer) { clearInterval(recordingTimer); recordingTimer = null; }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+function resetVideo() {
+    recordedVideoBlob = null;
+    document.getElementById('videoReady').classList.add('hidden');
+    document.getElementById('videoIdle').classList.remove('hidden');
+    document.getElementById('recordedVideo').src = '';
+    updateProgress();
+}
+
+function previewVideo() {
+    const video = document.getElementById('recordedVideo');
+    if (video.paused) {
+        video.play();
+    } else {
+        video.pause();
+    }
+}
+
+function toggleDamageNotes() {
+    const checkbox = document.getElementById('damageFlag');
+    const div = document.getElementById('damageNotesDiv');
+    if (checkbox.checked) div.classList.remove('hidden');
+    else div.classList.add('hidden');
+}
+
+function updateProgress() {
+    let done = 0;
+    if (photos.length > 0) done++;
+    if (recordedVideoBlob) done++;
+    
+    document.getElementById('progressText').textContent = done + '/2 completed (Photos + Video)';
+    
+    const btn = document.getElementById('submitBtn');
+    if (done === 2) {
+        btn.disabled = false;
+        btn.className = 'w-full bg-orange-600 text-white font-bold py-4 rounded-xl hover:bg-orange-700';
+        btn.textContent = '✅ Submit Return Report';
+    } else {
+        btn.disabled = true;
+        btn.className = 'w-full bg-gray-300 text-gray-500 font-bold py-4 rounded-xl cursor-not-allowed';
+        btn.textContent = 'Complete Photos + Video to Submit';
+    }
+}
+
+async function submitReport() {
+    if (photos.length === 0 || !recordedVideoBlob) { 
+        alert('Please add photos and video first'); 
+        return; 
+    }
+    
+    const damageFlag = document.getElementById('damageFlag').checked;
+    const damageNotes = document.getElementById('damageNotes').value.trim();
+    if (damageFlag && !damageNotes) { 
+        alert('Please describe the damage'); 
+        return; 
+    }
+    
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading video...';
+    
+    const status = document.getElementById('uploadStatus');
+    status.className = 'p-3 rounded-lg text-sm bg-blue-100 text-blue-800';
+    status.textContent = 'Uploading video...';
+    status.classList.remove('hidden');
+    
+    try {
+        const videoFormData = new FormData();
+        videoFormData.append('video', recordedVideoBlob, 'report.webm');
+        videoFormData.append('booking_id', '{{ booking.id }}');
+        videoFormData.append('report_type', 'return');
+        const videoRes = await fetch('/api/report/upload-video', { method: 'POST', body: videoFormData });
+        const videoData = await videoRes.json();
+        if (!videoData.success) throw new Error(videoData.error || 'Video upload failed');
+        
+        status.textContent = 'Video uploaded. Uploading photos...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Uploading photos...';
+        
+        const condition = document.querySelector('input[name="condition"]:checked').value;
+        const notes = document.getElementById('notesInput').value.trim();
+        const reportRes = await fetch('/api/report/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                booking_id: {{ booking.id }},
+                report_type: 'return',
+                photos: photos,
+                video_url: videoData.video_url,
+                video_public_id: videoData.video_public_id,
+                condition_rating: condition,
+                damage_flagged: damageFlag,
+                damage_notes: damageNotes,
+                notes: notes,
+                gps_lat: gpsLat,
+                gps_lng: gpsLng
+            })
+        });
+        const data = await reportRes.json();
+        if (data.success) {
+            status.className = 'p-3 rounded-lg text-sm bg-green-100 text-green-800';
+            status.textContent = '✅ Report submitted successfully!';
+            btn.innerHTML = '✅ Submitted!';
+            setTimeout(() => window.location.href = '{{ url_for("dashboard") }}', 1500);
+        } else {
+            throw new Error(data.error || 'Submit failed');
+        }
+    } catch (err) {
+        status.className = 'p-3 rounded-lg text-sm bg-red-100 text-red-800';
+        status.textContent = '❌ ' + err.message;
+        btn.disabled = false;
+        btn.innerHTML = 'Retry Submit';
+    }
+}
+
+updateProgress();
+</script>
+{% endblock %}
