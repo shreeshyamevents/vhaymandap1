@@ -198,6 +198,28 @@
     {% endif %}
 </div>
 
+<!-- Storage Status -->
+{% if expired_reports is defined %}
+<div class="bg-purple-50 border border-purple-200 p-4 rounded-xl mb-6">
+    <div class="flex justify-between items-center flex-wrap gap-3">
+        <div>
+            <h4 class="font-bold text-purple-900 mb-1">🗄️ Storage Management</h4>
+            <p class="text-xs text-purple-700">
+                <strong>{{ active_reports }}</strong> active ·
+                <strong>{{ expired_reports }}</strong> expired ·
+                <strong>{{ protected_reports }}</strong> protected ·
+                <strong>{{ disputed_reports }}</strong> disputed
+            </p>
+        </div>
+        <a href="{{ url_for('admin_storage') }}" 
+           class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-800">
+            Manage Storage →
+        </a>
+    </div>
+</div>
+{% endif %}
+
+
 <!-- Recent Users & Items -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div class="bg-white p-6 rounded-xl border shadow-sm">
