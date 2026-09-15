@@ -2138,6 +2138,24 @@ def leaderboard():
                          category_filter=category)
 
 
+
+@app.route('/api/leaderboard/top3')
+def api_leaderboard_top3():
+    """Top 3 vendors for homepage showcase"""
+    rankings = calculate_leaderboard(period='all_time', category='all')
+    top_3 = rankings[:3]
+    
+    return jsonify({
+        'vendors': [{
+            'name': r['vendor'].name,
+            'score': r['trust_score'],
+            'bookings': r['total_bookings'],
+            'rating': r['avg_rating'] if r['review_count'] > 0 else 'New',
+            'verified': r['has_verified_item']
+        } for r in top_3]
+    })
+
+
 # ============================================
 # ADMIN — STORAGE MANAGEMENT
 # ============================================
