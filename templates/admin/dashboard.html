@@ -94,10 +94,10 @@
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     {% if kyc_pending > 0 or kyc_completed > 0 %}
     <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
-        <h4 class="font-bold text-yellow-900 mb-2">🛡️ KYC Status (₹30,000+)</h4>
+        <h4 class="font-bold text-yellow-900 mb-2">🛡️ KYC Status</h4>
         <div class="flex gap-4 text-sm">
-            <span>✅ Completed: <strong>{{ kyc_completed }}</strong></span>
-            <span>⏳ Pending: <strong>{{ kyc_pending }}</strong></span>
+            <span>✅ {{ kyc_completed }}</span>
+            <span>⏳ {{ kyc_pending }}</span>
         </div>
     </div>
     {% endif %}
@@ -105,8 +105,8 @@
     <div class="bg-orange-50 border border-orange-200 p-4 rounded-xl">
         <h4 class="font-bold text-orange-900 mb-2">🎫 Support Tickets</h4>
         <div class="flex gap-4 text-sm">
-            <span>🆕 Open: <strong>{{ tickets_open }}</strong></span>
-            <span>⏳ In Progress: <strong>{{ tickets_in_progress }}</strong></span>
+            <span>🆕 {{ tickets_open }}</span>
+            <span>⏳ {{ tickets_in_progress }}</span>
             <a href="{{ url_for('admin_tickets') }}" class="ml-auto text-orange-700 font-bold hover:underline text-xs">View →</a>
         </div>
     </div>
@@ -121,6 +121,28 @@
             <span class="ml-auto text-gray-400 text-xs">No issues</span>
             {% endif %}
         </div>
+    </div>
+</div>
+
+<!-- Storage Management -->
+<div class="bg-purple-50 border border-purple-200 p-4 rounded-xl mb-6">
+    <div class="flex justify-between items-center flex-wrap gap-3">
+        <div>
+            <h4 class="font-bold text-purple-900 mb-1">🗄️ Storage Management</h4>
+            <p class="text-xs text-purple-700">
+                <strong>{{ active_reports }}</strong> active ·
+                <strong>{{ expired_reports }}</strong> expired ·
+                <strong>{{ protected_reports }}</strong> protected ·
+                <strong>{{ disputed_reports }}</strong> disputed
+            </p>
+            <p class="text-[10px] text-purple-600 mt-1">
+                Auto-delete reports older than 30 days · Disputed reports never deleted
+            </p>
+        </div>
+        <a href="{{ url_for('admin_storage') }}" 
+           class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-800">
+            Manage Storage →
+        </a>
     </div>
 </div>
 
@@ -197,28 +219,6 @@
     <p class="text-gray-500 text-sm">No bookings yet.</p>
     {% endif %}
 </div>
-
-<!-- Storage Status -->
-{% if expired_reports is defined %}
-<div class="bg-purple-50 border border-purple-200 p-4 rounded-xl mb-6">
-    <div class="flex justify-between items-center flex-wrap gap-3">
-        <div>
-            <h4 class="font-bold text-purple-900 mb-1">🗄️ Storage Management</h4>
-            <p class="text-xs text-purple-700">
-                <strong>{{ active_reports }}</strong> active ·
-                <strong>{{ expired_reports }}</strong> expired ·
-                <strong>{{ protected_reports }}</strong> protected ·
-                <strong>{{ disputed_reports }}</strong> disputed
-            </p>
-        </div>
-        <a href="{{ url_for('admin_storage') }}" 
-           class="bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-800">
-            Manage Storage →
-        </a>
-    </div>
-</div>
-{% endif %}
-
 
 <!-- Recent Users & Items -->
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
