@@ -6,7 +6,7 @@
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 <style>
-    #availabilityCalendar { max-height: 400px; }
+    #availabilityCalendar { max-height: 400px; min-height: 400px; }
     .fc-event { font-size: 11px; }
 </style>
 {% endblock %}
@@ -37,13 +37,6 @@
             </div>
         </div>
 
-        <!-- Buffer Note -->
-        <div class="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 text-xs text-blue-800">
-            <i class="fa-solid fa-circle-info mr-1"></i>
-            <strong>Note:</strong> Item can be booked from the <strong>next day</strong> after return.
-            Same-day re-booking is not available (transport + setup time).
-        </div>
-
         <!-- Check Availability Button -->
         <button type="button" onclick="toggleAvailability()" class="w-full mb-4 bg-blue-50 border-2 border-blue-200 text-blue-800 font-bold py-2.5 rounded-xl hover:bg-blue-100 transition text-sm">
             <i class="fa-regular fa-calendar-check mr-1"></i> Check Availability
@@ -56,13 +49,13 @@
                     <h4 class="font-bold text-sm text-gray-700">📅 Availability Calendar</h4>
                     <div class="flex gap-2 text-xs flex-wrap">
                         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded"></span>Available</span>
-                        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded"></span>Booked (Return Day Included)</span>
+                        <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded"></span>Fully Booked</span>
                         <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-500 rounded"></span>Partial</span>
                     </div>
                 </div>
                 <div id="availabilityCalendar"></div>
                 <p class="text-xs text-gray-500 mt-2 text-center">
-                    <i class="fa-regular fa-circle-info mr-1"></i> Click on any date to see details. Bookable from next day after return.
+                    <i class="fa-regular fa-circle-info mr-1"></i> Click on any date to see details.
                 </p>
             </div>
         </div>
@@ -129,14 +122,14 @@
                 <div class="flex justify-between font-bold text-base"><span>Total Payable</span><strong id="calcTotal" class="text-green-700">₹0</strong></div>
             </div>
 
-            <!-- KYC Section (Conditionally Shown) -->
+            <!-- KYC Section -->
             <div id="kycSection" class="hidden bg-yellow-50 border-2 border-yellow-300 p-4 rounded-xl space-y-3">
                 <div class="flex items-center gap-2">
                     <i class="fa-solid fa-shield-halved text-yellow-700"></i>
                     <h4 class="font-bold text-yellow-900">🛡️ KYC Verification Required</h4>
                 </div>
                 <p class="text-xs text-yellow-800">
-                    Your booking total is <strong>₹30,000 or above</strong>. For security, please provide your Aadhaar and PAN details.
+                    Your booking total is <strong>₹30,000 or above</strong>. Please provide Aadhaar and PAN details.
                 </p>
                 <div>
                     <label class="block font-semibold text-sm mb-1">Aadhaar Number (12 digits) *</label>
@@ -150,10 +143,6 @@
                            placeholder="ABCDE1234F" style="text-transform: uppercase;"
                            class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
-                <p class="text-[10px] text-yellow-700">
-                    <i class="fa-solid fa-lock mr-1"></i>
-                    Your data is securely stored and only used for verification.
-                </p>
             </div>
 
             <!-- Payment -->
@@ -204,7 +193,6 @@ let itemData = {
 
 let availabilityCalendar = null;
 
-// ===== Cost Calculation =====
 function calculateTotal() {
     const start = document.getElementById('startDate').value;
     const end = document.getElementById('endDate').value;
@@ -245,7 +233,6 @@ function calculateTotal() {
         document.getElementById('calcTransport').textContent = '₹' + data.transport_fee;
         document.getElementById('calcTotal').textContent = '₹' + data.total;
         
-        // Show/hide KYC section
         const kycSection = document.getElementById('kycSection');
         const aadhaarInput = document.getElementById('aadhaarInput');
         const panInput = document.getElementById('panInput');
@@ -271,25 +258,40 @@ function showBookingConflict(data) {
         errorDiv = document.createElement('div');
         errorDiv.id = 'bookingConflictError';
         errorDiv.className = 'bg-red-50 border-2 border-red-300 p-4 rounded-xl mb-4';
-        
         const form = document.querySelector('form');
         form.parentNode.insertBefore(errorDiv, form);
+    }
+    
+    let nextDateHtml = '';
+    if (data.next_available) {
+        nextDateHtml = `
+            <div class="mt-3 text-xs font-bold text-red-900">
+                📅 Next Available Date: 
+                <span class="bg-red-200 px-3 py-1 rounded-lg ml-1">
+                    ${new Date(data.next_available).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'})}
+                </span>
+            </div>
+        `;
+    }
+    
+    let title = 'Item Not Available for Selected Dates';
+    if (data.conflict_type === 'return_day_full') {
+        title = '⚠️ Item Returning That Day';
+    } else if (data.conflict_type === 'fully_booked') {
+        title = '⚠️ Item Fully Booked';
+    } else if (data.conflict_type === 'insufficient_stock') {
+        title = '⚠️ Insufficient Stock';
+    } else if (data.conflict_type === 'return_day_partial') {
+        title = '⚠️ Limited Availability';
     }
     
     errorDiv.innerHTML = `
         <div class="flex items-start gap-3">
             <div class="text-2xl">⚠️</div>
             <div class="flex-1">
-                <h4 class="font-bold text-red-900 text-sm">Item Not Available for Selected Dates</h4>
-                <p class="text-xs text-red-800 mt-1">${data.message || 'This item is not available for the selected dates.'}</p>
-                ${data.next_available ? `
-                    <div class="mt-2 text-xs font-bold text-red-900">
-                        📅 Next Available Date: 
-                        <span class="bg-red-200 px-2 py-0.5 rounded">
-                            ${new Date(data.next_available).toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'})}
-                        </span>
-                    </div>
-                ` : ''}
+                <h4 class="font-bold text-red-900 text-sm">${title}</h4>
+                <p class="text-xs text-red-800 mt-1">${data.message}</p>
+                ${nextDateHtml}
             </div>
         </div>
     `;
@@ -298,7 +300,7 @@ function showBookingConflict(data) {
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.className = 'w-full bg-gray-300 text-gray-500 font-bold py-3.5 rounded-xl cursor-not-allowed';
-        submitBtn.textContent = 'Item Not Available';
+        submitBtn.textContent = 'Not Available';
     }
     
     document.getElementById('calcDays').textContent = '-';
@@ -324,34 +326,54 @@ function clearBookingConflict() {
 // ===== Availability Calendar =====
 function toggleAvailability() {
     const section = document.getElementById('availabilitySection');
-    section.classList.toggle('hidden');
+    const isHidden = section.classList.contains('hidden');
     
-    if (!section.classList.contains('hidden') && !availabilityCalendar) {
-        initAvailabilityCalendar();
+    if (isHidden) {
+        section.classList.remove('hidden');
+        setTimeout(function() {
+            if (!availabilityCalendar) {
+                initAvailabilityCalendar();
+            } else {
+                availabilityCalendar.render();
+            }
+        }, 100);
+    } else {
+        section.classList.add('hidden');
     }
 }
 
 function initAvailabilityCalendar() {
     const calendarEl = document.getElementById('availabilityCalendar');
     
-    availabilityCalendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'dayGridMonth',
-        headerToolbar: {
-            left: 'prev,next',
-            center: 'title',
-            right: 'today'
-        },
-        height: 'auto',
-        events: `/api/item/{{ item.id }}/availability-calendar`,
-        eventClick: function(info) {
-            showDateDetails(info.event);
-        },
-        dateClick: function(info) {
-            showDateDetailsByDate(info.dateStr);
-        }
-    });
+    if (!calendarEl) {
+        console.error('Calendar element not found');
+        return;
+    }
     
-    availabilityCalendar.render();
+    try {
+        availabilityCalendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next',
+                center: 'title',
+                right: 'today'
+            },
+            height: 'auto',
+            events: `/api/item/{{ item.id }}/availability-calendar`,
+            eventClick: function(info) {
+                showDateDetails(info.event);
+            },
+            dateClick: function(info) {
+                showDateDetailsByDate(info.dateStr);
+            }
+        });
+        
+        availabilityCalendar.render();
+        console.log('✅ Calendar rendered successfully');
+    } catch (err) {
+        console.error('❌ Calendar render error:', err);
+        calendarEl.innerHTML = '<p class="text-center text-red-500 text-sm py-8">Calendar could not load. Please refresh the page.</p>';
+    }
 }
 
 function showDateDetails(event) {
@@ -382,6 +404,7 @@ function showDateDetailsByDate(dateStr) {
                 <div><strong>Total Stock:</strong> ${data.total_stock}</div>
                 <div><strong>Booked:</strong> ${data.booked_qty}</div>
                 <div><strong>Available:</strong> ${data.available_qty}</div>
+                ${data.is_end_date ? '<div class="text-xs text-orange-700 mt-2"><strong>⚠️ Return day</strong></div>' : ''}
             `;
             document.getElementById('dateDetailModal').classList.remove('hidden');
             document.getElementById('dateDetailModal').classList.add('flex');
