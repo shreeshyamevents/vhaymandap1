@@ -84,7 +84,6 @@ class Config:
     CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY') or ''
     CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET') or ''
     
-    # Auto-delete configuration
     REPORT_RETENTION_DAYS = 30
     CRON_SECRET = os.environ.get('CRON_SECRET') or 'vyahmandap-cron-secret-2026'
     
@@ -269,8 +268,6 @@ class EquipmentReport(db.Model):
     device_info = db.Column(db.String(200))
     ip_address = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Auto-delete fields
     expired = db.Column(db.Boolean, default=False)
     expired_at = db.Column(db.DateTime, nullable=True)
     keep_forever = db.Column(db.Boolean, default=False)
@@ -380,7 +377,6 @@ def load_user(user_id):
 # ============================================
 
 def cleanup_old_reports(dry_run=False):
-    """Delete reports older than REPORT_RETENTION_DAYS days"""
     cutoff_date = datetime.utcnow() - timedelta(days=Config.REPORT_RETENTION_DAYS)
     
     eligible_reports = EquipmentReport.query.filter(
@@ -1297,41 +1293,48 @@ def vendor_sales():
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     
-    items = Item.query.filter_by(vendor_id=current_user.id)\
-        .order_by(Item.created_at.desc()).all()
-    item_ids = [i.id for i in items]
-    
-    if item_ids:
-        bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
-            .order_by(Booking.created_at.desc()).all()
-    else:
-        bookings = []
-    
-    total_earnings = sum(b.base_rent for b in bookings)
-    total_bookings = len(bookings)
-    active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-    total_items = len(items)
-    
-    today = datetime.utcnow().date()
-    thirty_days_later = today + timedelta(days=30)
-    upcoming_bookings = [
-        b for b in bookings 
-        if b.start_date >= today and b.start_date <= thirty_days_later
-        and b.booking_status in ['confirmed', 'dispatched']
-    ]
-    
-    pending_dispatch = [b for b in bookings 
-                       if not b.dispatch_report_done 
-                       and b.booking_status == 'confirmed']
-    
-    return render_template('vendor/sales.html',
-                         items=items, bookings=bookings,
-                         total_earnings=total_earnings,
-                         total_bookings=total_bookings,
-                         active_rentals=active_rentals,
-                         total_items=total_items,
-                         upcoming_bookings=upcoming_bookings,
-                         pending_dispatch=pending_dispatch)
+    try:
+        items = Item.query.filter_by(vendor_id=current_user.id)\
+            .order_by(Item.created_at.desc()).all()
+        item_ids = [i.id for i in items]
+        
+        if item_ids:
+            bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
+                .order_by(Booking.created_at.desc()).all()
+        else:
+            bookings = []
+        
+        total_earnings = sum(b.base_rent for b in bookings)
+        total_bookings = len(bookings)
+        active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
+        total_items = len(items)
+        
+        today = datetime.utcnow().date()
+        thirty_days_later = today + timedelta(days=30)
+        upcoming_bookings = [
+            b for b in bookings 
+            if b.start_date >= today and b.start_date <= thirty_days_later
+            and b.booking_status in ['confirmed', 'dispatched']
+        ]
+        
+        pending_dispatch = [b for b in bookings 
+                           if not b.dispatch_report_done 
+                           and b.booking_status == 'confirmed']
+        
+        return render_template('vendor/dashboard.html',
+                             items=items, bookings=bookings,
+                             total_earnings=total_earnings,
+                             total_bookings=total_bookings,
+                             active_rentals=active_rentals,
+                             total_items=total_items,
+                             upcoming_bookings=upcoming_bookings,
+                             pending_dispatch=pending_dispatch)
+    except Exception as e:
+        import traceback
+        print(f"❌ vendor_sales error: {e}")
+        traceback.print_exc()
+        flash(f'Error loading sales dashboard: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 
 @app.route('/vendor/rentals')
@@ -1342,36 +1345,42 @@ def vendor_rentals():
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     
-    # Bookings where current user is CUSTOMER
-    bookings = Booking.query.filter_by(customer_id=current_user.id)\
-        .order_by(Booking.created_at.desc()).all()
-    
-    total_spent = sum(b.total_amount for b in bookings)
-    active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-    total_rentals = len(bookings)
-    
-    # Bookings needing return report (as customer)
-    pending_return = [b for b in bookings 
-                     if b.dispatch_report_done 
-                     and not b.return_report_done 
-                     and b.booking_status in ['dispatched', 'confirmed']
-                     and b.booking_status != 'cancelled']
-    
-    return render_template('vendor/rentals.html',
-                         bookings=bookings,
-                         total_spent=total_spent,
-                         active_rentals=active_rentals,
-                         total_rentals=total_rentals,
-                         pending_return=pending_return)
+    try:
+        bookings = Booking.query.filter_by(customer_id=current_user.id)\
+            .order_by(Booking.created_at.desc()).all()
+        
+        total_spent = sum(b.total_amount for b in bookings)
+        active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
+        total_rentals = len(bookings)
+        
+        pending_return = [b for b in bookings 
+                         if b.dispatch_report_done 
+                         and not b.return_report_done 
+                         and b.booking_status in ['dispatched', 'confirmed']
+                         and b.booking_status != 'cancelled']
+        
+        return render_template('vendor/rentals.html',
+                             bookings=bookings,
+                             total_spent=total_spent,
+                             active_rentals=active_rentals,
+                             total_rentals=total_rentals,
+                             pending_return=pending_return)
+    except Exception as e:
+        import traceback
+        print(f"❌ vendor_rentals error: {e}")
+        traceback.print_exc()
+        flash(f'Error loading rentals dashboard: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 
 # ============================================
-# VENDOR ROUTES
+# VENDOR MAIN DASHBOARD (Backwards compatible)
 # ============================================
 
 @app.route('/vendor')
 @login_required
 def vendor_dashboard():
+    """Vendor's main dashboard — same as sales view"""
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied. Vendor account required.', 'danger')
         return redirect(url_for('index'))
@@ -2074,36 +2083,19 @@ def admin_ticket_detail(ticket_id):
 # ============================================
 
 def calculate_leaderboard(period='all_time', category='all'):
-    """
-    Calculate vendor rankings based on:
-    - Rating (40%)
-    - Bookings count (30%)
-    - Earnings (20%)
-    - Verification (10%)
-    
-    period: 'all_time' or 'monthly' (last 30 days)
-    category: 'all' or specific category
-    """
-    from datetime import timedelta
-    from sqlalchemy import func
-    
-    # Date filter
     cutoff_date = None
     if period == 'monthly':
         cutoff_date = datetime.utcnow() - timedelta(days=30)
     
-    # Get all vendors
     vendors = User.query.filter_by(role='vendor').all()
     
     rankings = []
     
     for vendor in vendors:
-        # Get vendor's items
         vendor_items = Item.query.filter_by(vendor_id=vendor.id).all()
         if not vendor_items:
             continue
         
-        # Apply category filter
         if category != 'all':
             vendor_items = [i for i in vendor_items if i.category == category]
             if not vendor_items:
@@ -2111,7 +2103,6 @@ def calculate_leaderboard(period='all_time', category='all'):
         
         vendor_item_ids = [i.id for i in vendor_items]
         
-        # Get bookings for these items
         booking_query = Booking.query.filter(
             Booking.item_id.in_(vendor_item_ids),
             Booking.booking_status.in_(['completed', 'return_initiated'])
@@ -2122,17 +2113,13 @@ def calculate_leaderboard(period='all_time', category='all'):
         
         vendor_bookings = booking_query.all()
         
-        # Total bookings
         total_bookings = len(vendor_bookings)
         
-        # Minimum 5 bookings required
         if total_bookings < 5:
             continue
         
-        # Total earnings (base rent only)
         total_earnings = sum(b.base_rent for b in vendor_bookings)
         
-        # Average rating from reviews
         booking_ids = [b.id for b in vendor_bookings]
         reviews = Review.query.filter(Review.booking_id.in_(booking_ids)).all() if booking_ids else []
         
@@ -2141,23 +2128,13 @@ def calculate_leaderboard(period='all_time', category='all'):
         if reviews:
             avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
         
-        # Check if any item is verified
         has_verified_item = any(i.is_currently_verified for i in vendor_items)
         
-        # Composite Score Calculation
-        # Rating: 40% (max 100 if 5-star)
         rating_score = (avg_rating / 5) * 100 if avg_rating > 0 else 0
-        
-        # Bookings: 30% (50 bookings = full 100)
         bookings_score = min(100, total_bookings * 2)
-        
-        # Earnings: 20% (₹1,00,000 = full 100)
         earnings_score = min(100, total_earnings / 1000)
-        
-        # Verification: 10%
         verification_score = 100 if has_verified_item else 0
         
-        # Composite Score
         trust_score = round(
             (rating_score * 0.4) +
             (bookings_score * 0.3) +
@@ -2166,7 +2143,6 @@ def calculate_leaderboard(period='all_time', category='all'):
             1
         )
         
-        # Top category (most items)
         category_counts = {}
         for item in vendor_items:
             category_counts[item.category] = category_counts.get(item.category, 0) + 1
@@ -2184,10 +2160,8 @@ def calculate_leaderboard(period='all_time', category='all'):
             'total_items': len(vendor_items)
         })
     
-    # Sort by trust_score (highest first)
     rankings.sort(key=lambda x: x['trust_score'], reverse=True)
     
-    # Add rank
     for idx, r in enumerate(rankings):
         r['rank'] = idx + 1
     
@@ -2196,7 +2170,6 @@ def calculate_leaderboard(period='all_time', category='all'):
 
 @app.route('/leaderboard')
 def leaderboard():
-    """Public leaderboard page"""
     period = request.args.get('period', 'all_time')
     category = request.args.get('category', 'all')
     
@@ -2218,10 +2191,8 @@ def leaderboard():
                          category_filter=category)
 
 
-
 @app.route('/api/leaderboard/top3')
 def api_leaderboard_top3():
-    """Top 3 vendors for homepage showcase"""
     rankings = calculate_leaderboard(period='all_time', category='all')
     top_3 = rankings[:3]
     
@@ -2356,6 +2327,7 @@ def admin_dashboard():
     cancelled_bookings = Booking.query.filter_by(booking_status='cancelled').count()
     
     total_transport = db.session.query(db.func.sum(Booking.transport_fee)).scalar() or 0
+    total_deposits = db.session.query(db.func.sum(Booking.deposit)).scalar() or 0
     total_base_rent = db.session.query(db.func.sum(Booking.base_rent)).scalar() or 0
     
     kyc_pending = Booking.query.filter_by(kyc_required=True, kyc_verified=False).count()
@@ -2371,7 +2343,6 @@ def admin_dashboard():
     
     damage_flagged_count = Booking.query.filter_by(damage_flagged=True).count()
     
-    # Storage stats
     all_reports = EquipmentReport.query.all()
     total_reports = len(all_reports)
     active_reports = sum(1 for r in all_reports if not r.expired and not r.keep_forever)
@@ -2398,6 +2369,7 @@ def admin_dashboard():
                          completed_bookings=completed_bookings,
                          cancelled_bookings=cancelled_bookings,
                          total_transport=total_transport,
+                         total_deposits=total_deposits,
                          total_base_rent=total_base_rent,
                          kyc_pending=kyc_pending,
                          kyc_completed=kyc_completed,
@@ -2833,7 +2805,6 @@ def utility_processor():
 
 def init_database():
     try:
-        # Auto-migration: Add missing columns
         try:
             from sqlalchemy import text
             
