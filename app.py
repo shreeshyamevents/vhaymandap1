@@ -754,9 +754,16 @@ def index():
 @app.route('/api/items')
 def get_items():
     category = request.args.get('category', 'all')
-    query = Item.query.filter_by(is_available=True)
+    show_unavailable = request.args.get('show_unavailable', 'false').lower() == 'true'
+    
+    query = Item.query
+    if not show_unavailable:
+        # Default: show only available (for booking page)
+        query = query.filter_by(is_available=True)
+    
     if category != 'all':
         query = query.filter_by(category=category)
+    
     items = query.order_by(Item.created_at.desc()).all()
     
     result = []
@@ -781,7 +788,8 @@ def get_items():
             'vendor_verified': item.vendor.is_verified,
             'item_verified': item.is_currently_verified,
             'avg_rating': avg_rating,
-            'review_count': review_count
+            'review_count': review_count,
+            'is_available': item.is_available  # ← NEW
         })
     return jsonify(result)
 
@@ -878,9 +886,16 @@ def item_availability_single(item_id):
 @login_required
 def book_item(item_id):
     item = Item.query.get_or_404(item_id)
-    if not item.is_available or item.stock <= 0:
-        flash('This item is currently not available for booking.', 'danger')
+    
+    # NEW: Check if item is available
+    if not item.is_available:
+        flash('⚠️ This item is currently unavailable for booking.', 'warning')
         return redirect(url_for('index'))
+    
+    if item.stock <= 0:
+        flash('This item is out of stock.', 'danger')
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         try:
             start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
@@ -1545,6 +1560,33 @@ def vendor_edit_item(item_id):
         flash('✅ Item updated successfully!', 'success')
         return redirect(url_for('vendor_dashboard'))
     return render_template('vendor/item_form.html', item=item)
+
+
+@app.route('/vendor/item/<int:item_id>/toggle-availability', methods=['POST'])
+@login_required
+def vendor_toggle_availability(item_id):
+    """One-click toggle between available and unavailable for rental"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    item = Item.query.get_or_404(item_id)
+    
+    # Check ownership
+    if item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+    
+    # Toggle availability
+    item.is_available = not item.is_available
+    db.session.commit()
+    
+    if item.is_available:
+        flash(f'✅ "{item.title}" is now available for rent.', 'success')
+    else:
+        flash(f'⚪ "{item.title}" is now unavailable. Customers won\'t see it in marketplace.', 'info')
+    
+    return redirect(request.referrer or url_for('vendor_dashboard'))
 
 
 @app.route('/vendor/item/delete/<int:item_id>', methods=['POST'])
