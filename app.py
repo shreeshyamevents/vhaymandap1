@@ -1286,6 +1286,86 @@ def report_view(booking_id):
 
 
 # ============================================
+# VENDOR SALES & RENTALS (Split View)
+# ============================================
+
+@app.route('/vendor/sales')
+@login_required
+def vendor_sales():
+    """Vendor's sales view — bookings on their items"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    items = Item.query.filter_by(vendor_id=current_user.id)\
+        .order_by(Item.created_at.desc()).all()
+    item_ids = [i.id for i in items]
+    
+    if item_ids:
+        bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
+            .order_by(Booking.created_at.desc()).all()
+    else:
+        bookings = []
+    
+    total_earnings = sum(b.base_rent for b in bookings)
+    total_bookings = len(bookings)
+    active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
+    total_items = len(items)
+    
+    today = datetime.utcnow().date()
+    thirty_days_later = today + timedelta(days=30)
+    upcoming_bookings = [
+        b for b in bookings 
+        if b.start_date >= today and b.start_date <= thirty_days_later
+        and b.booking_status in ['confirmed', 'dispatched']
+    ]
+    
+    pending_dispatch = [b for b in bookings 
+                       if not b.dispatch_report_done 
+                       and b.booking_status == 'confirmed']
+    
+    return render_template('vendor/sales.html',
+                         items=items, bookings=bookings,
+                         total_earnings=total_earnings,
+                         total_bookings=total_bookings,
+                         active_rentals=active_rentals,
+                         total_items=total_items,
+                         upcoming_bookings=upcoming_bookings,
+                         pending_dispatch=pending_dispatch)
+
+
+@app.route('/vendor/rentals')
+@login_required
+def vendor_rentals():
+    """Vendor's rentals view — bookings they made as customer"""
+    if current_user.role not in ['admin', 'vendor']:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Bookings where current user is CUSTOMER
+    bookings = Booking.query.filter_by(customer_id=current_user.id)\
+        .order_by(Booking.created_at.desc()).all()
+    
+    total_spent = sum(b.total_amount for b in bookings)
+    active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
+    total_rentals = len(bookings)
+    
+    # Bookings needing return report (as customer)
+    pending_return = [b for b in bookings 
+                     if b.dispatch_report_done 
+                     and not b.return_report_done 
+                     and b.booking_status in ['dispatched', 'confirmed']
+                     and b.booking_status != 'cancelled']
+    
+    return render_template('vendor/rentals.html',
+                         bookings=bookings,
+                         total_spent=total_spent,
+                         active_rentals=active_rentals,
+                         total_rentals=total_rentals,
+                         pending_return=pending_return)
+
+
+# ============================================
 # VENDOR ROUTES
 # ============================================
 
