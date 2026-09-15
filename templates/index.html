@@ -36,6 +36,58 @@
     <div class="absolute right-0 bottom-0 opacity-10 text-[180px] leading-none font-black select-none">VM</div>
 </div>
 
+<!-- Top Vendors Showcase -->
+<div class="mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <h3 class="text-xl font-bold">🏆 Top Rated Vendors</h3>
+            <p class="text-xs text-gray-500">Trusted by customers</p>
+        </div>
+        <a href="{{ url_for('leaderboard') }}" class="text-sm text-green-700 font-bold hover:underline">
+            View Full Leaderboard →
+        </a>
+    </div>
+    
+    <div id="topVendorsShowcase" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Loaded via API -->
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/leaderboard/top3')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('topVendorsShowcase');
+            if (!data.vendors || data.vendors.length === 0) {
+                container.innerHTML = `<div class="col-span-3 text-center text-gray-500 text-sm py-4">Vendors will appear here once they get bookings.</div>`;
+                return;
+            }
+            
+            const medals = ['🥇', '🥈', '🥉'];
+            container.innerHTML = data.vendors.map((v, i) => `
+                <a href="{{ url_for('leaderboard') }}" class="bg-white rounded-xl border shadow-sm p-4 hover:shadow-md transition">
+                    <div class="flex items-center gap-3">
+                        <div class="text-3xl">${medals[i]}</div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-sm truncate">${v.name}</h4>
+                            <div class="flex gap-2 text-xs text-gray-500 mt-0.5">
+                                <span>⭐ ${v.rating}</span>
+                                <span>📦 ${v.bookings}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500">Score</div>
+                            <strong class="text-green-700">${v.score}</strong>
+                        </div>
+                    </div>
+                </a>
+            `).join('');
+        })
+        .catch(err => console.error('Top vendors error:', err));
+});
+</script>
+
 <!-- Marketplace -->
 <div id="marketplace">
     <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
