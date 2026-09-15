@@ -467,25 +467,16 @@ def check_availability_conflict(item_id, start_date, requested_quantity=1):
     Returns (has_conflict, conflict_booking, available_qty)
     
     Logic: 
-    1. Check for same-day conflict (existing booking end_date == new start_date)
-    2. Check for stock availability
+    1. Check stock availability for start_date
+    2. If sufficient stock → allow (even if returns happening same day)
+    3. If insufficient → conflict with details
     """
     item = Item.query.get(item_id)
     if not item:
         return (True, None, 0)
     
-    # ===== Rule 1: Same-day buffer check =====
-    # If any booking ends on start_date, that means return day — bookable only next day
-    same_day_booking = Booking.query.filter(
-        Booking.item_id == item_id,
-        Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-        Booking.end_date == start_date
-    ).first()
-    
-    if same_day_booking:
-        return (True, same_day_booking, 0)
-    
-    # ===== Rule 2: Stock check for overlapping dates =====
+    # ===== Stock check for start_date =====
+    # Find all bookings that cover start_date
     overlapping = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
@@ -496,8 +487,9 @@ def check_availability_conflict(item_id, start_date, requested_quantity=1):
     booked_qty = sum(b.quantity for b in overlapping)
     available_qty = max(0, item.stock - booked_qty)
     
+    # Conflict only if requested quantity exceeds available
     if requested_quantity > available_qty:
-        conflict_booking = overlapping[-1] if overlapping else None
+        conflict_booking = overlapping[0] if overlapping else None
         return (True, conflict_booking, available_qty)
     
     return (False, None, available_qty)
