@@ -6,8 +6,12 @@
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 <style>
-    #availabilityCalendar { max-height: 400px; min-height: 400px; }
+    #availabilityCalendar { min-height: 400px; }
     .fc-event { font-size: 11px; }
+    #availabilityCalendar .fc-view-harness { min-height: 380px !important; }
+    #availabilityCalendar .fc-daygrid-body,
+    #availabilityCalendar table { width: 100% !important; }
+    #availabilityCalendar .fc-scrollgrid { border: none; }
 </style>
 {% endblock %}
 
@@ -44,7 +48,7 @@
 
         <!-- Availability Calendar -->
         <div id="availabilitySection" class="hidden mb-6">
-            <div class="bg-white border rounded-xl p-4">
+            <div class="bg-white border rounded-xl p-4 overflow-hidden">
                 <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
                     <h4 class="font-bold text-sm text-gray-700">📅 Availability Calendar</h4>
                     <div class="flex gap-2 text-xs flex-wrap">
@@ -335,6 +339,7 @@ function toggleAvailability() {
                 initAvailabilityCalendar();
             } else {
                 availabilityCalendar.render();
+                availabilityCalendar.updateSize();
             }
         }, 100);
     } else {
@@ -365,6 +370,7 @@ function initAvailabilityCalendar() {
                 right: 'today'
             },
             height: 'auto',
+            contentHeight: 'auto',
             events: `/api/item/{{ item.id }}/availability-calendar`,
             eventClick: function(info) {
                 showDateDetails(info.event);
@@ -375,6 +381,7 @@ function initAvailabilityCalendar() {
         });
         
         availabilityCalendar.render();
+        setTimeout(() => availabilityCalendar.updateSize(), 50);
         console.log('✅ Calendar rendered successfully');
     } catch (err) {
         console.error('❌ Calendar render error:', err);
