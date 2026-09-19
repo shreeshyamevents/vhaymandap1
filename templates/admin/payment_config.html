@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Config - Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">💳 Payment Configuration</h2>
+        <a href="{{ url_for('admin_payments') }}" class="text-sm text-blue-600 hover:underline">
+            View Payments Queue →
+        </a>
+    </div>
+
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-900">
+        <strong>ℹ️ How this works:</strong> Customers see these details on their booking page
+        and upload payment screenshots as proof. You verify or reject from the queue.
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
+        
+        <!-- UPI Section -->
+        <div>
+            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-green-700 text-white text-xs flex items-center justify-center">1</span>
+                UPI Details
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">UPI ID</label>
+                    <input type="text" name="upi_id" value="{{ cfg.upi_id or '' }}"
+                           placeholder="vyahmandap@okhdfcbank"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">UPI Display Name</label>
+                    <input type="text" name="upi_name" value="{{ cfg.upi_name or 'VyahMandap' }}"
+                           placeholder="VyahMandap"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank Section -->
+        <div class="pt-4 border-t">
+            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-green-700 text-white text-xs flex items-center justify-center">2</span>
+                Bank Account Details
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Account Holder Name</label>
+                    <input type="text" name="account_name" value="{{ cfg.account_name or '' }}"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Account Number</label>
+                    <input type="text" name="account_number" value="{{ cfg.account_number or '' }}"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">IFSC Code</label>
+                    <input type="text" name="ifsc_code" value="{{ cfg.ifsc_code or '' }}"
+                           placeholder="SBIN0001234" style="text-transform: uppercase;"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1">Bank Name</label>
+                    <input type="text" name="bank_name" value="{{ cfg.bank_name or '' }}"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold mb-1">Branch</label>
+                    <input type="text" name="branch" value="{{ cfg.branch or '' }}"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Preview -->
+        <div class="pt-4 border-t">
+            <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-green-700 text-white text-xs flex items-center justify-center">3</span>
+                QR Code Preview
+            </h3>
+            <div class="flex flex-col md:flex-row gap-6 items-start">
+                <div class="bg-gray-50 border rounded-xl p-4 text-center">
+                    {% if qr_base64 %}
+                        <img src="data:image/png;base64,{{ qr_base64 }}" alt="UPI QR"
+                             class="w-48 h-48 mx-auto">
+                        <p class="text-xs text-gray-500 mt-2">Auto-generated from UPI ID</p>
+                    {% elif cfg.custom_qr_url %}
+                        <img src="{{ cfg.custom_qr_url }}" alt="Custom QR"
+                             class="w-48 h-48 mx-auto object-contain">
+                        <p class="text-xs text-gray-500 mt-2">Custom uploaded QR</p>
+                    {% else %}
+                        <div class="w-48 h-48 mx-auto flex items-center justify-center text-gray-400 text-sm">
+                            Enter UPI ID to see QR
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-1">Optional: Upload Custom QR</label>
+                    <input type="file" name="custom_qr" accept="image/*"
+                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <p class="text-xs text-gray-500 mt-2">
+                        If provided, this QR will be shown instead of the auto-generated one.
+                        Upload a photo of your bank/payment app's QR code if preferred.
+                    </p>
+                    {% if cfg.custom_qr_url %}
+                        <p class="text-xs text-orange-600 mt-2">
+                            ⚠️ A custom QR is currently set. Uploading a new one will replace it.
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 border-t flex justify-end">
+            <button type="submit"
+                    class="bg-green-700 text-white font-bold px-6 py-2.5 rounded-xl hover:bg-green-600 transition text-sm">
+                💾 Save Configuration
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
