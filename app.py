@@ -576,6 +576,42 @@ def get_longest_digit_sequence(text):
 
 
 # ============================================
+# CONTACT INFO FILTERING (emails, UPI IDs, length)
+# ============================================
+
+EMAIL_PATTERN = re.compile(
+    r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+)
+
+MAX_CHAT_CHARS = 2000
+
+
+def contains_email(text):
+    """Check if text contains any email address or UPI ID (john@okhdfcbank, 9876543210@ybl)."""
+    return EMAIL_PATTERN.search(text) is not None
+
+
+def get_first_email(text):
+    """Return the first email/UPI ID found in text, or None."""
+    match = EMAIL_PATTERN.search(text)
+    return match.group(0) if match else None
+
+
+def should_filter_contact_info(user_a, user_b):
+    """
+    Contact-info filtering applies only to customer <-> vendor chats.
+    Admin <-> anyone is exempt (admin may need to share info for support).
+    Returns True if filtering should be applied.
+    """
+    roles = {user_a.role, user_b.role}
+    # Exempt if either party is admin
+    if 'admin' in roles:
+        return False
+    # Only filter customer<->vendor
+    return roles == {'customer', 'vendor'}
+
+
+# ============================================
 # CLOUDINARY UPLOAD HELPERS
 # ============================================
 
@@ -1929,13 +1965,24 @@ def chat_with(user_id):
     
     if request.method == 'POST':
         body = request.form.get('body', '').strip()
+        
+        apply_filter = should_filter_contact_info(current_user, other_user)
+        
         if not body:
             flash('Message cannot be empty.', 'danger')
-        elif contains_too_many_digits(body, max_consecutive=4):
+        elif len(body) > MAX_CHAT_CHARS:
+            flash(f'⚠️ Message too long! Maximum {MAX_CHAT_CHARS} characters allowed '
+                  f'(yours has {len(body)}).', 'danger')
+        elif apply_filter and contains_email(body):
+            found = get_first_email(body)
+            flash(f'⚠️ Message blocked! Sharing email addresses or UPI IDs is not allowed '
+                  f'(found: {found}). Please use the platform to communicate.', 'danger')
+        elif apply_filter and contains_too_many_digits(body, max_consecutive=4):
             longest = get_longest_digit_sequence(body)
             flash(f'⚠️ Message blocked! Cannot share more than 4 consecutive digits '
                   f'(found {longest}). This prevents phone number sharing.', 'danger')
         else:
+            # Mask phone numbers as a safety net (applies to all chats)
             masked_body = mask_phone_numbers(body)
             msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
                          item_id=item_id, body=masked_body)
@@ -1986,9 +2033,29 @@ def api_chat_send():
     if not other_user:
         return jsonify({'error': 'User not found'}), 404
     
-    if contains_too_many_digits(body, max_consecutive=4):
+    apply_filter = should_filter_contact_info(current_user, other_user)
+    
+    # Length limit applies to ALL chats
+    if len(body) > MAX_CHAT_CHARS:
+        return jsonify({
+            'error': f'Message too long. Maximum {MAX_CHAT_CHARS} characters allowed '
+                     f'(yours has {len(body)}).'
+        }), 400
+    
+    # Email / UPI blocking — only customer<->vendor
+    if apply_filter and contains_email(body):
+        found = get_first_email(body)
+        return jsonify({
+            'error': f'Sharing email addresses or UPI IDs is not allowed (found: {found}). '
+                     f'Please use the platform to communicate.'
+        }), 400
+    
+    # Phone digit blocking — only customer<->vendor
+    if apply_filter and contains_too_many_digits(body, max_consecutive=4):
         longest = get_longest_digit_sequence(body)
-        return jsonify({'error': f'Number masking: Cannot share more than 4 consecutive digits. Found {longest}.'}), 400
+        return jsonify({
+            'error': f'Cannot share more than 4 consecutive digits. Found {longest}.'
+        }), 400
     
     masked_body = mask_phone_numbers(body)
     msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
