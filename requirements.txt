@@ -6,3 +6,4 @@ requests==2.32.3
 psycopg2-binary==2.9.9
 gunicorn==21.2.0
 cloudinary==1.40.0
+qrcode[pil]==7.4.2
