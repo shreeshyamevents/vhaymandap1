@@ -191,9 +191,6 @@ let itemData = {
     stock: {{ item.stock }}
 };
 
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script>
 let availabilityCalendar = null;
 
 function calculateTotal() {
@@ -350,6 +347,12 @@ function initAvailabilityCalendar() {
     
     if (!calendarEl) {
         console.error('Calendar element not found');
+        return;
+    }
+
+    if (typeof FullCalendar === 'undefined') {
+        console.error('FullCalendar library not loaded');
+        calendarEl.innerHTML = '<p class="text-center text-red-500 text-sm py-8">Calendar library failed to load. Please refresh the page.</p>';
         return;
     }
     
