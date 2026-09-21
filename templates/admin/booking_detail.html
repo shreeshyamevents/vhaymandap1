@@ -139,6 +139,83 @@
 </div>
 {% endif %}
 
+<!-- Payment Proofs -->
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <h3 class="font-bold text-lg">💰 Payment Proofs</h3>
+        <a href="{{ url_for('admin_payment_queue') }}" class="text-xs text-blue-600 hover:underline font-bold">
+            View Full Queue →
+        </a>
+    </div>
+
+    {% if not payment_proofs %}
+        <p class="text-sm text-gray-500 text-center py-6">No payment proofs submitted for this booking.</p>
+    {% else %}
+        <div class="space-y-3">
+            {% for p in payment_proofs %}
+            <div class="flex gap-3 p-3 bg-gray-50 rounded-xl flex-wrap md:flex-nowrap">
+                <a href="{{ p.screenshot_url }}" target="_blank" class="flex-shrink-0">
+                    <img src="{{ p.screenshot_url }}" class="w-24 h-24 object-cover rounded-lg border hover:opacity-80 transition" alt="proof">
+                </a>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-bold">₹{{ p.amount_paid }}</span>
+                        <span class="text-xs text-gray-500">{{ p.method.upper() }}</span>
+                        {% if p.status == 'pending' %}
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-0.5 rounded">PENDING</span>
+                        {% elif p.status == 'verified' %}
+                            <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">VERIFIED</span>
+                        {% else %}
+                            <span class="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded">REJECTED</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        By {{ p.uploader.name }} • {{ p.created_at.strftime('%d %b %Y, %H:%M') }}
+                    </div>
+                    {% if p.transaction_id %}
+                    <div class="text-xs mt-1"><strong>UTR:</strong> {{ p.transaction_id }}</div>
+                    {% endif %}
+                    {% if p.payer_name %}
+                    <div class="text-xs mt-1"><strong>Payer:</strong> {{ p.payer_name }}{% if p.payer_bank %} ({{ p.payer_bank }}){% endif %}</div>
+                    {% endif %}
+                    {% if p.payment_date %}
+                    <div class="text-xs mt-1"><strong>Payment Date:</strong> {{ p.payment_date.strftime('%d %b %Y') }}</div>
+                    {% endif %}
+                    {% if p.notes %}
+                    <div class="text-xs mt-1 text-gray-600"><strong>Notes:</strong> {{ p.notes }}</div>
+                    {% endif %}
+                    {% if p.status == 'rejected' and p.rejection_reason %}
+                    <div class="text-xs text-red-700 mt-1 bg-red-50 border border-red-200 rounded p-2">
+                        <strong>Rejection reason:</strong> {{ p.rejection_reason }}
+                    </div>
+                    {% endif %}
+                    {% if p.status != 'pending' and p.verifier %}
+                    <div class="text-xs text-gray-500 mt-1">
+                        {{ p.status|title }} by {{ p.verifier.name }}
+                        {% if p.verified_at %} on {{ p.verified_at.strftime('%d %b %Y, %H:%M') }}{% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if p.status == 'pending' %}
+                    <div class="flex gap-2 mt-3">
+                        <form method="POST" action="{{ url_for('admin_verify_payment_proof', proof_id=p.id) }}">
+                            <button class="text-xs bg-green-700 text-white font-bold px-3 py-1.5 rounded hover:bg-green-600">
+                                ✓ Verify
+                            </button>
+                        </form>
+                        <button onclick="openRejectModal2({{ p.id }})"
+                                class="text-xs bg-red-100 text-red-700 font-bold px-3 py-1.5 rounded hover:bg-red-200">
+                            ✕ Reject
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
 <!-- Status Update -->
 <div class="bg-white p-6 rounded-xl border shadow-sm">
     <h3 class="font-bold text-lg mb-4">⚙️ Update Status</h3>
@@ -155,4 +232,35 @@
         <span class="text-xs text-gray-500 ml-auto">Current: <strong>{{ booking.booking_status.replace('_', ' ')|title }}</strong></span>
     </form>
 </div>
+
+<!-- Reject Payment Proof Modal -->
+<div id="rejectModal2" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(0,0,0,0.55);">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 relative">
+        <button onclick="closeRejectModal2()" class="absolute top-3 right-4 text-2xl text-gray-400 hover:text-black">&times;</button>
+        <h3 class="text-lg font-bold mb-3">✕ Reject Payment Proof</h3>
+        <form id="rejectForm2" method="POST">
+            <label class="block text-sm font-semibold mb-1">Rejection Reason *</label>
+            <textarea name="rejection_reason" required rows="4"
+                      placeholder="e.g. Screenshot unclear / amount mismatch / invalid UTR"
+                      class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+            <div class="flex gap-2 mt-4 justify-end">
+                <button type="button" onclick="closeRejectModal2()"
+                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500">Confirm Reject</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openRejectModal2(id) {
+    document.getElementById('rejectForm2').action = '/admin/payment-proof/' + id + '/reject';
+    document.getElementById('rejectModal2').classList.remove('hidden');
+    document.getElementById('rejectModal2').classList.add('flex');
+}
+function closeRejectModal2() {
+    document.getElementById('rejectModal2').classList.add('hidden');
+    document.getElementById('rejectModal2').classList.remove('flex');
+}
+</script>
 {% endblock %}
