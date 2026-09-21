@@ -4,11 +4,12 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
+    <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
         <h2 class="text-2xl font-bold">💳 Payment Configuration</h2>
-        <a href="{{ url_for('admin_payments') }}" class="text-sm text-blue-600 hover:underline">
-            View Payments Queue →
-        </a>
+        <div class="flex gap-2">
+            <a href="{{ url_for('admin_payment_queue') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">🧾 Proofs Queue</a>
+            <a href="{{ url_for('admin_payments') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">💰 UTR Tracking</a>
+        </div>
     </div>
 
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-900">
