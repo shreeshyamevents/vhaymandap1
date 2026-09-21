@@ -21,7 +21,7 @@ from io import BytesIO
 from urllib.parse import quote
 
 # ============================================
-# SAFETY: Clear invalid CLOUDINARY_URL before importing cloudinary
+# SAFETY: Clear invalid CLOUDINARY_URL
 # ============================================
 _env_cl_url = os.environ.get('CLOUDINARY_URL', '')
 if _env_cl_url and not _env_cl_url.startswith('cloudinary://'):
@@ -31,14 +31,13 @@ if _env_cl_url and not _env_cl_url.startswith('cloudinary://'):
 import cloudinary
 import cloudinary.uploader
 
+
 # ============================================
 # CONFIGURATION
 # ============================================
-
 class Config:
     APP_NAME = "VyahMandap"
     APP_TAGLINE = "Taiyari Hamari, Celebration Aapka!"
-    
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'vyahmandap-fixed-secret-key-2026-do-not-change'
     
     database_url = os.environ.get('DATABASE_URL')
@@ -61,7 +60,6 @@ class Config:
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    SQLALCHEMY_ENGINE_OPTIONS = {}
     if not database_url:
         SQLALCHEMY_ENGINE_OPTIONS = {
             'connect_args': {'check_same_thread': False, 'timeout': 30}
@@ -141,7 +139,6 @@ print(f"📷 Cloudinary: {'Configured' if Config.CLOUDINARY_CLOUD_NAME else 'Not
 # ============================================
 # MODELS
 # ============================================
-
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -331,10 +328,8 @@ class PaymentProof(db.Model):
     """Customer-uploaded payment evidence. Multiple per booking allowed."""
     __tablename__ = 'payment_proof'
     id              = db.Column(db.Integer, primary_key=True)
-    booking_id      = db.Column(db.Integer, db.ForeignKey('bookings.id'),
-                                nullable=False)
-    uploaded_by     = db.Column(db.Integer, db.ForeignKey('users.id'),
-                                nullable=False)
+    booking_id      = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)
+    uploaded_by     = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     method          = db.Column(db.String(20), default='upi')
     amount_paid     = db.Column(db.Float, default=0)
@@ -422,7 +417,6 @@ class TicketReply(db.Model):
 # ============================================
 # LOGIN MANAGER
 # ============================================
-
 login_manager = LoginManager()
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please login to access this page.'
@@ -437,7 +431,6 @@ def load_user(user_id):
 # ============================================
 # AUTO-DELETE OLD REPORTS
 # ============================================
-
 def cleanup_old_reports(dry_run=False):
     cutoff_date = datetime.utcnow() - timedelta(days=Config.REPORT_RETENTION_DAYS)
     
@@ -483,10 +476,7 @@ def cleanup_old_reports(dry_run=False):
             
             if report.video_public_id:
                 try:
-                    cloudinary.uploader.destroy(
-                        report.video_public_id,
-                        resource_type='video'
-                    )
+                    cloudinary.uploader.destroy(report.video_public_id, resource_type='video')
                     stats['deleted_videos'] += 1
                 except Exception as e:
                     print(f"⚠️ Video delete failed: {e}")
@@ -507,18 +497,15 @@ def cleanup_old_reports(dry_run=False):
 
 
 # ============================================
-# AVAILABILITY HELPERS (STOCK-AWARE + RETURN DAY)
+# AVAILABILITY HELPERS
 # ============================================
-
 def get_next_available_date(item_id):
     latest_booking = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])
     ).order_by(Booking.end_date.desc()).first()
-    
     if not latest_booking:
         return None
-    
     return latest_booking.end_date + timedelta(days=1)
 
 
@@ -544,19 +531,12 @@ def check_availability_conflict(item_id, start_date, requested_quantity=1):
             break
     
     has_conflict = requested_quantity > available_qty
-    
     conflict_type = None
     if has_conflict:
         if available_qty == 0:
-            if returning_booking:
-                conflict_type = 'return_day_full'
-            else:
-                conflict_type = 'fully_booked'
+            conflict_type = 'return_day_full' if returning_booking else 'fully_booked'
         else:
-            if returning_booking:
-                conflict_type = 'return_day_partial'
-            else:
-                conflict_type = 'insufficient_stock'
+            conflict_type = 'return_day_partial' if returning_booking else 'insufficient_stock'
     
     return (has_conflict, returning_booking, available_qty, conflict_type)
 
@@ -564,9 +544,9 @@ def check_availability_conflict(item_id, start_date, requested_quantity=1):
 # ============================================
 # UTILITY FUNCTIONS
 # ============================================
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+
 
 def save_uploaded_file(file):
     if file and allowed_file(file.filename):
@@ -583,6 +563,7 @@ def save_uploaded_file(file):
             return None
     return None
 
+
 def calculate_booking_total(item, start_date, end_date, quantity, area, weight_category):
     days = (end_date - start_date).days + 1
     if days < 1:
@@ -595,24 +576,31 @@ def calculate_booking_total(item, start_date, end_date, quantity, area, weight_c
     return {'days': days, 'base_rent': base_rent, 'commission': commission,
             'deposit': deposit, 'transport_fee': transport_fee, 'total': total}
 
+
 def generate_booking_reference():
     return 'VM' + ''.join(random.choices(string.digits, k=8))
+
 
 def generate_ticket_number():
     return 'TK' + ''.join(random.choices(string.digits, k=8))
 
+
 def format_currency(amount):
     return f"₹{amount:,.2f}"
+
 
 def validate_mobile(mobile):
     return re.match(r'^\d{10}$', mobile) is not None
 
+
 def mask_phone_numbers(text):
     return re.sub(r'\b(\d{2})\d{6}(\d{2})\b', r'\1XXXXXX\2', text)
+
 
 def contains_too_many_digits(text, max_consecutive=4):
     matches = re.findall(r'\d{' + str(max_consecutive + 1) + r',}', text)
     return len(matches) > 0
+
 
 def get_longest_digit_sequence(text):
     sequences = re.findall(r'\d+', text)
@@ -622,13 +610,11 @@ def get_longest_digit_sequence(text):
 
 
 # ============================================
-# CONTACT INFO FILTERING (emails, UPI IDs, length)
+# CONTACT INFO FILTERING
 # ============================================
-
 EMAIL_PATTERN = re.compile(
     r'\b[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9][A-Za-z0-9.-]*(?:\.[A-Za-z]{2,})?\b'
 )
-
 MAX_CHAT_CHARS = 2000
 
 
@@ -651,16 +637,13 @@ def should_filter_contact_info(user_a, user_b):
 # ============================================
 # CLOUDINARY UPLOAD HELPERS
 # ============================================
-
 def upload_base64_to_cloudinary(base64_string, folder='vyahmandap/reports'):
     if not Config.CLOUDINARY_CLOUD_NAME:
         print("⚠️ Cloudinary not configured")
         return None
-    
     try:
         if ',' in base64_string:
             base64_string = base64_string.split(',')[1]
-        
         result = cloudinary.uploader.upload(
             f"data:image/jpeg;base64,{base64_string}",
             folder=folder,
@@ -681,17 +664,14 @@ def upload_file_to_cloudinary(file_obj, folder='vyahmandap/payments'):
     """Upload a FileStorage object. Returns dict {'url', 'public_id'} or None."""
     if not Config.CLOUDINARY_CLOUD_NAME or not file_obj:
         return None
-    
     temp_path = None
     try:
         ext = ''
         if file_obj.filename and '.' in file_obj.filename:
             ext = '.' + file_obj.filename.rsplit('.', 1)[1].lower()
-        
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             file_obj.save(tmp.name)
             temp_path = tmp.name
-        
         result = cloudinary.uploader.upload(
             temp_path,
             folder=folder,
@@ -702,10 +682,7 @@ def upload_file_to_cloudinary(file_obj, folder='vyahmandap/payments'):
                 {'fetch_format': 'auto'}
             ]
         )
-        return {
-            'url': result.get('secure_url'),
-            'public_id': result.get('public_id')
-        }
+        return {'url': result.get('secure_url'), 'public_id': result.get('public_id')}
     except Exception as e:
         print(f"❌ Cloudinary file upload failed: {type(e).__name__}: {e}")
         import traceback
@@ -723,16 +700,13 @@ def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
     if not Config.CLOUDINARY_CLOUD_NAME:
         print("⚠️ Cloudinary not configured")
         return None, None
-    
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as tmp:
             file_obj.save(tmp.name)
             temp_path = tmp.name
-        
         file_size = os.path.getsize(temp_path)
         print(f"📹 Video file size: {file_size / (1024*1024):.2f} MB")
-        
         result = cloudinary.uploader.upload(
             temp_path,
             folder=folder,
@@ -745,13 +719,10 @@ def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
                 {'fetch_format': 'mp4'}
             ]
         )
-        
         video_url = result.get('secure_url')
         public_id = result.get('public_id')
-        
         print(f"✅ Video uploaded: {video_url}")
         return video_url, public_id
-        
     except Exception as e:
         print(f"❌ Cloudinary video upload failed: {type(e).__name__}: {e}")
         import traceback
@@ -768,7 +739,6 @@ def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
 # ============================================
 # UPI QR GENERATOR
 # ============================================
-
 def generate_upi_qr_base64(upi_id, name='VyahMandap', amount=None, box_size=8):
     if not upi_id:
         return None
@@ -798,19 +768,12 @@ def get_client_info(request_obj):
 # ============================================
 # TELEGRAM NOTIFICATION HELPERS
 # ============================================
-
 def send_telegram_notification(chat_id, message):
     token = Config.TELEGRAM_BOT_TOKEN
     if not chat_id or not token:
         return
-    
     api_url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": str(chat_id),
-        "text": message,
-        "disable_web_page_preview": True
-    }
-    
+    payload = {"chat_id": str(chat_id), "text": message, "disable_web_page_preview": True}
     try:
         response = requests.post(api_url, json=payload, timeout=10)
         if response.status_code == 200:
@@ -823,15 +786,13 @@ def send_telegram_notification(chat_id, message):
 
 def send_telegram_notification_async(chat_id, message):
     if chat_id:
-        thread = threading.Thread(
-            target=send_telegram_notification,
-            args=(chat_id, message)
-        )
+        thread = threading.Thread(target=send_telegram_notification, args=(chat_id, message))
         thread.daemon = True
         thread.start()
 
 
 def notify_all_admins(message):
+    """Send a Telegram message to every admin with a linked chat_id."""
     admins = User.query.filter_by(role='admin').all()
     for admin_user in admins:
         if admin_user.telegram_chat_id:
@@ -841,7 +802,6 @@ def notify_all_admins(message):
 # ============================================
 # AUTH ROUTES
 # ============================================
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -911,7 +871,6 @@ def logout():
 # ============================================
 # TELEGRAM LINKING ROUTES
 # ============================================
-
 @app.route('/link-telegram', methods=['GET', 'POST'])
 @login_required
 def link_telegram():
@@ -921,30 +880,19 @@ def link_telegram():
             if not re.match(r'^-?\d+$', chat_id):
                 flash('⚠️ Chat ID must be a number.', 'danger')
                 return render_template('link_telegram.html', current_chat_id=current_user.telegram_chat_id)
-            
             current_user.telegram_chat_id = chat_id
             db.session.commit()
-            
             test_msg = (
                 f"✅ VyahMandap — Telegram Linked!\n\n"
                 f"Hi {current_user.name},\n\n"
-                f"You will now receive notifications here for:\n"
-                f"• New bookings\n"
-                f"• Chat messages\n"
-                f"• Payment updates\n"
-                f"• Booking status changes\n"
-                f"• New reviews\n"
-                f"• Support ticket updates\n"
-                f"• Equipment condition reports\n\n"
+                f"You will now receive notifications here.\n\n"
                 f"Taiyari Hamari, Celebration Aapka! 🎉"
             )
             send_telegram_notification_async(chat_id, test_msg)
-            
             flash('✅ Telegram linked! Check your Telegram for confirmation.', 'success')
             return redirect(url_for('link_telegram'))
         else:
             flash('⚠️ Please enter a valid Chat ID.', 'danger')
-    
     return render_template('link_telegram.html', current_chat_id=current_user.telegram_chat_id)
 
 
@@ -960,7 +908,6 @@ def unlink_telegram():
 # ============================================
 # MAIN ROUTES
 # ============================================
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -970,14 +917,11 @@ def index():
 def get_items():
     category = request.args.get('category', 'all')
     show_unavailable = request.args.get('show_unavailable', 'false').lower() == 'true'
-    
     query = Item.query
     if not show_unavailable:
         query = query.filter_by(is_available=True)
-    
     if category != 'all':
         query = query.filter_by(category=category)
-    
     items = query.order_by(Item.created_at.desc()).all()
     
     result = []
@@ -991,9 +935,7 @@ def get_items():
                 review_count = len(reviews)
         except:
             pass
-        
         next_available = get_next_available_date(item.id)
-        
         result.append({
             'id': item.id, 'title': item.title, 'description': item.description,
             'category': item.category, 'rate': item.rate_per_day,
@@ -1003,8 +945,7 @@ def get_items():
             'vendor_id': item.vendor_id,
             'vendor_verified': item.vendor.is_verified,
             'item_verified': item.is_currently_verified,
-            'avg_rating': avg_rating,
-            'review_count': review_count,
+            'avg_rating': avg_rating, 'review_count': review_count,
             'is_available': item.is_available,
             'next_available': next_available.strftime('%Y-%m-%d') if next_available else None
         })
@@ -1022,59 +963,40 @@ def calculate():
     weight = data.get('weight', 'till_20')
     
     item = Item.query.get_or_404(item_id)
-    
     has_conflict, conflict_booking, available_qty, conflict_type = check_availability_conflict(
         item.id, start_date, quantity
     )
     
     if has_conflict:
         next_available = None
-        
         if conflict_type == 'return_day_full':
             next_available = start_date + timedelta(days=1)
-            message = (
-                f'This item is returning on {start_date.strftime("%d %b %Y")} '
-                f'(from another booking). Booking available from next day onwards.'
-            )
+            message = f'This item is returning on {start_date.strftime("%d %b %Y")}.'
         elif conflict_type == 'fully_booked':
             latest_end = Booking.query.filter(
                 Booking.item_id == item.id,
                 Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-                Booking.start_date <= start_date,
-                Booking.end_date >= start_date
+                Booking.start_date <= start_date, Booking.end_date >= start_date
             ).order_by(Booking.end_date.desc()).first()
             if latest_end:
                 next_available = latest_end.end_date + timedelta(days=1)
-            message = (
-                f'Item is fully booked on {start_date.strftime("%d %b %Y")}. '
-                f'Please select different dates.'
-            )
+            message = f'Item is fully booked on {start_date.strftime("%d %b %Y")}.'
         elif conflict_type == 'return_day_partial':
             next_available = start_date + timedelta(days=1)
-            message = (
-                f'Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")} '
-                f'(some units are returning that day). You requested {quantity}.'
-            )
+            message = f'Only {available_qty} unit(s) available.'
         else:
             latest_end = Booking.query.filter(
                 Booking.item_id == item.id,
                 Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-                Booking.start_date <= start_date,
-                Booking.end_date >= start_date
+                Booking.start_date <= start_date, Booking.end_date >= start_date
             ).order_by(Booking.end_date.desc()).first()
             if latest_end:
                 next_available = latest_end.end_date + timedelta(days=1)
-            message = (
-                f'Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}. '
-                f'You requested {quantity}.'
-            )
+            message = f'Only {available_qty} unit(s) available.'
         
         return jsonify({
-            'error': True,
-            'message': message,
-            'conflict_type': conflict_type,
-            'available_qty': available_qty,
-            'requested_qty': quantity,
+            'error': True, 'message': message, 'conflict_type': conflict_type,
+            'available_qty': available_qty, 'requested_qty': quantity,
             'next_available': next_available.strftime('%Y-%m-%d') if next_available else None
         }), 400
     
@@ -1087,7 +1009,6 @@ def item_availability_calendar(item_id):
     item = Item.query.get_or_404(item_id)
     bookings = Booking.query.filter_by(item_id=item_id)\
         .filter(Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])).all()
-    
     if not bookings:
         return jsonify([])
     
@@ -1103,32 +1024,21 @@ def item_availability_calendar(item_id):
     events = []
     for date, booked_qty in date_booked.items():
         available_qty = item.stock - booked_qty
-        
         if available_qty <= 0:
-            status = 'booked'
-            color = '#dc2626'
+            status, color = 'booked', '#dc2626'
         elif available_qty < item.stock:
-            status = 'partial'
-            color = '#eab308'
+            status, color = 'partial', '#eab308'
         else:
-            status = 'available'
-            color = '#16a34a'
-        
-        is_end_date = date in end_dates
-        
+            status, color = 'available', '#16a34a'
         events.append({
             'title': f"{available_qty}/{item.stock}",
-            'start': date.isoformat(),
-            'allDay': True,
-            'backgroundColor': color,
-            'borderColor': color,
+            'start': date.isoformat(), 'allDay': True,
+            'backgroundColor': color, 'borderColor': color,
             'extendedProps': {
-                'status': status,
-                'total_stock': item.stock,
-                'booked_qty': booked_qty,
-                'available_qty': max(0, available_qty),
-                'is_end_date': is_end_date,
-                'note': 'Return day — Bookable from next day' if is_end_date else ''
+                'status': status, 'total_stock': item.stock,
+                'booked_qty': booked_qty, 'available_qty': max(0, available_qty),
+                'is_end_date': date in end_dates,
+                'note': 'Return day' if date in end_dates else ''
             }
         })
     return jsonify(events)
@@ -1148,27 +1058,16 @@ def item_availability_single(item_id):
     overlapping = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated']),
-        Booking.start_date <= check_date,
-        Booking.end_date >= check_date
+        Booking.start_date <= check_date, Booking.end_date >= check_date
     ).all()
-    
     booked_qty = sum(b.quantity for b in overlapping)
     available_qty = max(0, item.stock - booked_qty)
-    
-    if available_qty <= 0:
-        status = 'booked'
-    elif available_qty < item.stock:
-        status = 'partial'
-    else:
-        status = 'available'
-    
+    status = 'booked' if available_qty <= 0 else ('partial' if available_qty < item.stock else 'available')
     is_end_date = any(b.end_date == check_date for b in overlapping)
     
     return jsonify({
-        'date': date_str, 'status': status,
-        'total_stock': item.stock, 'booked_qty': booked_qty,
-        'available_qty': available_qty,
-        'is_end_date': is_end_date
+        'date': date_str, 'status': status, 'total_stock': item.stock,
+        'booked_qty': booked_qty, 'available_qty': available_qty, 'is_end_date': is_end_date
     })
 
 
@@ -1176,11 +1075,9 @@ def item_availability_single(item_id):
 @login_required
 def book_item(item_id):
     item = Item.query.get_or_404(item_id)
-    
     if not item.is_available:
         flash('⚠️ This item is currently unavailable for booking.', 'warning')
         return redirect(url_for('index'))
-    
     if item.stock <= 0:
         flash('This item is out of stock.', 'danger')
         return redirect(url_for('index'))
@@ -1208,48 +1105,22 @@ def book_item(item_id):
             has_conflict, conflict_booking, available_qty, conflict_type = check_availability_conflict(
                 item.id, start_date, quantity
             )
-            
             if has_conflict:
-                if conflict_type == 'return_day_full':
-                    flash(
-                        f'⚠️ This item is returning on {start_date.strftime("%d %b %Y")}. '
-                        f'Please book from {(start_date + timedelta(days=1)).strftime("%d %b %Y")} onwards.',
-                        'warning'
-                    )
-                elif conflict_type == 'fully_booked':
-                    flash(
-                        f'⚠️ Item is fully booked on {start_date.strftime("%d %b %Y")}. '
-                        f'Please select different dates.',
-                        'warning'
-                    )
-                elif conflict_type == 'return_day_partial':
-                    flash(
-                        f'⚠️ Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")} '
-                        f'(some units are returning that day). You requested {quantity}.',
-                        'warning'
-                    )
-                else:
-                    flash(
-                        f'⚠️ Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}. '
-                        f'You requested {quantity}.',
-                        'warning'
-                    )
+                flash(f'⚠️ Only {available_qty} unit(s) available on {start_date.strftime("%d %b %Y")}.', 'warning')
                 return render_template('booking.html', item=item)
             
             calc = calculate_booking_total(item, start_date, end_date, quantity, area, weight)
-            
             kyc_required = calc['total'] >= 30000
             aadhaar = None
             pan = None
-            
             if kyc_required:
                 aadhaar = request.form.get('aadhaar', '').strip()
                 pan = request.form.get('pan', '').strip().upper()
                 if not aadhaar or not re.match(r'^\d{12}$', aadhaar):
-                    flash('⚠️ Booking ≥ ₹30,000 — Valid 12-digit Aadhaar required.', 'danger')
+                    flash('⚠️ Valid 12-digit Aadhaar required.', 'danger')
                     return render_template('booking.html', item=item)
                 if not pan or not re.match(r'^[A-Z]{5}\d{4}[A-Z]$', pan):
-                    flash('⚠️ Booking ≥ ₹30,000 — Valid PAN required (e.g. ABCDE1234F).', 'danger')
+                    flash('⚠️ Valid PAN required.', 'danger')
                     return render_template('booking.html', item=item)
             
             booking = Booking(
@@ -1273,35 +1144,13 @@ def book_item(item_id):
             db.session.commit()
             
             if current_user.telegram_chat_id:
-                customer_msg = (
-                    f"🎉 Booking Confirmed!\n\n"
-                    f"Item: {item.title}\n"
-                    f"Reference: {booking.booking_reference}\n"
-                    f"Dates: {start_date} → {end_date}\n"
-                    f"Quantity: {quantity}\n"
-                    f"Total Paid: ₹{calc['total']}\n\n"
-                    f"Thank you for booking with VyahMandap! 🙏"
-                )
-                send_telegram_notification_async(current_user.telegram_chat_id, customer_msg)
-            
+                send_telegram_notification_async(current_user.telegram_chat_id,
+                    f"🎉 Booking Confirmed!\n\nItem: {item.title}\nRef: {booking.booking_reference}")
             if item.vendor.telegram_chat_id:
-                vendor_msg = (
-                    f"📦 New Booking Received!\n\n"
-                    f"Item: {item.title}\n"
-                    f"Customer: {current_user.name}\n"
-                    f"Mobile: {current_user.mobile[:2]}XXXX{current_user.mobile[-2:]}\n"
-                    f"Reference: {booking.booking_reference}\n"
-                    f"Dates: {start_date} → {end_date}\n"
-                    f"Quantity: {quantity}\n"
-                    f"Your Earning: ₹{calc['base_rent']}\n\n"
-                    f"⚠️ Upload equipment photos + video before dispatching!"
-                )
-                send_telegram_notification_async(item.vendor.telegram_chat_id, vendor_msg)
+                send_telegram_notification_async(item.vendor.telegram_chat_id,
+                    f"📦 New Booking!\n\nRef: {booking.booking_reference}\nFrom: {current_user.name}")
             
-            if kyc_required:
-                flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}. KYC verified.', 'success')
-            else:
-                flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}', 'success')
+            flash(f'🎉 Booking confirmed! Reference: {booking.booking_reference}', 'success')
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
@@ -1317,70 +1166,51 @@ def dashboard():
         .order_by(Booking.created_at.desc()).all()
     total_spent = sum(b.total_amount for b in bookings)
     active_bookings = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-    
     pending_return = [b for b in bookings 
-                     if b.dispatch_report_done 
-                     and not b.return_report_done 
-                     and b.booking_status in ['dispatched', 'confirmed']
-                     and b.booking_status != 'cancelled']
+                     if b.dispatch_report_done and not b.return_report_done 
+                     and b.booking_status in ['dispatched', 'confirmed']]
     
     return render_template('dashboard.html', 
-                         bookings=bookings,
-                         total_spent=total_spent, 
-                         active_bookings=active_bookings,
-                         pending_return=pending_return)
+                         bookings=bookings, total_spent=total_spent, 
+                         active_bookings=active_bookings, pending_return=pending_return)
 
 
 @app.route('/my-booking/<int:booking_id>')
 @login_required
 def my_booking_detail(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    
     if booking.customer_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
     
     payment_config = AdminPaymentConfig.get()
-    
     qr_base64 = None
     if payment_config.upi_id:
         qr_base64 = generate_upi_qr_base64(
-            payment_config.upi_id,
-            payment_config.upi_name,
-            amount=None
+            payment_config.upi_id, payment_config.upi_name, amount=None
         )
     
     proofs = PaymentProof.query.filter_by(booking_id=booking_id)\
         .order_by(PaymentProof.created_at.desc()).all()
     
     return render_template('my_booking.html',
-                         booking=booking,
-                         payment_config=payment_config,
-                         qr_base64=qr_base64,
-                         proofs=proofs)
+                         booking=booking, payment_config=payment_config,
+                         qr_base64=qr_base64, proofs=proofs)
 
 
 # ============================================
 # EQUIPMENT CONDITION REPORT ROUTES
 # ============================================
-
 @app.route('/booking/<int:booking_id>/report-dispatch', methods=['GET', 'POST'])
 @login_required
 def report_dispatch(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    
     if booking.item.vendor_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('vendor_dashboard'))
-    
     if booking.dispatch_report_done:
         flash('Dispatch report already submitted.', 'info')
         return redirect(url_for('vendor_dashboard'))
-    
-    if booking.booking_status == 'cancelled':
-        flash('This booking was cancelled.', 'danger')
-        return redirect(url_for('vendor_dashboard'))
-    
     return render_template('reports/dispatch.html', booking=booking)
 
 
@@ -1388,23 +1218,15 @@ def report_dispatch(booking_id):
 @login_required
 def report_return(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    
     if booking.customer_id != current_user.id:
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
-    
     if not booking.dispatch_report_done:
         flash('Vendor has not yet submitted dispatch report.', 'warning')
         return redirect(url_for('dashboard'))
-    
     if booking.return_report_done:
         flash('Return report already submitted.', 'info')
         return redirect(url_for('dashboard'))
-    
-    if booking.booking_status == 'cancelled':
-        flash('This booking was cancelled.', 'danger')
-        return redirect(url_for('dashboard'))
-    
     return render_template('reports/return.html', booking=booking)
 
 
@@ -1413,19 +1235,14 @@ def report_return(booking_id):
 def api_report_upload_video():
     if 'video' not in request.files:
         return jsonify({'error': 'No video file'}), 400
-    
     video = request.files['video']
     if not video.filename:
         return jsonify({'error': 'Empty filename'}), 400
-    
     booking_id = request.form.get('booking_id')
     report_type = request.form.get('report_type')
-    
     if not booking_id or not report_type:
         return jsonify({'error': 'Missing fields'}), 400
-    
     booking = Booking.query.get_or_404(booking_id)
-    
     if report_type == 'dispatch':
         if booking.item.vendor_id != current_user.id and current_user.role != 'admin':
             return jsonify({'error': 'Access denied'}), 403
@@ -1434,21 +1251,13 @@ def api_report_upload_video():
             return jsonify({'error': 'Access denied'}), 403
     else:
         return jsonify({'error': 'Invalid report type'}), 400
-    
     if not Config.CLOUDINARY_CLOUD_NAME:
-        return jsonify({'error': 'Cloudinary not configured. Contact admin.'}), 500
-    
+        return jsonify({'error': 'Cloudinary not configured'}), 500
     folder = f'vyahmandap/reports/videos/booking_{booking_id}_{report_type}'
     url, public_id = upload_video_to_cloudinary(video, folder=folder)
-    
     if not url:
-        return jsonify({'error': 'Video upload to cloud failed. Check server logs.'}), 500
-    
-    return jsonify({
-        'success': True,
-        'video_url': url,
-        'video_public_id': public_id
-    })
+        return jsonify({'error': 'Video upload failed'}), 500
+    return jsonify({'success': True, 'video_url': url, 'video_public_id': public_id})
 
 
 @app.route('/api/report/submit', methods=['POST'])
@@ -1468,7 +1277,6 @@ def api_report_submit():
     gps_lng = data.get('gps_lng', '')
     
     booking = Booking.query.get_or_404(booking_id)
-    
     if report_type == 'dispatch':
         if booking.item.vendor_id != current_user.id and current_user.role != 'admin':
             return jsonify({'error': 'Access denied'}), 403
@@ -1504,22 +1312,14 @@ def api_report_submit():
         return jsonify({'error': 'Photo upload failed.'}), 500
     
     device, ip = get_client_info(request)
-    
     report = EquipmentReport(
-        booking_id=booking.id,
-        reporter_id=current_user.id,
-        report_type=report_type,
-        photos_json=json_lib.dumps(uploaded),
-        video_url=video_url,
-        video_public_id=video_public_id,
-        condition_rating=condition_rating,
-        damage_flagged=damage_flagged,
+        booking_id=booking.id, reporter_id=current_user.id,
+        report_type=report_type, photos_json=json_lib.dumps(uploaded),
+        video_url=video_url, video_public_id=video_public_id,
+        condition_rating=condition_rating, damage_flagged=damage_flagged,
         damage_notes=damage_notes if damage_flagged else None,
-        notes=notes,
-        gps_latitude=gps_lat,
-        gps_longitude=gps_lng,
-        device_info=device,
-        ip_address=ip
+        notes=notes, gps_latitude=gps_lat, gps_longitude=gps_lng,
+        device_info=device, ip_address=ip
     )
     db.session.add(report)
     
@@ -1536,74 +1336,19 @@ def api_report_submit():
     
     if damage_flagged:
         ticket = Ticket(
-            ticket_number=generate_ticket_number(),
-            user_id=current_user.id,
+            ticket_number=generate_ticket_number(), user_id=current_user.id,
             subject=f"⚠️ Damage Reported — {booking.booking_reference}",
-            description=(
-                f"Damage flagged on {report_type} report.\n\n"
-                f"Booking: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Reported by: {current_user.name} ({current_user.role.title()})\n"
-                f"Condition: {condition_rating}\n\n"
-                f"Damage Notes:\n{damage_notes or 'No details provided'}\n\n"
-                f"Review comparison at: /booking/{booking.id}/report-view"
-            ),
-            category='item',
-            priority='high',
-            status='open'
+            description=f"Damage on {report_type} report.\n\nBooking: {booking.booking_reference}\nItem: {booking.item.title}",
+            category='item', priority='high', status='open'
         )
         db.session.add(ticket)
         db.session.commit()
-        
-        notify_all_admins(
-            f"🚨 DAMAGE REPORTED!\n\n"
-            f"Booking: {booking.booking_reference}\n"
-            f"Item: {booking.item.title}\n"
-            f"Reported by: {current_user.name}\n"
-            f"Ticket: {ticket.ticket_number}\n\n"
-            f"Please review immediately."
-        )
-    
-    if report_type == 'dispatch':
-        if booking.customer.telegram_chat_id:
-            msg = (
-                f"📦 Vendor Dispatched Equipment!\n\n"
-                f"Booking: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Photos: {len(uploaded)}\n"
-                f"Video: {'Yes' if video_url else 'No'}\n\n"
-                f"Equipment is on the way. 🚚"
-            )
-            send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
-    else:
-        if booking.item.vendor.telegram_chat_id:
-            msg = (
-                f"📦 Customer Initiated Return!\n\n"
-                f"Booking: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Photos: {len(uploaded)}\n"
-                f"Video: {'Yes' if video_url else 'No'}\n"
-                f"{'⚠️ DAMAGE FLAGGED' if damage_flagged else ''}\n\n"
-                f"Please review the return report."
-            )
-            send_telegram_notification_async(booking.item.vendor.telegram_chat_id, msg)
-        
-        if not damage_flagged:
-            notify_all_admins(
-                f"🔔 Return Report Submitted\n\n"
-                f"Booking: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Customer: {booking.customer.name}\n"
-                f"Condition: {condition_rating.title()}"
-            )
+        notify_all_admins(f"🚨 DAMAGE!\n\nBooking: {booking.booking_reference}\nItem: {booking.item.title}\nTicket: {ticket.ticket_number}")
     
     return jsonify({
-        'success': True,
-        'report_id': report.id,
-        'photos_uploaded': len(uploaded),
-        'video_uploaded': bool(video_url),
-        'damage_flagged': damage_flagged,
-        'message': 'Report submitted successfully!'
+        'success': True, 'report_id': report.id,
+        'photos_uploaded': len(uploaded), 'video_uploaded': bool(video_url),
+        'damage_flagged': damage_flagged, 'message': 'Report submitted!'
     })
 
 
@@ -1611,109 +1356,33 @@ def api_report_submit():
 @login_required
 def report_view(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    
-    can_view = (
-        current_user.role == 'admin' or
-        booking.customer_id == current_user.id or
-        booking.item.vendor_id == current_user.id
-    )
+    can_view = (current_user.role == 'admin' or 
+                booking.customer_id == current_user.id or 
+                booking.item.vendor_id == current_user.id)
     if not can_view:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     
-    dispatch_report = EquipmentReport.query.filter_by(
-        booking_id=booking_id, report_type='dispatch').first()
-    return_report = EquipmentReport.query.filter_by(
-        booking_id=booking_id, report_type='return').first()
-    
+    dispatch_report = EquipmentReport.query.filter_by(booking_id=booking_id, report_type='dispatch').first()
+    return_report = EquipmentReport.query.filter_by(booking_id=booking_id, report_type='return').first()
     dispatch_photos = json_lib.loads(dispatch_report.photos_json) if dispatch_report else []
     return_photos = json_lib.loads(return_report.photos_json) if return_report else []
     
     return render_template('reports/view.html',
-                         booking=booking,
-                         dispatch_report=dispatch_report,
+                         booking=booking, dispatch_report=dispatch_report,
                          return_report=return_report,
-                         dispatch_photos=dispatch_photos,
-                         return_photos=return_photos)
+                         dispatch_photos=dispatch_photos, return_photos=return_photos)
 
 
 # ============================================
 # PAYMENT PROOF ROUTES
 # ============================================
 
-@app.route('/booking/<int:booking_id>/payment-proof', methods=['POST'])
-@login_required
-def submit_payment_proof(booking_id):
-    booking = Booking.query.get_or_404(booking_id)
-    
-    if booking.customer_id != current_user.id and current_user.role != 'admin':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('dashboard'))
-    
-    if 'screenshot' not in request.files or not request.files['screenshot'].filename:
-        flash('⚠️ Payment screenshot is required.', 'danger')
-        return redirect(url_for('my_booking_detail', booking_id=booking.id))
-    
-    screenshot = request.files['screenshot']
-    
-    if not Config.CLOUDINARY_CLOUD_NAME:
-        flash('⚠️ Cloudinary not configured. Please contact admin.', 'danger')
-        return redirect(url_for('my_booking_detail', booking_id=booking.id))
-    
-    folder = f"vyahmandap/payments/booking_{booking_id}"
-    upload_result = upload_file_to_cloudinary(screenshot, folder=folder)
-    
-    if not upload_result or not upload_result.get('url'):
-        flash('⚠️ Screenshot upload failed. Please try again.', 'danger')
-        return redirect(url_for('my_booking_detail', booking_id=booking.id))
-    
-    payment_date = None
-    pd_str = request.form.get('payment_date', '').strip()
-    if pd_str:
-        try:
-            payment_date = datetime.strptime(pd_str, '%Y-%m-%d').date()
-        except:
-            payment_date = None
-    
-    try:
-        amount_paid = float(request.form.get('amount_paid', 0) or 0)
-    except:
-        amount_paid = 0
-    
-    proof = PaymentProof(
-        booking_id=booking.id,
-        uploaded_by=current_user.id,
-        method=request.form.get('method', 'upi').strip() or 'upi',
-        amount_paid=amount_paid,
-        transaction_id=request.form.get('transaction_id', '').strip() or None,
-        payment_date=payment_date,
-        payer_name=request.form.get('payer_name', '').strip() or None,
-        payer_bank=request.form.get('payer_bank', '').strip() or None,
-        notes=request.form.get('notes', '').strip() or None,
-        screenshot_url=upload_result['url'],
-        screenshot_public_id=upload_result.get('public_id'),
-        status='pending'
-    )
-    db.session.add(proof)
-    db.session.commit()
-    
-    method_label = proof.method.upper()
-    notify_all_admins(
-        f"💰 New Payment Proof Submitted\n\n"
-        f"Booking: {booking.booking_reference}\n"
-        f"Customer: {current_user.name}\n"
-        f"Amount: ₹{proof.amount_paid:,.2f}\n"
-        f"Method: {method_label}\n\n"
-        f"Review at /admin/payment-proofs"
-    )
-    
-    flash('✅ Payment proof submitted! Admin will verify shortly.', 'success')
-    return redirect(url_for('my_booking_detail', booking_id=booking.id))
-
+# ---- ORIGINAL UTR TRACKING PAGE (RESTORED) ----
 @app.route('/admin/payments')
 @login_required
 def admin_payments():
-    """Original UTR tracking page."""
+    """Original UTR tracking page — lists all bookings with UTR numbers."""
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
@@ -1735,6 +1404,7 @@ def admin_payments():
                          total_transport=total_transport)
 
 
+# ---- NEW: PAYMENT CONFIG ----
 @app.route('/admin/payment-config', methods=['GET', 'POST'])
 @login_required
 def admin_payment_config():
@@ -1755,10 +1425,7 @@ def admin_payment_config():
         
         if 'custom_qr' in request.files and request.files['custom_qr'].filename:
             qr_file = request.files['custom_qr']
-            upload_result = upload_file_to_cloudinary(
-                qr_file,
-                folder='vyahmandap/payments/qr'
-            )
+            upload_result = upload_file_to_cloudinary(qr_file, folder='vyahmandap/payments/qr')
             if upload_result and upload_result.get('url'):
                 cfg.custom_qr_url = upload_result['url']
         
@@ -1771,10 +1438,35 @@ def admin_payment_config():
         qr_base64 = generate_upi_qr_base64(cfg.upi_id, cfg.upi_name)
     
     return render_template('admin/payment_config.html',
-                         cfg=cfg,
-                         qr_base64=qr_base64)
+                         cfg=cfg, qr_base64=qr_base64)
 
 
+# ---- NEW: PAYMENT PROOFS QUEUE ----
+@app.route('/admin/payment-proofs')
+@login_required
+def admin_payment_queue():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    status_filter = request.args.get('status', 'pending')
+    query = PaymentProof.query
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+    proofs = query.order_by(PaymentProof.created_at.desc()).all()
+    
+    pending_count = PaymentProof.query.filter_by(status='pending').count()
+    verified_count = PaymentProof.query.filter_by(status='verified').count()
+    rejected_count = PaymentProof.query.filter_by(status='rejected').count()
+    
+    return render_template('admin/payment_queue.html',
+                         proofs=proofs, status_filter=status_filter,
+                         pending_count=pending_count,
+                         verified_count=verified_count,
+                         rejected_count=rejected_count)
+
+
+# ---- NEW: VERIFY PAYMENT PROOF ----
 @app.route('/admin/payment-proof/<int:proof_id>/verify', methods=['POST'])
 @login_required
 def admin_verify_payment_proof(proof_id):
@@ -1793,30 +1485,23 @@ def admin_verify_payment_proof(proof_id):
     proof.verified_at = datetime.utcnow()
     
     booking = proof.booking
-    total_verified = sum(p.amount_paid for p in booking.payment_proofs if p.status == 'verified' and p.id != proof.id)
+    total_verified = sum(p.amount_paid for p in booking.payment_proofs 
+                         if p.status == 'verified' and p.id != proof.id)
     total_verified += proof.amount_paid
-    if total_verified >= booking.total_amount:
-        booking.payment_status = 'paid'
-    else:
-        booking.payment_status = 'partial'
+    booking.payment_status = 'paid' if total_verified >= booking.total_amount else 'partial'
     
     db.session.commit()
     
     if booking.customer.telegram_chat_id:
-        msg = (
-            f"✅ Payment Verified!\n\n"
-            f"Booking: {booking.booking_reference}\n"
-            f"Item: {booking.item.title}\n"
-            f"Amount: ₹{proof.amount_paid:,.2f}\n"
-            f"Method: {proof.method.upper()}\n\n"
-            f"Your payment has been verified. Thank you! 🙏"
-        )
-        send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
+        send_telegram_notification_async(booking.customer.telegram_chat_id,
+            f"✅ Payment Verified!\n\nBooking: {booking.booking_reference}\n"
+            f"Amount: ₹{proof.amount_paid:,.2f}\nMethod: {proof.method.upper()}")
     
     flash(f'✅ Payment proof verified.', 'success')
     return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
+# ---- NEW: REJECT PAYMENT PROOF ----
 @app.route('/admin/payment-proof/<int:proof_id>/reject', methods=['POST'])
 @login_required
 def admin_reject_payment_proof(proof_id):
@@ -1842,72 +1527,107 @@ def admin_reject_payment_proof(proof_id):
     db.session.commit()
     
     if proof.booking.customer.telegram_chat_id:
-        msg = (
-            f"❌ Payment Proof Rejected\n\n"
-            f"Booking: {proof.booking.booking_reference}\n"
-            f"Item: {proof.booking.item.title}\n"
-            f"Amount: ₹{proof.amount_paid:,.2f}\n"
-            f"Reason: {reason}\n\n"
-            f"Please re-upload with correct proof."
-        )
-        send_telegram_notification_async(proof.booking.customer.telegram_chat_id, msg)
+        send_telegram_notification_async(proof.booking.customer.telegram_chat_id,
+            f"❌ Payment Proof Rejected\n\nBooking: {proof.booking.booking_reference}\n"
+            f"Reason: {reason}\n\nPlease re-upload.")
     
     flash('Payment proof rejected.', 'info')
     return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
-# ============================================
-# VENDOR SALES & RENTALS (Split View)
-# ============================================
+# ---- NEW: CUSTOMER SUBMITS PAYMENT PROOF ----
+@app.route('/booking/<int:booking_id>/payment-proof', methods=['POST'])
+@login_required
+def submit_payment_proof(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+    
+    if booking.customer_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    if 'screenshot' not in request.files or not request.files['screenshot'].filename:
+        flash('⚠️ Payment screenshot is required.', 'danger')
+        return redirect(url_for('my_booking_detail', booking_id=booking.id))
+    
+    screenshot = request.files['screenshot']
+    
+    if not Config.CLOUDINARY_CLOUD_NAME:
+        flash('⚠️ Cloudinary not configured. Contact admin.', 'danger')
+        return redirect(url_for('my_booking_detail', booking_id=booking.id))
+    
+    folder = f"vyahmandap/payments/booking_{booking_id}"
+    upload_result = upload_file_to_cloudinary(screenshot, folder=folder)
+    
+    if not upload_result or not upload_result.get('url'):
+        flash('⚠️ Screenshot upload failed. Please try again.', 'danger')
+        return redirect(url_for('my_booking_detail', booking_id=booking.id))
+    
+    payment_date = None
+    pd_str = request.form.get('payment_date', '').strip()
+    if pd_str:
+        try:
+            payment_date = datetime.strptime(pd_str, '%Y-%m-%d').date()
+        except:
+            payment_date = None
+    
+    try:
+        amount_paid = float(request.form.get('amount_paid', 0) or 0)
+    except:
+        amount_paid = 0
+    
+    proof = PaymentProof(
+        booking_id=booking.id, uploaded_by=current_user.id,
+        method=request.form.get('method', 'upi').strip() or 'upi',
+        amount_paid=amount_paid,
+        transaction_id=request.form.get('transaction_id', '').strip() or None,
+        payment_date=payment_date,
+        payer_name=request.form.get('payer_name', '').strip() or None,
+        payer_bank=request.form.get('payer_bank', '').strip() or None,
+        notes=request.form.get('notes', '').strip() or None,
+        screenshot_url=upload_result['url'],
+        screenshot_public_id=upload_result.get('public_id'),
+        status='pending'
+    )
+    db.session.add(proof)
+    db.session.commit()
+    
+    notify_all_admins(
+        f"💰 New Payment Proof Submitted\n\n"
+        f"Booking: {booking.booking_reference}\n"
+        f"Customer: {current_user.name}\n"
+        f"Amount: ₹{proof.amount_paid:,.2f}\n"
+        f"Method: {proof.method.upper()}\n\n"
+        f"Review at /admin/payment-proofs"
+    )
+    
+    flash('✅ Payment proof submitted! Admin will verify shortly.', 'success')
+    return redirect(url_for('my_booking_detail', booking_id=booking.id))
 
+
+# ============================================
+# VENDOR DASHBOARDS
+# ============================================
 @app.route('/vendor/sales')
 @login_required
 def vendor_sales():
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     try:
-        items = Item.query.filter_by(vendor_id=current_user.id)\
-            .order_by(Item.created_at.desc()).all()
+        items = Item.query.filter_by(vendor_id=current_user.id).order_by(Item.created_at.desc()).all()
         item_ids = [i.id for i in items]
-        
-        if item_ids:
-            bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
-                .order_by(Booking.created_at.desc()).all()
-        else:
-            bookings = []
-        
+        bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).order_by(Booking.created_at.desc()).all() if item_ids else []
         total_earnings = sum(b.base_rent for b in bookings)
-        total_bookings = len(bookings)
-        active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-        total_items = len(items)
-        
-        today = datetime.utcnow().date()
-        thirty_days_later = today + timedelta(days=30)
-        upcoming_bookings = [
-            b for b in bookings 
-            if b.start_date >= today and b.start_date <= thirty_days_later
-            and b.booking_status in ['confirmed', 'dispatched']
-        ]
-        
-        pending_dispatch = [b for b in bookings 
-                           if not b.dispatch_report_done 
-                           and b.booking_status == 'confirmed']
-        
         return render_template('vendor/dashboard.html',
                              items=items, bookings=bookings,
                              total_earnings=total_earnings,
-                             total_bookings=total_bookings,
-                             active_rentals=active_rentals,
-                             total_items=total_items,
-                             upcoming_bookings=upcoming_bookings,
-                             pending_dispatch=pending_dispatch)
+                             total_bookings=len(bookings),
+                             active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched']),
+                             total_items=len(items),
+                             upcoming_bookings=[b for b in bookings if b.start_date >= datetime.utcnow().date() and b.start_date <= datetime.utcnow().date() + timedelta(days=30)],
+                             pending_dispatch=[b for b in bookings if not b.dispatch_report_done and b.booking_status == 'confirmed'])
     except Exception as e:
-        import traceback
-        print(f"❌ vendor_sales error: {e}")
-        traceback.print_exc()
-        flash(f'Error loading sales dashboard: {str(e)}', 'danger')
+        flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
 
@@ -1917,88 +1637,40 @@ def vendor_rentals():
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
-    try:
-        bookings = Booking.query.filter_by(customer_id=current_user.id)\
-            .order_by(Booking.created_at.desc()).all()
-        
-        total_spent = sum(b.total_amount for b in bookings)
-        active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-        total_rentals = len(bookings)
-        
-        pending_return = [b for b in bookings 
-                         if b.dispatch_report_done 
-                         and not b.return_report_done 
-                         and b.booking_status in ['dispatched', 'confirmed']
-                         and b.booking_status != 'cancelled']
-        
-        return render_template('vendor/rentals.html',
-                             bookings=bookings,
-                             total_spent=total_spent,
-                             active_rentals=active_rentals,
-                             total_rentals=total_rentals,
-                             pending_return=pending_return)
-    except Exception as e:
-        import traceback
-        print(f"❌ vendor_rentals error: {e}")
-        traceback.print_exc()
-        flash(f'Error loading rentals dashboard: {str(e)}', 'danger')
-        return redirect(url_for('index'))
+    bookings = Booking.query.filter_by(customer_id=current_user.id).order_by(Booking.created_at.desc()).all()
+    total_spent = sum(b.total_amount for b in bookings)
+    return render_template('vendor/rentals.html',
+                         bookings=bookings, total_spent=total_spent,
+                         active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched']),
+                         total_rentals=len(bookings),
+                         pending_return=[b for b in bookings if b.dispatch_report_done and not b.return_report_done and b.booking_status in ['dispatched', 'confirmed']])
 
-
-# ============================================
-# VENDOR MAIN DASHBOARD
-# ============================================
 
 @app.route('/vendor')
 @login_required
 def vendor_dashboard():
     if current_user.role not in ['admin', 'vendor']:
-        flash('Access denied. Vendor account required.', 'danger')
+        flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
-    items = Item.query.filter_by(vendor_id=current_user.id)\
-        .order_by(Item.created_at.desc()).all()
+    items = Item.query.filter_by(vendor_id=current_user.id).order_by(Item.created_at.desc()).all()
     item_ids = [i.id for i in items]
-    
-    if item_ids:
-        bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
-            .order_by(Booking.created_at.desc()).all()
-    else:
-        bookings = []
-    
+    bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).order_by(Booking.created_at.desc()).all() if item_ids else []
     total_earnings = sum(b.base_rent for b in bookings)
-    total_bookings = len(bookings)
-    active_rentals = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched'])
-    total_items = len(items)
-    
-    today = datetime.utcnow().date()
-    thirty_days_later = today + timedelta(days=30)
-    upcoming_bookings = [
-        b for b in bookings 
-        if b.start_date >= today and b.start_date <= thirty_days_later
-        and b.booking_status in ['confirmed', 'dispatched']
-    ]
-    
-    pending_dispatch = [b for b in bookings 
-                       if not b.dispatch_report_done 
-                       and b.booking_status == 'confirmed']
-    
     return render_template('vendor/dashboard.html',
                          items=items, bookings=bookings,
                          total_earnings=total_earnings,
-                         total_bookings=total_bookings,
-                         active_rentals=active_rentals,
-                         total_items=total_items,
-                         upcoming_bookings=upcoming_bookings,
-                         pending_dispatch=pending_dispatch)
+                         total_bookings=len(bookings),
+                         active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched']),
+                         total_items=len(items),
+                         upcoming_bookings=[b for b in bookings if b.start_date >= datetime.utcnow().date() and b.start_date <= datetime.utcnow().date() + timedelta(days=30)],
+                         pending_dispatch=[b for b in bookings if not b.dispatch_report_done and b.booking_status == 'confirmed'])
 
 
 @app.route('/vendor/calendar')
 @login_required
 def vendor_calendar():
     if current_user.role not in ['admin', 'vendor']:
-        flash('Access denied. Vendor account required.', 'danger')
+        flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     items = Item.query.filter_by(vendor_id=current_user.id).all()
     return render_template('vendor/calendar.html', items=items)
@@ -2009,10 +1681,8 @@ def vendor_calendar():
 def api_vendor_calendar():
     if current_user.role not in ['admin', 'vendor']:
         return jsonify([])
-    
     items = Item.query.filter_by(vendor_id=current_user.id).all()
     item_ids = [i.id for i in items]
-    
     if not item_ids:
         return jsonify([])
     
@@ -2023,34 +1693,16 @@ def api_vendor_calendar():
     bookings = query.all()
     
     colors = ['#2d5a3d', '#b45309', '#1e40af', '#7c2d12', '#166534', '#9a3412', '#a16207']
-    item_color_map = {}
-    for idx, item in enumerate(items):
-        item_color_map[item.id] = colors[idx % len(colors)]
+    item_color_map = {item.id: colors[idx % len(colors)] for idx, item in enumerate(items)}
     
     events = []
     for b in bookings:
         events.append({
-            'id': b.id,
-            'title': f"{b.item.title} ({b.quantity})",
+            'id': b.id, 'title': f"{b.item.title} ({b.quantity})",
             'start': b.start_date.isoformat(),
             'end': (b.end_date + timedelta(days=1)).isoformat(),
             'backgroundColor': item_color_map.get(b.item_id, '#2d5a3d'),
-            'borderColor': item_color_map.get(b.item_id, '#2d5a3d'),
-            'extendedProps': {
-                'customer': b.customer.name,
-                'customer_mobile': b.customer.mobile,
-                'customer_id': b.customer_id,
-                'item': b.item.title,
-                'quantity': b.quantity,
-                'base_rent': b.base_rent,
-                'total': b.total_amount,
-                'status': b.booking_status,
-                'venue': b.venue_address,
-                'utr': b.utr_number,
-                'reference': b.booking_reference,
-                'start_time': b.start_time,
-                'end_time': b.end_time
-            }
+            'extendedProps': {'customer': b.customer.name, 'reference': b.booking_reference}
         })
     return jsonify(events)
 
@@ -2114,7 +1766,7 @@ def vendor_edit_item(item_id):
             item.image_url = image_url
             item.image_filename = None
         db.session.commit()
-        flash('✅ Item updated successfully!', 'success')
+        flash('✅ Item updated!', 'success')
         return redirect(url_for('vendor_dashboard'))
     return render_template('vendor/item_form.html', item=item)
 
@@ -2131,7 +1783,7 @@ def vendor_delete_item(item_id):
         return redirect(url_for('vendor_dashboard'))
     db.session.delete(item)
     db.session.commit()
-    flash('Item deleted successfully.', 'success')
+    flash('Item deleted.', 'success')
     return redirect(url_for('vendor_dashboard'))
 
 
@@ -2141,28 +1793,19 @@ def vendor_toggle_availability(item_id):
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     item = Item.query.get_or_404(item_id)
-    
     if item.vendor_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('vendor_dashboard'))
-    
     item.is_available = not item.is_available
     db.session.commit()
-    
-    if item.is_available:
-        flash(f'✅ "{item.title}" is now available for rent.', 'success')
-    else:
-        flash(f'⚪ "{item.title}" is now unavailable. Customers won\'t see it in marketplace.', 'info')
-    
+    flash(f'✅ "{item.title}" is now {"available" if item.is_available else "unavailable"}.', 'success')
     return redirect(request.referrer or url_for('vendor_dashboard'))
 
 
 # ============================================
-# VERIFICATION ROUTES
+# VERIFICATION
 # ============================================
-
 VERIFICATION_PRICE = 999
 VERIFICATION_DAYS = 90
 
@@ -2173,58 +1816,37 @@ def vendor_verify_item(item_id):
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     item = Item.query.get_or_404(item_id)
-    
     if item.vendor_id != current_user.id and current_user.role != 'admin':
-        flash('Access denied. This item does not belong to you.', 'danger')
+        flash('Access denied.', 'danger')
         return redirect(url_for('vendor_dashboard'))
-    
     if item.is_currently_verified:
-        flash('This item is already verified.', 'info')
+        flash('Already verified.', 'info')
         return redirect(url_for('vendor_dashboard'))
-    
     if request.method == 'POST':
         utr = request.form.get('utr', '').strip()
         if not utr:
-            flash('UTR number is required.', 'danger')
+            flash('UTR required.', 'danger')
             return render_template('vendor/verify_item.html', item=item, price=VERIFICATION_PRICE)
-        
         item.is_verified = True
         if item.verified_until and item.verified_until > datetime.utcnow():
-            item.verified_until = item.verified_until + timedelta(days=VERIFICATION_DAYS)
+            item.verified_until += timedelta(days=VERIFICATION_DAYS)
         else:
             item.verified_until = datetime.utcnow() + timedelta(days=VERIFICATION_DAYS)
-        
         db.session.commit()
-        
-        if current_user.telegram_chat_id:
-            msg = (
-                f"✅ Item Verified!\n\n"
-                f"Item: {item.title}\n"
-                f"Valid Until: {item.verified_until.strftime('%d %b, %Y')}\n"
-                f"Fee Paid: ₹{VERIFICATION_PRICE}\n\n"
-                f"Your item now shows a blue verified badge!"
-            )
-            send_telegram_notification_async(current_user.telegram_chat_id, msg)
-        
-        flash(f'✅ Item verified successfully! Valid until {item.verified_until.strftime("%d %b, %Y")}.', 'success')
+        flash(f'✅ Verified until {item.verified_until.strftime("%d %b, %Y")}.', 'success')
         return redirect(url_for('vendor_dashboard'))
-    
     return render_template('vendor/verify_item.html', item=item, price=VERIFICATION_PRICE)
 
 
 # ============================================
-# REVIEW ROUTES
+# REVIEWS
 # ============================================
-
 @app.route('/item/<int:item_id>/reviews')
 def item_reviews(item_id):
     item = Item.query.get_or_404(item_id)
     reviews = Review.query.filter_by(item_id=item_id).order_by(Review.created_at.desc()).all()
-    avg_rating = 0
-    if reviews:
-        avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
+    avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0
     return render_template('item_reviews.html', item=item, reviews=reviews, avg_rating=avg_rating)
 
 
@@ -2236,44 +1858,29 @@ def submit_review(booking_id):
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
     if booking.booking_status not in ['completed', 'confirmed']:
-        flash('You can only review completed or confirmed bookings.', 'warning')
+        flash('Only completed bookings can be reviewed.', 'warning')
         return redirect(url_for('dashboard'))
-    existing = Review.query.filter_by(booking_id=booking_id).first()
-    if existing:
-        flash('You have already reviewed this booking.', 'info')
+    if Review.query.filter_by(booking_id=booking_id).first():
+        flash('Already reviewed.', 'info')
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
         rating = int(request.form.get('rating', 0))
         comment = request.form.get('comment', '').strip()
         if rating < 1 or rating > 5:
-            flash('Please select a rating between 1 and 5.', 'danger')
+            flash('Rating must be 1-5.', 'danger')
             return render_template('review_form.html', booking=booking)
         review = Review(booking_id=booking.id, item_id=booking.item_id,
                        customer_id=current_user.id, rating=rating, comment=comment)
         db.session.add(review)
         db.session.commit()
-        
-        if booking.item.vendor.telegram_chat_id:
-            stars = '⭐' * rating
-            msg = (
-                f"⭐ New Review Received!\n\n"
-                f"Item: {booking.item.title}\n"
-                f"Customer: {current_user.name}\n"
-                f"Rating: {stars} ({rating}/5)\n"
-                f"Comment: {comment[:150] if comment else 'No comment'}\n\n"
-                f"Keep up the good work! 🙌"
-            )
-            send_telegram_notification_async(booking.item.vendor.telegram_chat_id, msg)
-        
         flash('⭐ Thank you for your review!', 'success')
         return redirect(url_for('dashboard'))
     return render_template('review_form.html', booking=booking)
 
 
 # ============================================
-# CHAT ROUTES
+# CHAT
 # ============================================
-
 @app.route('/chat')
 @login_required
 def chat_list():
@@ -2287,14 +1894,9 @@ def chat_list():
         if other_id not in conversations:
             other_user = User.query.get(other_id)
             if other_user:
-                conversations[other_id] = {
-                    'user': other_user,
-                    'last_message': msg,
-                    'unread': 0
-                }
+                conversations[other_id] = {'user': other_user, 'last_message': msg, 'unread': 0}
         if not msg.is_read and msg.receiver_id == current_user.id:
             conversations[other_id]['unread'] += 1
-    
     return render_template('chat/list.html', conversations=conversations.values())
 
 
@@ -2302,31 +1904,24 @@ def chat_list():
 @login_required
 def chat_with(user_id):
     other_user = User.query.get_or_404(user_id)
-    
     if other_user.id == current_user.id:
         flash('You cannot chat with yourself.', 'danger')
         return redirect(url_for('chat_list'))
-    
     item_id = request.args.get('item_id', type=int)
     
     if request.method == 'POST':
         body = request.form.get('body', '').strip()
-        
         apply_filter = should_filter_contact_info(current_user, other_user)
         
         if not body:
             flash('Message cannot be empty.', 'danger')
         elif len(body) > MAX_CHAT_CHARS:
-            flash(f'⚠️ Message too long! Maximum {MAX_CHAT_CHARS} characters allowed '
-                  f'(yours has {len(body)}).', 'danger')
+            flash(f'⚠️ Message too long! Max {MAX_CHAT_CHARS} chars.', 'danger')
         elif apply_filter and contains_email(body):
             found = get_first_email(body)
-            flash(f'⚠️ Message blocked! Sharing email addresses or UPI IDs is not allowed '
-                  f'(found: {found}). Please use the platform to communicate.', 'danger')
+            flash(f'⚠️ Sharing email/UPI not allowed (found: {found}).', 'danger')
         elif apply_filter and contains_too_many_digits(body, max_consecutive=4):
-            longest = get_longest_digit_sequence(body)
-            flash(f'⚠️ Message blocked! Cannot share more than 4 consecutive digits '
-                  f'(found {longest}). This prevents phone number sharing.', 'danger')
+            flash(f'⚠️ Cannot share >4 consecutive digits.', 'danger')
         else:
             masked_body = mask_phone_numbers(body)
             msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
@@ -2336,15 +1931,11 @@ def chat_with(user_id):
             
             if other_user.telegram_chat_id:
                 preview = masked_body[:100] + ('...' if len(masked_body) > 100 else '')
-                tg_msg = (
-                    f"💬 New Message from {current_user.name}\n\n"
-                    f"{preview}\n\n"
-                    f"Open Chat: https://vhaymandap1.onrender.com/chat/{current_user.id}"
-                )
-                send_telegram_notification_async(other_user.telegram_chat_id, tg_msg)
+                send_telegram_notification_async(other_user.telegram_chat_id,
+                    f"💬 New Message from {current_user.name}\n\n{preview}")
             
             if masked_body != body:
-                flash('ℹ️ Some numbers were masked for privacy.', 'info')
+                flash('ℹ️ Some numbers masked for privacy.', 'info')
             return redirect(url_for('chat_with', user_id=other_user.id))
     
     messages = Message.query.filter(
@@ -2358,9 +1949,7 @@ def chat_with(user_id):
     db.session.commit()
     
     item = Item.query.get(item_id) if item_id else None
-    
-    return render_template('chat/conversation.html',
-                         other_user=other_user, messages=messages, item=item)
+    return render_template('chat/conversation.html', other_user=other_user, messages=messages, item=item)
 
 
 @app.route('/api/chat/send', methods=['POST'])
@@ -2373,7 +1962,6 @@ def api_chat_send():
     
     if not receiver_id or not body:
         return jsonify({'error': 'Missing fields'}), 400
-    
     other_user = User.query.get(receiver_id)
     if not other_user:
         return jsonify({'error': 'User not found'}), 404
@@ -2381,47 +1969,27 @@ def api_chat_send():
     apply_filter = should_filter_contact_info(current_user, other_user)
     
     if len(body) > MAX_CHAT_CHARS:
-        return jsonify({
-            'error': f'Message too long. Maximum {MAX_CHAT_CHARS} characters allowed '
-                     f'(yours has {len(body)}).'
-        }), 400
-    
+        return jsonify({'error': f'Message too long. Max {MAX_CHAT_CHARS}.'}), 400
     if apply_filter and contains_email(body):
         found = get_first_email(body)
-        return jsonify({
-            'error': f'Sharing email addresses or UPI IDs is not allowed (found: {found}). '
-                     f'Please use the platform to communicate.'
-        }), 400
-    
+        return jsonify({'error': f'Email/UPI not allowed (found: {found}).'}), 400
     if apply_filter and contains_too_many_digits(body, max_consecutive=4):
-        longest = get_longest_digit_sequence(body)
-        return jsonify({
-            'error': f'Cannot share more than 4 consecutive digits. Found {longest}.'
-        }), 400
+        return jsonify({'error': 'Cannot share >4 consecutive digits.'}), 400
     
     masked_body = mask_phone_numbers(body)
-    msg = Message(sender_id=current_user.id, receiver_id=other_user.id,
-                 item_id=item_id, body=masked_body)
+    msg = Message(sender_id=current_user.id, receiver_id=other_user.id, item_id=item_id, body=masked_body)
     db.session.add(msg)
     db.session.commit()
     
     if other_user.telegram_chat_id:
         preview = masked_body[:100] + ('...' if len(masked_body) > 100 else '')
-        tg_msg = (
-            f"💬 New Message from {current_user.name}\n\n"
-            f"{preview}\n\n"
-            f"Open Chat: https://vhaymandap1.onrender.com/chat/{current_user.id}"
-        )
-        send_telegram_notification_async(other_user.telegram_chat_id, tg_msg)
+        send_telegram_notification_async(other_user.telegram_chat_id,
+            f"💬 New Message from {current_user.name}\n\n{preview}")
     
-    return jsonify({
-        'success': True,
-        'message': {
-            'id': msg.id, 'body': msg.body,
-            'masked': masked_body != body,
-            'created_at': msg.created_at.strftime('%H:%M')
-        }
-    })
+    return jsonify({'success': True, 'message': {
+        'id': msg.id, 'body': msg.body, 'masked': masked_body != body,
+        'created_at': msg.created_at.strftime('%H:%M')
+    }})
 
 
 @app.route('/api/chat/messages/<int:user_id>')
@@ -2431,12 +1999,10 @@ def api_chat_messages(user_id):
         ((Message.sender_id == current_user.id) & (Message.receiver_id == user_id)) |
         ((Message.sender_id == user_id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.created_at.asc()).all()
-    
     for msg in messages:
         if msg.receiver_id == current_user.id and not msg.is_read:
             msg.is_read = True
     db.session.commit()
-    
     return jsonify([{
         'id': m.id, 'sender_id': m.sender_id, 'body': m.body,
         'is_mine': m.sender_id == current_user.id,
@@ -2445,14 +2011,12 @@ def api_chat_messages(user_id):
 
 
 # ============================================
-# TICKET ROUTES
+# TICKETS
 # ============================================
-
 @app.route('/tickets')
 @login_required
 def tickets_list():
-    tickets = Ticket.query.filter_by(user_id=current_user.id)\
-        .order_by(Ticket.last_reply_at.desc()).all()
+    tickets = Ticket.query.filter_by(user_id=current_user.id).order_by(Ticket.last_reply_at.desc()).all()
     return render_template('tickets/list.html', tickets=tickets)
 
 
@@ -2464,36 +2028,17 @@ def ticket_new():
         description = request.form.get('description', '').strip()
         category = request.form.get('category', 'other')
         priority = request.form.get('priority', 'medium')
-        
         if not subject or not description:
-            flash('Subject and description are required.', 'danger')
+            flash('Subject and description required.', 'danger')
             return render_template('tickets/new.html')
-        
-        ticket = Ticket(
-            ticket_number=generate_ticket_number(),
-            user_id=current_user.id,
-            subject=subject,
-            description=description,
-            category=category,
-            priority=priority,
-            status='open'
-        )
+        ticket = Ticket(ticket_number=generate_ticket_number(), user_id=current_user.id,
+                       subject=subject, description=description, category=category,
+                       priority=priority, status='open')
         db.session.add(ticket)
         db.session.commit()
-        
-        notify_all_admins(
-            f"🎫 New Support Ticket!\n\n"
-            f"From: {current_user.name} ({current_user.role.title()})\n"
-            f"Number: {ticket.ticket_number}\n"
-            f"Subject: {subject}\n"
-            f"Priority: {priority.upper()}\n"
-            f"Category: {category.title()}\n\n"
-            f"Open admin panel to reply."
-        )
-        
-        flash(f'✅ Ticket {ticket.ticket_number} created! We will respond soon.', 'success')
+        notify_all_admins(f"🎫 New Ticket!\n\nFrom: {current_user.name}\n#{ticket.ticket_number}\nSubject: {subject}")
+        flash(f'✅ Ticket {ticket.ticket_number} created!', 'success')
         return redirect(url_for('ticket_detail', ticket_id=ticket.id))
-    
     return render_template('tickets/new.html')
 
 
@@ -2501,54 +2046,24 @@ def ticket_new():
 @login_required
 def ticket_detail(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
-    
     if ticket.user_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('tickets_list'))
-    
     if request.method == 'POST':
         message = request.form.get('message', '').strip()
         if not message:
             flash('Reply cannot be empty.', 'danger')
         else:
-            reply = TicketReply(
-                ticket_id=ticket.id,
-                user_id=current_user.id,
-                message=message,
-                is_admin_reply=(current_user.role == 'admin')
-            )
+            reply = TicketReply(ticket_id=ticket.id, user_id=current_user.id,
+                              message=message, is_admin_reply=(current_user.role == 'admin'))
             db.session.add(reply)
             ticket.last_reply_at = datetime.utcnow()
-            
             if current_user.role == 'admin' and ticket.status == 'open':
                 ticket.status = 'in_progress'
-            
             db.session.commit()
-            
-            if current_user.role == 'admin':
-                if ticket.user.telegram_chat_id:
-                    msg = (
-                        f"💬 Admin replied to your ticket!\n\n"
-                        f"Number: {ticket.ticket_number}\n"
-                        f"Subject: {ticket.subject}\n\n"
-                        f"Reply: {message[:150]}{'...' if len(message) > 150 else ''}\n\n"
-                        f"Open ticket: https://vhaymandap1.onrender.com/tickets/{ticket.id}"
-                    )
-                    send_telegram_notification_async(ticket.user.telegram_chat_id, msg)
-            else:
-                notify_all_admins(
-                    f"💬 New reply on ticket {ticket.ticket_number}\n\n"
-                    f"From: {current_user.name}\n"
-                    f"Subject: {ticket.subject}\n\n"
-                    f"Reply: {message[:150]}{'...' if len(message) > 150 else ''}"
-                )
-            
             flash('✅ Reply posted.', 'success')
             return redirect(url_for('ticket_detail', ticket_id=ticket.id))
-    
-    replies = TicketReply.query.filter_by(ticket_id=ticket.id)\
-        .order_by(TicketReply.created_at.asc()).all()
-    
+    replies = TicketReply.query.filter_by(ticket_id=ticket.id).order_by(TicketReply.created_at.asc()).all()
     return render_template('tickets/detail.html', ticket=ticket, replies=replies)
 
 
@@ -2556,18 +2071,13 @@ def ticket_detail(ticket_id):
 @login_required
 def ticket_close(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
-    
     if ticket.user_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('tickets_list'))
-    
     ticket.status = 'closed'
     db.session.commit()
     flash('Ticket closed.', 'info')
-    
-    if current_user.role == 'admin':
-        return redirect(url_for('admin_tickets'))
-    return redirect(url_for('tickets_list'))
+    return redirect(url_for('admin_tickets') if current_user.role == 'admin' else url_for('tickets_list'))
 
 
 @app.route('/admin/tickets')
@@ -2576,31 +2086,21 @@ def admin_tickets():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     status_filter = request.args.get('status', 'all')
     priority_filter = request.args.get('priority', 'all')
     search = request.args.get('search', '').strip()
-    
     query = Ticket.query
-    
     if status_filter != 'all':
         query = query.filter_by(status=status_filter)
-    
     if priority_filter != 'all':
         query = query.filter_by(priority=priority_filter)
-    
     if search:
-        query = query.join(User, Ticket.user_id == User.id).filter(
-            db.or_(
-                Ticket.ticket_number.ilike(f'%{search}%'),
-                Ticket.subject.ilike(f'%{search}%'),
-                User.name.ilike(f'%{search}%'),
-                User.mobile.ilike(f'%{search}%')
-            )
-        )
-    
+        query = query.join(User, Ticket.user_id == User.id).filter(db.or_(
+            Ticket.ticket_number.ilike(f'%{search}%'),
+            Ticket.subject.ilike(f'%{search}%'),
+            User.name.ilike(f'%{search}%')
+        ))
     tickets = query.order_by(Ticket.last_reply_at.desc()).all()
-    
     stats = {
         'total': Ticket.query.count(),
         'open': Ticket.query.filter_by(status='open').count(),
@@ -2608,13 +2108,8 @@ def admin_tickets():
         'resolved': Ticket.query.filter_by(status='resolved').count(),
         'closed': Ticket.query.filter_by(status='closed').count(),
     }
-    
-    return render_template('admin/tickets.html',
-                         tickets=tickets,
-                         stats=stats,
-                         status_filter=status_filter,
-                         priority_filter=priority_filter,
-                         search=search)
+    return render_template('admin/tickets.html', tickets=tickets, stats=stats,
+                         status_filter=status_filter, priority_filter=priority_filter, search=search)
 
 
 @app.route('/admin/ticket/<int:ticket_id>', methods=['GET', 'POST'])
@@ -2623,33 +2118,16 @@ def admin_ticket_detail(ticket_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     ticket = Ticket.query.get_or_404(ticket_id)
-    
     if request.method == 'POST':
         action = request.form.get('action', 'reply')
-        
         if action == 'status':
             new_status = request.form.get('status', '')
             if new_status in ['open', 'in_progress', 'resolved', 'closed']:
-                old_status = ticket.status
                 ticket.status = new_status
                 db.session.commit()
-                
-                if ticket.user.telegram_chat_id:
-                    msg = (
-                        f"🔄 Ticket Status Updated\n\n"
-                        f"Number: {ticket.ticket_number}\n"
-                        f"Subject: {ticket.subject}\n"
-                        f"Old: {old_status.replace('_', ' ').title()}\n"
-                        f"New: {new_status.replace('_', ' ').title()}\n\n"
-                        f"Thank you for your patience!"
-                    )
-                    send_telegram_notification_async(ticket.user.telegram_chat_id, msg)
-                
-                flash(f'Status updated to {new_status}.', 'success')
+                flash(f'Status updated.', 'success')
             return redirect(url_for('admin_ticket_detail', ticket_id=ticket.id))
-        
         elif action == 'priority':
             new_priority = request.form.get('priority', '')
             if new_priority in ['low', 'medium', 'high', 'urgent']:
@@ -2657,129 +2135,71 @@ def admin_ticket_detail(ticket_id):
                 db.session.commit()
                 flash('Priority updated.', 'success')
             return redirect(url_for('admin_ticket_detail', ticket_id=ticket.id))
-        
         else:
             message = request.form.get('message', '').strip()
             if not message:
                 flash('Reply cannot be empty.', 'danger')
             else:
-                reply = TicketReply(
-                    ticket_id=ticket.id,
-                    user_id=current_user.id,
-                    message=message,
-                    is_admin_reply=True
-                )
+                reply = TicketReply(ticket_id=ticket.id, user_id=current_user.id,
+                                  message=message, is_admin_reply=True)
                 db.session.add(reply)
                 ticket.last_reply_at = datetime.utcnow()
                 if ticket.status == 'open':
                     ticket.status = 'in_progress'
                 db.session.commit()
-                
-                if ticket.user.telegram_chat_id:
-                    msg = (
-                        f"💬 Admin replied to your ticket!\n\n"
-                        f"Number: {ticket.ticket_number}\n"
-                        f"Subject: {ticket.subject}\n\n"
-                        f"Reply: {message[:150]}{'...' if len(message) > 150 else ''}"
-                    )
-                    send_telegram_notification_async(ticket.user.telegram_chat_id, msg)
-                
                 flash('✅ Reply sent.', 'success')
                 return redirect(url_for('admin_ticket_detail', ticket_id=ticket.id))
-    
-    replies = TicketReply.query.filter_by(ticket_id=ticket.id)\
-        .order_by(TicketReply.created_at.asc()).all()
-    
+    replies = TicketReply.query.filter_by(ticket_id=ticket.id).order_by(TicketReply.created_at.asc()).all()
     return render_template('admin/ticket_detail.html', ticket=ticket, replies=replies)
 
 
 # ============================================
-# LEADERBOARD ROUTES
+# LEADERBOARD
 # ============================================
-
 def calculate_leaderboard(period='all_time', category='all'):
-    cutoff_date = None
-    if period == 'monthly':
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
-    
+    cutoff_date = datetime.utcnow() - timedelta(days=30) if period == 'monthly' else None
     vendors = User.query.filter_by(role='vendor').all()
-    
     rankings = []
     
     for vendor in vendors:
         vendor_items = Item.query.filter_by(vendor_id=vendor.id).all()
         if not vendor_items:
             continue
-        
         if category != 'all':
             vendor_items = [i for i in vendor_items if i.category == category]
             if not vendor_items:
                 continue
-        
         vendor_item_ids = [i.id for i in vendor_items]
-        
         booking_query = Booking.query.filter(
             Booking.item_id.in_(vendor_item_ids),
             Booking.booking_status.in_(['completed', 'return_initiated'])
         )
-        
         if cutoff_date:
             booking_query = booking_query.filter(Booking.created_at >= cutoff_date)
-        
         vendor_bookings = booking_query.all()
-        
         total_bookings = len(vendor_bookings)
-        
         if total_bookings < 5:
             continue
-        
         total_earnings = sum(b.base_rent for b in vendor_bookings)
-        
         booking_ids = [b.id for b in vendor_bookings]
         reviews = Review.query.filter(Review.booking_id.in_(booking_ids)).all() if booking_ids else []
-        
-        avg_rating = 0
-        review_count = len(reviews)
-        if reviews:
-            avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1)
-        
+        avg_rating = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0
         has_verified_item = any(i.is_currently_verified for i in vendor_items)
-        
         rating_score = (avg_rating / 5) * 100 if avg_rating > 0 else 0
         bookings_score = min(100, total_bookings * 2)
         earnings_score = min(100, total_earnings / 1000)
         verification_score = 100 if has_verified_item else 0
-        
-        trust_score = round(
-            (rating_score * 0.4) +
-            (bookings_score * 0.3) +
-            (earnings_score * 0.2) +
-            (verification_score * 0.1),
-            1
-        )
-        
-        category_counts = {}
-        for item in vendor_items:
-            category_counts[item.category] = category_counts.get(item.category, 0) + 1
-        top_category = max(category_counts, key=category_counts.get) if category_counts else 'other'
-        
+        trust_score = round((rating_score * 0.4) + (bookings_score * 0.3) + 
+                           (earnings_score * 0.2) + (verification_score * 0.1), 1)
         rankings.append({
-            'vendor': vendor,
-            'trust_score': trust_score,
-            'total_bookings': total_bookings,
-            'total_earnings': total_earnings,
-            'avg_rating': avg_rating,
-            'review_count': review_count,
-            'has_verified_item': has_verified_item,
-            'top_category': top_category,
-            'total_items': len(vendor_items)
+            'vendor': vendor, 'trust_score': trust_score,
+            'total_bookings': total_bookings, 'total_earnings': total_earnings,
+            'avg_rating': avg_rating, 'review_count': len(reviews),
+            'has_verified_item': has_verified_item, 'total_items': len(vendor_items)
         })
-    
     rankings.sort(key=lambda x: x['trust_score'], reverse=True)
-    
     for idx, r in enumerate(rankings):
         r['rank'] = idx + 1
-    
     return rankings
 
 
@@ -2787,81 +2207,47 @@ def calculate_leaderboard(period='all_time', category='all'):
 def leaderboard():
     period = request.args.get('period', 'all_time')
     category = request.args.get('category', 'all')
-    
-    if period not in ['all_time', 'monthly']:
-        period = 'all_time'
-    if category not in ['all', 'furniture', 'lighting', 'decor', 'mandap']:
-        category = 'all'
-    
     rankings = calculate_leaderboard(period=period, category=category)
-    
-    top_3 = rankings[:3] if len(rankings) >= 3 else rankings
-    rest = rankings[3:] if len(rankings) > 3 else []
-    
     return render_template('leaderboard.html',
-                         top_3=top_3,
-                         rest=rest,
-                         total_vendors=len(rankings),
-                         period=period,
-                         category_filter=category)
+                         top_3=rankings[:3] if len(rankings) >= 3 else rankings,
+                         rest=rankings[3:] if len(rankings) > 3 else [],
+                         total_vendors=len(rankings), period=period, category_filter=category)
 
 
 @app.route('/api/leaderboard/top3')
 def api_leaderboard_top3():
-    rankings = calculate_leaderboard(period='all_time', category='all')
-    top_3 = rankings[:3]
-    
-    return jsonify({
-        'vendors': [{
-            'name': r['vendor'].name,
-            'score': r['trust_score'],
-            'bookings': r['total_bookings'],
-            'rating': r['avg_rating'] if r['review_count'] > 0 else 'New',
-            'verified': r['has_verified_item']
-        } for r in top_3]
-    })
+    rankings = calculate_leaderboard(period='all_time', category='all')[:3]
+    return jsonify({'vendors': [{
+        'name': r['vendor'].name, 'score': r['trust_score'],
+        'bookings': r['total_bookings'],
+        'rating': r['avg_rating'] if r['review_count'] > 0 else 'New',
+        'verified': r['has_verified_item']
+    } for r in rankings]})
 
 
 # ============================================
-# ADMIN — STORAGE MANAGEMENT
+# ADMIN — STORAGE
 # ============================================
-
 @app.route('/admin/storage')
 @login_required
 def admin_storage():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     all_reports = EquipmentReport.query.all()
-    total_reports = len(all_reports)
-    active_reports = sum(1 for r in all_reports if not r.expired and not r.keep_forever)
-    expired_reports = sum(1 for r in all_reports if r.expired)
-    protected_reports = sum(1 for r in all_reports if r.keep_forever)
-    disputed_reports = sum(1 for r in all_reports if r.damage_flagged)
-    
-    expiring_soon = []
-    for r in all_reports:
-        if not r.expired and not r.keep_forever and not r.damage_flagged:
-            if 0 <= r.days_until_expiry <= 7:
-                expiring_soon.append(r)
-    
-    eligible_now = [r for r in all_reports 
-                    if not r.expired and not r.keep_forever 
-                    and not r.damage_flagged and r.is_expired]
-    
-    recent_expired = EquipmentReport.query.filter_by(expired=True)\
-        .order_by(EquipmentReport.expired_at.desc()).limit(20).all()
-    
+    expiring_soon = [r for r in all_reports if not r.expired and not r.keep_forever 
+                    and not r.damage_flagged and 0 <= r.days_until_expiry <= 7]
     return render_template('admin/storage.html',
-                         total_reports=total_reports,
-                         active_reports=active_reports,
-                         expired_reports=expired_reports,
-                         protected_reports=protected_reports,
-                         disputed_reports=disputed_reports,
+                         total_reports=len(all_reports),
+                         active_reports=sum(1 for r in all_reports if not r.expired and not r.keep_forever),
+                         expired_reports=sum(1 for r in all_reports if r.expired),
+                         protected_reports=sum(1 for r in all_reports if r.keep_forever),
+                         disputed_reports=sum(1 for r in all_reports if r.damage_flagged),
                          expiring_soon=expiring_soon,
-                         eligible_now=eligible_now,
-                         recent_expired=recent_expired)
+                         eligible_now=[r for r in all_reports if not r.expired and not r.keep_forever 
+                                      and not r.damage_flagged and r.is_expired],
+                         recent_expired=EquipmentReport.query.filter_by(expired=True)\
+                             .order_by(EquipmentReport.expired_at.desc()).limit(20).all())
 
 
 @app.route('/admin/storage/cleanup', methods=['POST'])
@@ -2870,18 +2256,9 @@ def admin_storage_cleanup():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     dry_run = request.form.get('dry_run') == 'true'
     stats = cleanup_old_reports(dry_run=dry_run)
-    
-    if dry_run:
-        flash(f"🔍 Dry run: {stats['eligible']} reports would be deleted. "
-              f"{stats['deleted_photos']} photos + {stats['deleted_videos']} videos.", 'info')
-    else:
-        flash(f"✅ Cleanup complete: {stats['deleted_photos']} photos + "
-              f"{stats['deleted_videos']} videos deleted. "
-              f"({stats['failed']} failures)", 'success')
-    
+    flash(f"Cleanup: {stats['deleted_photos']} photos, {stats['deleted_videos']} videos.", 'success')
     return redirect(url_for('admin_storage'))
 
 
@@ -2891,35 +2268,25 @@ def admin_toggle_report_protection(report_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     report = EquipmentReport.query.get_or_404(report_id)
     report.keep_forever = not report.keep_forever
     db.session.commit()
-    
-    if report.keep_forever:
-        flash(f'🔒 Report #{report.id} protected from auto-delete.', 'success')
-    else:
-        flash(f'🔓 Report #{report.id} protection removed.', 'info')
-    
+    flash('Protection toggled.', 'success')
     return redirect(request.referrer or url_for('admin_storage'))
 
 
 @app.route('/api/cron/cleanup', methods=['GET', 'POST'])
 def cron_cleanup():
     token = request.args.get('token') or request.form.get('token')
-    expected = Config.CRON_SECRET
-    
-    if token != expected:
+    if token != Config.CRON_SECRET:
         return jsonify({'error': 'Unauthorized'}), 401
-    
     stats = cleanup_old_reports(dry_run=False)
     return jsonify({'success': True, 'stats': stats})
 
 
 # ============================================
-# ADMIN ROUTES
+# ADMIN MAIN
 # ============================================
-
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -2940,70 +2307,45 @@ def admin_dashboard():
     dispatched_bookings = Booking.query.filter_by(booking_status='dispatched').count()
     completed_bookings = Booking.query.filter_by(booking_status='completed').count()
     cancelled_bookings = Booking.query.filter_by(booking_status='cancelled').count()
-    
     total_transport = db.session.query(db.func.sum(Booking.transport_fee)).scalar() or 0
     total_deposits = db.session.query(db.func.sum(Booking.deposit)).scalar() or 0
     total_base_rent = db.session.query(db.func.sum(Booking.base_rent)).scalar() or 0
-    
     kyc_pending = Booking.query.filter_by(kyc_required=True, kyc_verified=False).count()
     kyc_completed = Booking.query.filter_by(kyc_required=True, kyc_verified=True).count()
-    
     tickets_open = Ticket.query.filter_by(status='open').count()
     tickets_in_progress = Ticket.query.filter_by(status='in_progress').count()
-    
     reports_pending_dispatch = Booking.query.filter_by(dispatch_report_done=False)\
         .filter(Booking.booking_status == 'confirmed').count()
     reports_pending_return = Booking.query.filter_by(dispatch_report_done=True, return_report_done=False)\
         .filter(Booking.booking_status.in_(['dispatched', 'confirmed'])).count()
-    
     damage_flagged_count = Booking.query.filter_by(damage_flagged=True).count()
     
     all_reports = EquipmentReport.query.all()
-    total_reports = len(all_reports)
-    active_reports = sum(1 for r in all_reports if not r.expired and not r.keep_forever)
-    expired_reports = sum(1 for r in all_reports if r.expired)
-    protected_reports = sum(1 for r in all_reports if r.keep_forever)
-    disputed_reports = sum(1 for r in all_reports if r.damage_flagged)
-    
     pending_payment_proofs = PaymentProof.query.filter_by(status='pending').count()
     
-    recent_bookings = Booking.query.order_by(Booking.created_at.desc()).limit(10).all()
-    recent_users = User.query.order_by(User.created_at.desc()).limit(5).all()
-    recent_items = Item.query.order_by(Item.created_at.desc()).limit(5).all()
-    
     return render_template('admin/dashboard.html',
-                         total_bookings=total_bookings,
-                         total_commission=total_commission,
-                         total_revenue=total_revenue,
-                         total_items=total_items,
-                         total_users=total_users,
-                         total_vendors=total_vendors,
-                         total_customers=total_customers,
-                         total_verified_items=total_verified_items,
-                         pending_bookings=pending_bookings,
-                         confirmed_bookings=confirmed_bookings,
-                         dispatched_bookings=dispatched_bookings,
-                         completed_bookings=completed_bookings,
-                         cancelled_bookings=cancelled_bookings,
-                         total_transport=total_transport,
-                         total_deposits=total_deposits,
-                         total_base_rent=total_base_rent,
-                         kyc_pending=kyc_pending,
-                         kyc_completed=kyc_completed,
-                         tickets_open=tickets_open,
-                         tickets_in_progress=tickets_in_progress,
+                         total_bookings=total_bookings, total_commission=total_commission,
+                         total_revenue=total_revenue, total_items=total_items,
+                         total_users=total_users, total_vendors=total_vendors,
+                         total_customers=total_customers, total_verified_items=total_verified_items,
+                         pending_bookings=pending_bookings, confirmed_bookings=confirmed_bookings,
+                         dispatched_bookings=dispatched_bookings, completed_bookings=completed_bookings,
+                         cancelled_bookings=cancelled_bookings, total_transport=total_transport,
+                         total_deposits=total_deposits, total_base_rent=total_base_rent,
+                         kyc_pending=kyc_pending, kyc_completed=kyc_completed,
+                         tickets_open=tickets_open, tickets_in_progress=tickets_in_progress,
                          reports_pending_dispatch=reports_pending_dispatch,
                          reports_pending_return=reports_pending_return,
                          damage_flagged_count=damage_flagged_count,
-                         total_reports=total_reports,
-                         active_reports=active_reports,
-                         expired_reports=expired_reports,
-                         protected_reports=protected_reports,
-                         disputed_reports=disputed_reports,
+                         total_reports=len(all_reports),
+                         active_reports=sum(1 for r in all_reports if not r.expired and not r.keep_forever),
+                         expired_reports=sum(1 for r in all_reports if r.expired),
+                         protected_reports=sum(1 for r in all_reports if r.keep_forever),
+                         disputed_reports=sum(1 for r in all_reports if r.damage_flagged),
                          pending_payment_proofs=pending_payment_proofs,
-                         recent_bookings=recent_bookings,
-                         recent_users=recent_users,
-                         recent_items=recent_items)
+                         recent_bookings=Booking.query.order_by(Booking.created_at.desc()).limit(10).all(),
+                         recent_users=User.query.order_by(User.created_at.desc()).limit(5).all(),
+                         recent_items=Item.query.order_by(Item.created_at.desc()).limit(5).all())
 
 
 @app.route('/admin/bookings')
@@ -3012,33 +2354,19 @@ def admin_bookings():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     status_filter = request.args.get('status', 'all')
     search = request.args.get('search', '').strip()
     sort = request.args.get('sort', 'newest')
     damage_filter = request.args.get('damage', 'all')
-    
     query = Booking.query
-    
     if status_filter != 'all':
         query = query.filter_by(booking_status=status_filter)
-    
     if damage_filter == 'flagged':
         query = query.filter_by(damage_flagged=True)
-    
     if search:
-        query = query.join(User, Booking.customer_id == User.id)\
-                     .join(Item, Booking.item_id == Item.id)\
-                     .filter(
-                         db.or_(
-                             Booking.booking_reference.ilike(f'%{search}%'),
-                             Booking.utr_number.ilike(f'%{search}%'),
-                             User.name.ilike(f'%{search}%'),
-                             User.mobile.ilike(f'%{search}%'),
-                             Item.title.ilike(f'%{search}%')
-                         )
-                     )
-    
+        query = query.join(User, Booking.customer_id == User.id).join(Item, Booking.item_id == Item.id).filter(
+            db.or_(Booking.booking_reference.ilike(f'%{search}%'), Booking.utr_number.ilike(f'%{search}%'),
+                   User.name.ilike(f'%{search}%'), User.mobile.ilike(f'%{search}%'), Item.title.ilike(f'%{search}%')))
     if sort == 'newest':
         query = query.order_by(Booking.created_at.desc())
     elif sort == 'oldest':
@@ -3047,15 +2375,9 @@ def admin_bookings():
         query = query.order_by(Booking.total_amount.desc())
     elif sort == 'lowest':
         query = query.order_by(Booking.total_amount.asc())
-    
-    bookings = query.all()
-    
-    return render_template('admin/bookings.html',
-                         bookings=bookings,
-                         status_filter=status_filter,
-                         damage_filter=damage_filter,
-                         search=search,
-                         sort=sort)
+    return render_template('admin/bookings.html', bookings=query.all(),
+                         status_filter=status_filter, damage_filter=damage_filter,
+                         search=search, sort=sort)
 
 
 @app.route('/admin/booking/<int:booking_id>')
@@ -3064,13 +2386,11 @@ def admin_booking_detail(booking_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     booking = Booking.query.get_or_404(booking_id)
     payment_proofs = PaymentProof.query.filter_by(booking_id=booking_id)\
         .order_by(PaymentProof.created_at.desc()).all()
     return render_template('admin/booking_detail.html',
-                         booking=booking,
-                         payment_proofs=payment_proofs)
+                         booking=booking, payment_proofs=payment_proofs)
 
 
 @app.route('/admin/booking/<int:booking_id>/status', methods=['POST'])
@@ -3082,27 +2402,9 @@ def admin_update_booking_status(booking_id):
     booking = Booking.query.get_or_404(booking_id)
     new_status = request.form.get('status', '')
     if new_status in ['confirmed', 'cancelled', 'completed', 'pending', 'dispatched', 'return_initiated']:
-        old_status = booking.booking_status
         booking.booking_status = new_status
         db.session.commit()
-        
-        if booking.customer.telegram_chat_id:
-            status_emoji = {
-                'confirmed': '✅', 'cancelled': '❌',
-                'completed': '🎉', 'pending': '⏳',
-                'dispatched': '🚚', 'return_initiated': '📦'
-            }.get(new_status, '🔄')
-            msg = (
-                f"{status_emoji} Booking Status Updated\n\n"
-                f"Reference: {booking.booking_reference}\n"
-                f"Item: {booking.item.title}\n"
-                f"Old Status: {old_status.replace('_', ' ').title()}\n"
-                f"New Status: {new_status.replace('_', ' ').title()}\n\n"
-                f"Thank you for using VyahMandap!"
-            )
-            send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
-        
-        flash('Booking status updated.', 'success')
+        flash('Status updated.', 'success')
     return redirect(request.referrer or url_for('admin_bookings'))
 
 
@@ -3112,36 +2414,20 @@ def admin_items():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     search = request.args.get('search', '').strip()
     category_filter = request.args.get('category', 'all')
     verified_filter = request.args.get('verified', 'all')
-    
     query = Item.query
-    
     if search:
-        query = query.filter(
-            db.or_(
-                Item.title.ilike(f'%{search}%'),
-                Item.description.ilike(f'%{search}%')
-            )
-        )
-    
+        query = query.filter(db.or_(Item.title.ilike(f'%{search}%'), Item.description.ilike(f'%{search}%')))
     if category_filter != 'all':
         query = query.filter_by(category=category_filter)
-    
     if verified_filter == 'verified':
         query = query.filter_by(is_verified=True)
     elif verified_filter == 'unverified':
         query = query.filter_by(is_verified=False)
-    
-    items = query.order_by(Item.created_at.desc()).all()
-    
-    return render_template('admin/items.html',
-                         items=items,
-                         search=search,
-                         category_filter=category_filter,
-                         verified_filter=verified_filter)
+    return render_template('admin/items.html', items=query.order_by(Item.created_at.desc()).all(),
+                         search=search, category_filter=category_filter, verified_filter=verified_filter)
 
 
 @app.route('/admin/item/add', methods=['GET', 'POST'])
@@ -3151,26 +2437,19 @@ def admin_add_item():
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     if request.method == 'POST':
-        title = request.form.get('title', '').strip()
-        description = request.form.get('description', '').strip()
-        category = request.form.get('category', '')
-        rate = float(request.form.get('rate', 0))
-        deposit = float(request.form.get('deposit', 0))
-        stock = int(request.form.get('stock', 1))
-        image_url = request.form.get('image_url', '').strip()
-        image_filename = None
-        if 'image_file' in request.files and request.files['image_file'].filename:
-            image_filename = save_uploaded_file(request.files['image_file'])
-        if not title or rate <= 0:
-            flash('Title and rate are required.', 'danger')
-            return render_template('admin/item_form.html')
-        item = Item(title=title, description=description, category=category,
-                    rate_per_day=rate, deposit_amount=deposit, stock=stock,
-                    image_url=image_url if image_url else None,
-                    image_filename=image_filename, vendor_id=current_user.id)
+        item = Item(
+            title=request.form.get('title', '').strip(),
+            description=request.form.get('description', '').strip(),
+            category=request.form.get('category', ''),
+            rate_per_day=float(request.form.get('rate', 0)),
+            deposit_amount=float(request.form.get('deposit', 0)),
+            stock=int(request.form.get('stock', 1)),
+            image_url=request.form.get('image_url', '').strip() or None,
+            vendor_id=current_user.id
+        )
         db.session.add(item)
         db.session.commit()
-        flash('✅ Item added successfully!', 'success')
+        flash('✅ Item added!', 'success')
         return redirect(url_for('admin_items'))
     return render_template('admin/item_form.html')
 
@@ -3190,17 +2469,8 @@ def admin_edit_item(item_id):
         item.deposit_amount = float(request.form.get('deposit', 0))
         item.stock = int(request.form.get('stock', 1))
         item.is_available = 'is_available' in request.form
-        if 'image_file' in request.files and request.files['image_file'].filename:
-            image_filename = save_uploaded_file(request.files['image_file'])
-            if image_filename:
-                item.image_filename = image_filename
-                item.image_url = None
-        image_url = request.form.get('image_url', '').strip()
-        if image_url:
-            item.image_url = image_url
-            item.image_filename = None
         db.session.commit()
-        flash('✅ Item updated successfully!', 'success')
+        flash('✅ Item updated!', 'success')
         return redirect(url_for('admin_items'))
     return render_template('admin/item_form.html', item=item)
 
@@ -3214,7 +2484,7 @@ def admin_delete_item(item_id):
     item = Item.query.get_or_404(item_id)
     db.session.delete(item)
     db.session.commit()
-    flash('Item deleted successfully.', 'success')
+    flash('Item deleted.', 'success')
     return redirect(url_for('admin_items'))
 
 
@@ -3242,7 +2512,7 @@ def admin_unverify_item(item_id):
     item.is_verified = False
     item.verified_until = None
     db.session.commit()
-    flash(f'Item unverified.', 'info')
+    flash('Item unverified.', 'info')
     return redirect(url_for('admin_items'))
 
 
@@ -3252,30 +2522,17 @@ def admin_users():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     role_filter = request.args.get('role', 'all')
     search = request.args.get('search', '').strip()
-    
     query = User.query
-    
     if role_filter != 'all':
         query = query.filter_by(role=role_filter)
-    
     if search:
-        query = query.filter(
-            db.or_(
-                User.name.ilike(f'%{search}%'),
-                User.mobile.ilike(f'%{search}%'),
-                User.email.ilike(f'%{search}%')
-            )
-        )
-    
-    users = query.order_by(User.created_at.desc()).all()
-    
-    return render_template('admin/users.html',
-                         users=users,
-                         role_filter=role_filter,
-                         search=search)
+        query = query.filter(db.or_(User.name.ilike(f'%{search}%'),
+                                    User.mobile.ilike(f'%{search}%'),
+                                    User.email.ilike(f'%{search}%')))
+    return render_template('admin/users.html', users=query.order_by(User.created_at.desc()).all(),
+                         role_filter=role_filter, search=search)
 
 
 @app.route('/admin/user/<int:user_id>/role', methods=['POST'])
@@ -3289,7 +2546,7 @@ def admin_update_user_role(user_id):
     if new_role in ['admin', 'customer', 'vendor'] and user.id != current_user.id:
         user.role = new_role
         db.session.commit()
-        flash(f'{user.name} role updated to {new_role}.', 'success')
+        flash(f'Role updated.', 'success')
     return redirect(url_for('admin_users'))
 
 
@@ -3299,25 +2556,15 @@ def admin_user_detail(user_id):
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
     user = User.query.get_or_404(user_id)
-    
-    user_bookings = Booking.query.filter_by(customer_id=user.id)\
-        .order_by(Booking.created_at.desc()).all() if user.role == 'customer' else []
-    
-    user_items = Item.query.filter_by(vendor_id=user.id)\
-        .order_by(Item.created_at.desc()).all() if user.role in ['vendor', 'admin'] else []
-    
+    user_bookings = Booking.query.filter_by(customer_id=user.id).order_by(Booking.created_at.desc()).all() if user.role == 'customer' else []
+    user_items = Item.query.filter_by(vendor_id=user.id).order_by(Item.created_at.desc()).all() if user.role in ['vendor', 'admin'] else []
     vendor_bookings = []
     if user.role in ['vendor', 'admin'] and user_items:
         item_ids = [i.id for i in user_items]
-        vendor_bookings = Booking.query.filter(Booking.item_id.in_(item_ids))\
-            .order_by(Booking.created_at.desc()).all()
-    
-    return render_template('admin/user_detail.html',
-                         user=user,
-                         user_bookings=user_bookings,
-                         user_items=user_items,
+        vendor_bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).order_by(Booking.created_at.desc()).all()
+    return render_template('admin/user_detail.html', user=user,
+                         user_bookings=user_bookings, user_items=user_items,
                          vendor_bookings=vendor_bookings)
 
 
@@ -3327,47 +2574,25 @@ def admin_export_bookings():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    
-    import csv
-    import io
-    
+    import csv, io
     bookings = Booking.query.order_by(Booking.created_at.desc()).all()
-    
     output = io.StringIO()
     writer = csv.writer(output)
-    
-    writer.writerow([
-        'Reference', 'Date', 'Customer', 'Mobile', 'Item', 'Vendor',
-        'Start Date', 'End Date', 'Qty', 'Base Rent', 'Commission',
-        'Deposit', 'Transport', 'Total', 'UTR', 'Status', 'KYC',
-        'Dispatch Report', 'Return Report', 'Damage Flagged'
-    ])
-    
+    writer.writerow(['Reference', 'Date', 'Customer', 'Mobile', 'Item', 'Vendor',
+                     'Start Date', 'End Date', 'Qty', 'Base Rent', 'Commission',
+                     'Deposit', 'Transport', 'Total', 'UTR', 'Status'])
     for b in bookings:
-        writer.writerow([
-            b.booking_reference, b.created_at.strftime('%Y-%m-%d %H:%M'),
-            b.customer.name, b.customer.mobile,
-            b.item.title, b.item.vendor.name,
-            b.start_date, b.end_date, b.quantity,
-            b.base_rent, b.commission, b.deposit, b.transport_fee,
-            b.total_amount, b.utr_number, b.booking_status,
-            'Yes' if b.kyc_verified else 'No',
-            'Yes' if b.dispatch_report_done else 'No',
-            'Yes' if b.return_report_done else 'No',
-            'Yes' if b.damage_flagged else 'No'
-        ])
-    
-    return Response(
-        output.getvalue(),
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=vyahmandap_bookings.csv'}
-    )
+        writer.writerow([b.booking_reference, b.created_at.strftime('%Y-%m-%d %H:%M'),
+                        b.customer.name, b.customer.mobile, b.item.title, b.item.vendor.name,
+                        b.start_date, b.end_date, b.quantity, b.base_rent, b.commission,
+                        b.deposit, b.transport_fee, b.total_amount, b.utr_number, b.booking_status])
+    return Response(output.getvalue(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=vyahmandap_bookings.csv'})
 
 
 # ============================================
-# CONTEXT PROCESSORS
+# CONTEXT PROCESSOR
 # ============================================
-
 @app.context_processor
 def utility_processor():
     def unread_count():
@@ -3408,12 +2633,10 @@ def utility_processor():
 # ============================================
 # INIT DATABASE
 # ============================================
-
 def init_database():
     try:
         try:
             from sqlalchemy import text
-            
             migrations = [
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatch_report_done BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS return_report_done BOOLEAN DEFAULT FALSE",
@@ -3426,18 +2649,15 @@ def init_database():
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
             ]
-            
             with db.engine.connect() as conn:
                 for sql in migrations:
                     try:
                         conn.execute(text(sql))
-                    except Exception as col_err:
+                    except Exception:
                         pass
                 conn.commit()
-            print("✅ Auto-migration: All columns verified/added")
+            print("✅ Auto-migration done")
         except Exception as mig_err:
             print(f"⚠️ Auto-migration skipped: {mig_err}")
         
@@ -3473,26 +2693,21 @@ def init_database():
         
         if Item.query.count() == 0:
             default_items = [
-                {'title': 'Maharaja Gold Carved Wedding Sofa',
-                 'description': 'Elegant gold carved sofa for royal wedding setups.',
-                 'category': 'furniture', 'rate_per_day': 4500, 'deposit_amount': 3000,
-                 'stock': 5, 'image_url': 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=600&q=80',
+                {'title': 'Maharaja Gold Carved Wedding Sofa', 'category': 'furniture',
+                 'rate_per_day': 4500, 'deposit_amount': 3000, 'stock': 5,
+                 'description': 'Elegant gold carved sofa.',
+                 'image_url': 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600',
                  'vendor_id': admin.id},
-                {'title': 'Heavy Truss & LED Setup (Per Box)',
-                 'description': 'Professional truss lighting system for events.',
-                 'category': 'lighting', 'rate_per_day': 2500, 'deposit_amount': 1500,
-                 'stock': 12, 'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
+                {'title': 'Heavy Truss & LED Setup', 'category': 'lighting',
+                 'rate_per_day': 2500, 'deposit_amount': 1500, 'stock': 12,
+                 'description': 'Professional truss lighting system.',
+                 'image_url': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600',
                  'vendor_id': admin.id},
-                {'title': 'Royal Floral Mandap Setup',
-                 'description': 'Beautiful floral mandap for wedding ceremonies.',
-                 'category': 'mandap', 'rate_per_day': 12000, 'deposit_amount': 5000,
-                 'stock': 3, 'image_url': 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80',
+                {'title': 'Royal Floral Mandap Setup', 'category': 'mandap',
+                 'rate_per_day': 12000, 'deposit_amount': 5000, 'stock': 3,
+                 'description': 'Beautiful floral mandap.',
+                 'image_url': 'https://images.unsplash.com/photo-1519741497674-611481863552?w=600',
                  'vendor_id': admin.id},
-                {'title': 'Wedding Arch Decor',
-                 'description': 'Elegant wedding arch with floral arrangements.',
-                 'category': 'decor', 'rate_per_day': 7500, 'deposit_amount': 2500,
-                 'stock': 4, 'image_url': 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=600&q=80',
-                 'vendor_id': admin.id}
             ]
             for item_data in default_items:
                 db.session.add(Item(**item_data))
@@ -3509,14 +2724,12 @@ def init_database():
 # ============================================
 # STARTUP
 # ============================================
-
 with app.app_context():
     print("=" * 50)
     print(f"🚀 Starting {Config.APP_NAME}...")
-    print(f"📱 Telegram Bot: {'Enabled' if Config.TELEGRAM_BOT_TOKEN else 'Disabled'}")
+    print(f"📱 Telegram: {'Enabled' if Config.TELEGRAM_BOT_TOKEN else 'Disabled'}")
     print(f"📷 Cloudinary: {'Configured' if Config.CLOUDINARY_CLOUD_NAME else 'Not configured'}")
-    print(f"🗄️  Database: {'PostgreSQL' if 'postgres' in Config.SQLALCHEMY_DATABASE_URI else 'SQLite'}")
-    print(f"⏰ Report Retention: {Config.REPORT_RETENTION_DAYS} days")
+    print(f"🗄️  DB: {'PostgreSQL' if 'postgres' in Config.SQLALCHEMY_DATABASE_URI else 'SQLite'}")
     print("=" * 50)
     init_database()
 
