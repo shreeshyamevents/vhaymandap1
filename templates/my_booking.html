@@ -22,40 +22,19 @@
             <div class="text-right">
                 <div class="text-xs text-gray-500">Total</div>
                 <div class="text-2xl font-bold text-green-700">₹{{ booking.total_amount }}</div>
-                <span class="text-xs font-bold px-2 py-0.5 rounded 
-                    {% if booking.booking_status == 'confirmed' %}bg-blue-100 text-blue-800
-                    {% elif booking.booking_status == 'cancelled' %}bg-red-100 text-red-800
-                    {% elif booking.booking_status == 'completed' %}bg-green-100 text-green-800
-                    {% else %}bg-gray-100 text-gray-700{% endif %}">
-                    {{ booking.booking_status.upper() }}
-                </span>
             </div>
         </div>
-
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t text-sm">
-            <div>
-                <div class="text-xs text-gray-500">Start</div>
-                <div class="font-semibold">{{ booking.start_date.strftime('%d %b %Y') }}</div>
-            </div>
-            <div>
-                <div class="text-xs text-gray-500">End</div>
-                <div class="font-semibold">{{ booking.end_date.strftime('%d %b %Y') }}</div>
-            </div>
-            <div>
-                <div class="text-xs text-gray-500">Quantity</div>
-                <div class="font-semibold">{{ booking.quantity }}</div>
-            </div>
-            <div>
-                <div class="text-xs text-gray-500">Venue</div>
-                <div class="font-semibold truncate">{{ booking.venue_address }}</div>
-            </div>
+            <div><div class="text-xs text-gray-500">Start</div><div class="font-semibold">{{ booking.start_date.strftime('%d %b %Y') }}</div></div>
+            <div><div class="text-xs text-gray-500">End</div><div class="font-semibold">{{ booking.end_date.strftime('%d %b %Y') }}</div></div>
+            <div><div class="text-xs text-gray-500">Quantity</div><div class="font-semibold">{{ booking.quantity }}</div></div>
+            <div><div class="text-xs text-gray-500">Venue</div><div class="font-semibold truncate">{{ booking.venue_address }}</div></div>
         </div>
     </div>
 
     {% if payment_config.upi_id or payment_config.account_number or payment_config.custom_qr_url %}
     <div class="bg-white p-6 rounded-2xl border shadow-sm mb-6">
-        <h3 class="font-bold text-lg mb-4 flex items-center gap-2">💳 Payment Details</h3>
-        
+        <h3 class="font-bold text-lg mb-4">💳 Payment Details</h3>
         <div class="flex flex-col md:flex-row gap-6">
             {% if qr_base64 %}
             <div class="flex-shrink-0 text-center">
@@ -69,7 +48,6 @@
                 <div class="bg-white border-2 border-gray-200 rounded-xl p-3 inline-block">
                     <img src="{{ payment_config.custom_qr_url }}" alt="QR" class="w-48 h-48 object-contain">
                 </div>
-                <p class="text-xs text-gray-500 mt-2">Scan to pay</p>
             </div>
             {% endif %}
 
@@ -81,9 +59,7 @@
                         <code class="bg-gray-100 px-3 py-1.5 rounded text-sm font-bold" id="upiText">{{ payment_config.upi_id }}</code>
                         <button onclick="copyUpi()" class="text-xs text-blue-600 hover:underline">Copy</button>
                     </div>
-                    {% if payment_config.upi_name %}
-                    <div class="text-xs text-gray-500 mt-1">Name: {{ payment_config.upi_name }}</div>
-                    {% endif %}
+                    {% if payment_config.upi_name %}<div class="text-xs text-gray-500 mt-1">Name: {{ payment_config.upi_name }}</div>{% endif %}
                 </div>
                 {% endif %}
 
@@ -91,19 +67,11 @@
                 <div class="pt-2 border-t">
                     <div class="text-xs text-gray-500 font-semibold mb-1">Bank Transfer</div>
                     <div class="text-sm space-y-1">
-                        {% if payment_config.account_name %}
-                        <div><span class="text-gray-500">Name:</span> <strong>{{ payment_config.account_name }}</strong></div>
-                        {% endif %}
+                        {% if payment_config.account_name %}<div><span class="text-gray-500">Name:</span> <strong>{{ payment_config.account_name }}</strong></div>{% endif %}
                         <div><span class="text-gray-500">A/C:</span> <strong>{{ payment_config.account_number }}</strong></div>
-                        {% if payment_config.ifsc_code %}
-                        <div><span class="text-gray-500">IFSC:</span> <strong>{{ payment_config.ifsc_code }}</strong></div>
-                        {% endif %}
-                        {% if payment_config.bank_name %}
-                        <div><span class="text-gray-500">Bank:</span> {{ payment_config.bank_name }}</div>
-                        {% endif %}
-                        {% if payment_config.branch %}
-                        <div><span class="text-gray-500">Branch:</span> {{ payment_config.branch }}</div>
-                        {% endif %}
+                        {% if payment_config.ifsc_code %}<div><span class="text-gray-500">IFSC:</span> <strong>{{ payment_config.ifsc_code }}</strong></div>{% endif %}
+                        {% if payment_config.bank_name %}<div><span class="text-gray-500">Bank:</span> {{ payment_config.bank_name }}</div>{% endif %}
+                        {% if payment_config.branch %}<div><span class="text-gray-500">Branch:</span> {{ payment_config.branch }}</div>{% endif %}
                     </div>
                 </div>
                 {% endif %}
@@ -114,9 +82,7 @@
 
     <div class="bg-white p-6 rounded-2xl border shadow-sm mb-6">
         <h3 class="font-bold text-lg mb-4">📤 Upload Payment Proof</h3>
-        <form method="POST" action="{{ url_for('submit_payment_proof', booking_id=booking.id) }}"
-              enctype="multipart/form-data" class="space-y-4">
-            
+        <form method="POST" action="{{ url_for('submit_payment_proof', booking_id=booking.id) }}" enctype="multipart/form-data" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-semibold mb-1">Payment Method *</label>
@@ -130,50 +96,34 @@
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Amount Paid (₹) *</label>
-                    <input type="number" name="amount_paid" required min="1" step="0.01"
-                           value="{{ booking.total_amount }}"
-                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <input type="number" name="amount_paid" required min="1" step="0.01" value="{{ booking.total_amount }}" class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Transaction ID / UTR (optional)</label>
-                    <input type="text" name="transaction_id" placeholder="e.g. 123456789012"
-                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <input type="text" name="transaction_id" class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Payment Date</label>
-                    <input type="date" name="payment_date"
-                           value="{{ booking.start_date.isoformat() }}"
-                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <input type="date" name="payment_date" value="{{ booking.start_date.isoformat() }}" class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Payer Name</label>
-                    <input type="text" name="payer_name" value="{{ current_user.name }}"
-                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <input type="text" name="payer_name" value="{{ current_user.name }}" class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-semibold mb-1">Payer Bank (optional)</label>
-                    <input type="text" name="payer_bank"
-                           class="w-full border rounded-lg p-2.5 text-sm">
+                    <input type="text" name="payer_bank" class="w-full border rounded-lg p-2.5 text-sm">
                 </div>
             </div>
-
             <div>
                 <label class="block text-sm font-semibold mb-1">Notes (optional)</label>
-                <textarea name="notes" rows="2" placeholder="Any additional info"
-                          class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+                <textarea name="notes" rows="2" class="w-full border rounded-lg p-2.5 text-sm"></textarea>
             </div>
-
             <div>
                 <label class="block text-sm font-semibold mb-1">Screenshot *</label>
-                <input type="file" name="screenshot" required accept="image/*"
-                       class="w-full border rounded-lg p-2.5 text-sm bg-white">
-                <p class="text-xs text-gray-500 mt-1">Clear screenshot of the payment confirmation.</p>
+                <input type="file" name="screenshot" required accept="image/*" class="w-full border rounded-lg p-2.5 text-sm bg-white">
             </div>
-
-            <button type="submit"
-                    class="w-full bg-green-700 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition text-sm">
-                📤 Submit Payment Proof
-            </button>
+            <button type="submit" class="w-full bg-green-700 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition text-sm">📤 Submit Payment Proof</button>
         </form>
     </div>
 
@@ -190,24 +140,13 @@
                     <div class="flex items-center gap-2 flex-wrap">
                         <span class="font-bold text-sm">₹{{ p.amount_paid }}</span>
                         <span class="text-xs text-gray-500">{{ p.method.upper() }}</span>
-                        {% if p.status == 'pending' %}
-                            <span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-0.5 rounded">PENDING</span>
-                        {% elif p.status == 'verified' %}
-                            <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">VERIFIED</span>
-                        {% else %}
-                            <span class="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded">REJECTED</span>
-                        {% endif %}
+                        {% if p.status == 'pending' %}<span class="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-0.5 rounded">PENDING</span>
+                        {% elif p.status == 'verified' %}<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded">VERIFIED</span>
+                        {% else %}<span class="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded">REJECTED</span>{% endif %}
                     </div>
-                    <div class="text-xs text-gray-500 mt-1">
-                        Submitted {{ p.created_at.strftime('%d %b %Y, %H:%M') }}
-                    </div>
-                    {% if p.transaction_id %}
-                    <div class="text-xs text-gray-600 mt-1">Txn: {{ p.transaction_id }}</div>
-                    {% endif %}
+                    <div class="text-xs text-gray-500 mt-1">Submitted {{ p.created_at.strftime('%d %b %Y, %H:%M') }}</div>
                     {% if p.status == 'rejected' and p.rejection_reason %}
-                    <div class="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 mt-2">
-                        <strong>Reason:</strong> {{ p.rejection_reason }}
-                    </div>
+                    <div class="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-800 mt-2"><strong>Reason:</strong> {{ p.rejection_reason }}</div>
                     {% endif %}
                 </div>
             </div>
