@@ -1710,6 +1710,30 @@ def submit_payment_proof(booking_id):
     flash('✅ Payment proof submitted! Admin will verify shortly.', 'success')
     return redirect(url_for('my_booking_detail', booking_id=booking.id))
 
+@app.route('/admin/payments')
+@login_required
+def admin_payments():
+    """Original UTR tracking page."""
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    
+    bookings = Booking.query.order_by(Booking.created_at.desc()).all()
+    
+    total_utr_count = len(bookings)
+    total_collected = sum(b.total_amount for b in bookings)
+    total_commission = sum(b.commission for b in bookings)
+    total_deposits = sum(b.deposit for b in bookings)
+    total_transport = sum(b.transport_fee for b in bookings)
+    
+    return render_template('admin/payments.html',
+                         bookings=bookings,
+                         total_utr_count=total_utr_count,
+                         total_collected=total_collected,
+                         total_commission=total_commission,
+                         total_deposits=total_deposits,
+                         total_transport=total_transport)
+
 
 @app.route('/admin/payment-config', methods=['GET', 'POST'])
 @login_required
