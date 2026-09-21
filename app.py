@@ -511,7 +511,6 @@ def cleanup_old_reports(dry_run=False):
 # ============================================
 
 def get_next_available_date(item_id):
-    """Get the earliest date this item can be booked again"""
     latest_booking = Booking.query.filter(
         Booking.item_id == item_id,
         Booking.booking_status.in_(['confirmed', 'pending', 'dispatched', 'return_initiated'])
@@ -524,10 +523,6 @@ def get_next_available_date(item_id):
 
 
 def check_availability_conflict(item_id, start_date, requested_quantity=1):
-    """
-    Stock-aware availability check with return-day detection.
-    Returns (has_conflict, conflict_booking, available_qty, conflict_type)
-    """
     item = Item.query.get(item_id)
     if not item:
         return (True, None, 0, 'fully_booked')
@@ -630,7 +625,6 @@ def get_longest_digit_sequence(text):
 # CONTACT INFO FILTERING (emails, UPI IDs, length)
 # ============================================
 
-# Fixed regex: catches BOTH real emails (user@domain.tld) AND UPI IDs (user@bank, no dot)
 EMAIL_PATTERN = re.compile(
     r'\b[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9][A-Za-z0-9.-]*(?:\.[A-Za-z]{2,})?\b'
 )
@@ -639,18 +633,15 @@ MAX_CHAT_CHARS = 2000
 
 
 def contains_email(text):
-    """Check if text contains any email address or UPI ID."""
     return EMAIL_PATTERN.search(text) is not None
 
 
 def get_first_email(text):
-    """Return the first email/UPI ID found in text, or None."""
     match = EMAIL_PATTERN.search(text)
     return match.group(0) if match else None
 
 
 def should_filter_contact_info(user_a, user_b):
-    """Filtering applies only to customer<->vendor chats. Admins exempt."""
     roles = {user_a.role, user_b.role}
     if 'admin' in roles:
         return False
@@ -662,7 +653,6 @@ def should_filter_contact_info(user_a, user_b):
 # ============================================
 
 def upload_base64_to_cloudinary(base64_string, folder='vyahmandap/reports'):
-    """Upload base64 image. Returns URL string or None. (Existing helper — DO NOT CHANGE)"""
     if not Config.CLOUDINARY_CLOUD_NAME:
         print("⚠️ Cloudinary not configured")
         return None
@@ -688,8 +678,7 @@ def upload_base64_to_cloudinary(base64_string, folder='vyahmandap/reports'):
 
 
 def upload_file_to_cloudinary(file_obj, folder='vyahmandap/payments'):
-    """Upload a FileStorage object. Returns dict {'url', 'public_id'} or None.
-    New helper for payment screenshots."""
+    """Upload a FileStorage object. Returns dict {'url', 'public_id'} or None."""
     if not Config.CLOUDINARY_CLOUD_NAME or not file_obj:
         return None
     
@@ -731,7 +720,6 @@ def upload_file_to_cloudinary(file_obj, folder='vyahmandap/payments'):
 
 
 def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
-    """Upload a video FileStorage. Returns (secure_url, public_id) or (None, None)."""
     if not Config.CLOUDINARY_CLOUD_NAME:
         print("⚠️ Cloudinary not configured")
         return None, None
@@ -782,10 +770,6 @@ def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
 # ============================================
 
 def generate_upi_qr_base64(upi_id, name='VyahMandap', amount=None, box_size=8):
-    """
-    Generate a UPI payment QR as base64-encoded PNG string.
-    Returns None if upi_id is missing/blank.
-    """
     if not upi_id:
         return None
     params = f"pa={quote(upi_id)}&pn={quote(name or 'VyahMandap')}"
@@ -848,7 +832,6 @@ def send_telegram_notification_async(chat_id, message):
 
 
 def notify_all_admins(message):
-    """Send a Telegram message to every admin with a linked chat_id."""
     admins = User.query.filter_by(role='admin').all()
     for admin_user in admins:
         if admin_user.telegram_chat_id:
@@ -1351,7 +1334,6 @@ def dashboard():
 @app.route('/my-booking/<int:booking_id>')
 @login_required
 def my_booking_detail(booking_id):
-    """Customer-facing single booking detail page with payment info + proof upload."""
     booking = Booking.query.get_or_404(booking_id)
     
     if booking.customer_id != current_user.id and current_user.role != 'admin':
@@ -1365,10 +1347,8 @@ def my_booking_detail(booking_id):
         qr_base64 = generate_upi_qr_base64(
             payment_config.upi_id,
             payment_config.upi_name,
-            amount=None  # Don't lock amount — customer may pay partial
+            amount=None
         )
-    elif payment_config.custom_qr_url:
-        qr_base64 = None  # template will fall back to custom_qr_url
     
     proofs = PaymentProof.query.filter_by(booking_id=booking_id)\
         .order_by(PaymentProof.created_at.desc()).all()
@@ -1664,10 +1644,8 @@ def report_view(booking_id):
 @app.route('/booking/<int:booking_id>/payment-proof', methods=['POST'])
 @login_required
 def submit_payment_proof(booking_id):
-    """Customer uploads a payment proof (screenshot). Multiple allowed per booking."""
     booking = Booking.query.get_or_404(booking_id)
     
-    # Only booking's customer or admin
     if booking.customer_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
@@ -1689,7 +1667,6 @@ def submit_payment_proof(booking_id):
         flash('⚠️ Screenshot upload failed. Please try again.', 'danger')
         return redirect(url_for('my_booking_detail', booking_id=booking.id))
     
-    # Parse optional payment_date
     payment_date = None
     pd_str = request.form.get('payment_date', '').strip()
     if pd_str:
@@ -1720,16 +1697,14 @@ def submit_payment_proof(booking_id):
     db.session.add(proof)
     db.session.commit()
     
-    # Telegram alert to all admins
     method_label = proof.method.upper()
     notify_all_admins(
         f"💰 New Payment Proof Submitted\n\n"
         f"Booking: {booking.booking_reference}\n"
         f"Customer: {current_user.name}\n"
         f"Amount: ₹{proof.amount_paid:,.2f}\n"
-        f"Method: {method_label}\n"
-        f"Uploaded by: {current_user.name}\n\n"
-        f"Review at /admin/payments"
+        f"Method: {method_label}\n\n"
+        f"Review at /admin/payment-proofs"
     )
     
     flash('✅ Payment proof submitted! Admin will verify shortly.', 'success')
@@ -1754,7 +1729,6 @@ def admin_payment_config():
         cfg.bank_name      = request.form.get('bank_name', '').strip() or None
         cfg.branch         = request.form.get('branch', '').strip() or None
         
-        # Optional custom QR upload
         if 'custom_qr' in request.files and request.files['custom_qr'].filename:
             qr_file = request.files['custom_qr']
             upload_result = upload_file_to_cloudinary(
@@ -1768,7 +1742,6 @@ def admin_payment_config():
         flash('✅ Payment configuration saved.', 'success')
         return redirect(url_for('admin_payment_config'))
     
-    # Preview QR
     qr_base64 = None
     if cfg.upi_id:
         qr_base64 = generate_upi_qr_base64(cfg.upi_id, cfg.upi_name)
@@ -1789,13 +1762,12 @@ def admin_verify_payment_proof(proof_id):
     
     if proof.status != 'pending':
         flash('⚠️ This proof has already been reviewed.', 'info')
-        return redirect(request.referrer or url_for('admin_payments'))
+        return redirect(request.referrer or url_for('admin_payment_queue'))
     
     proof.status = 'verified'
     proof.verified_by = current_user.id
     proof.verified_at = datetime.utcnow()
     
-    # Optionally update booking payment_status if fully paid
     booking = proof.booking
     total_verified = sum(p.amount_paid for p in booking.payment_proofs if p.status == 'verified' and p.id != proof.id)
     total_verified += proof.amount_paid
@@ -1806,7 +1778,6 @@ def admin_verify_payment_proof(proof_id):
     
     db.session.commit()
     
-    # Notify customer
     if booking.customer.telegram_chat_id:
         msg = (
             f"✅ Payment Verified!\n\n"
@@ -1819,7 +1790,7 @@ def admin_verify_payment_proof(proof_id):
         send_telegram_notification_async(booking.customer.telegram_chat_id, msg)
     
     flash(f'✅ Payment proof verified.', 'success')
-    return redirect(request.referrer or url_for('admin_payments'))
+    return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
 @app.route('/admin/payment-proof/<int:proof_id>/reject', methods=['POST'])
@@ -1833,12 +1804,12 @@ def admin_reject_payment_proof(proof_id):
     
     if proof.status != 'pending':
         flash('⚠️ This proof has already been reviewed.', 'info')
-        return redirect(request.referrer or url_for('admin_payments'))
+        return redirect(request.referrer or url_for('admin_payment_queue'))
     
     reason = request.form.get('rejection_reason', '').strip()
     if not reason:
         flash('⚠️ Rejection reason is required.', 'danger')
-        return redirect(request.referrer or url_for('admin_payments'))
+        return redirect(request.referrer or url_for('admin_payment_queue'))
     
     proof.status = 'rejected'
     proof.rejection_reason = reason
@@ -1846,7 +1817,6 @@ def admin_reject_payment_proof(proof_id):
     proof.verified_at = datetime.utcnow()
     db.session.commit()
     
-    # Notify customer
     if proof.booking.customer.telegram_chat_id:
         msg = (
             f"❌ Payment Proof Rejected\n\n"
@@ -1859,64 +1829,7 @@ def admin_reject_payment_proof(proof_id):
         send_telegram_notification_async(proof.booking.customer.telegram_chat_id, msg)
     
     flash('Payment proof rejected.', 'info')
-    return redirect(request.referrer or url_for('admin_payments'))
-
-
-@app.route('/admin/payments')
-@login_required
-def admin_payments():
-    if current_user.role != 'admin':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('index'))
-    
-    status_filter = request.args.get('status', 'pending')
-    
-    query = PaymentProof.query
-    if status_filter != 'all':
-        query = query.filter_by(status=status_filter)
-    
-    proofs = query.order_by(PaymentProof.created_at.desc()).all()
-    
-    # Stats
-    pending_count = PaymentProof.query.filter_by(status='pending').count()
-    verified_count = PaymentProof.query.filter_by(status='verified').count()
-    rejected_count = PaymentProof.query.filter_by(status='rejected').count()
-    
-    return render_template('admin/payments.html',
-                         proofs=proofs,
-                         status_filter=status_filter,
-                         pending_count=pending_count,
-                         verified_count=verified_count,
-                         rejected_count=rejected_count)
-
-
-@app.route('/admin/booking/<int:booking_id>/payment-proofs')
-@login_required
-def admin_booking_payment_proofs(booking_id):
-    """JSON endpoint for admin booking detail page to fetch proofs."""
-    if current_user.role != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-    
-    proofs = PaymentProof.query.filter_by(booking_id=booking_id)\
-        .order_by(PaymentProof.created_at.desc()).all()
-    
-    return jsonify([{
-        'id': p.id,
-        'method': p.method,
-        'amount_paid': p.amount_paid,
-        'transaction_id': p.transaction_id,
-        'payment_date': p.payment_date.strftime('%Y-%m-%d') if p.payment_date else None,
-        'payer_name': p.payer_name,
-        'payer_bank': p.payer_bank,
-        'notes': p.notes,
-        'screenshot_url': p.screenshot_url,
-        'status': p.status,
-        'rejection_reason': p.rejection_reason,
-        'uploader': p.uploader.name if p.uploader else None,
-        'verifier': p.verifier.name if p.verifier else None,
-        'verified_at': p.verified_at.strftime('%d %b %Y, %H:%M') if p.verified_at else None,
-        'created_at': p.created_at.strftime('%d %b %Y, %H:%M')
-    } for p in proofs])
+    return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
 # ============================================
@@ -3504,7 +3417,7 @@ def init_database():
         except Exception as mig_err:
             print(f"⚠️ Auto-migration skipped: {mig_err}")
         
-        db.create_all()  # ← This creates admin_payment_config & payment_proof tables
+        db.create_all()
         print("✅ Database tables created!")
         
         admin = User.query.filter_by(mobile=Config.ADMIN_MOBILE).first()
