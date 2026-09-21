@@ -31,22 +31,10 @@
     </div>
 
     <div class="flex gap-2 mb-4 flex-wrap">
-        <a href="{{ url_for('admin_payment_queue', status='pending') }}"
-           class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'pending' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
-            Pending
-        </a>
-        <a href="{{ url_for('admin_payment_queue', status='verified') }}"
-           class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'verified' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
-            Verified
-        </a>
-        <a href="{{ url_for('admin_payment_queue', status='rejected') }}"
-           class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'rejected' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
-            Rejected
-        </a>
-        <a href="{{ url_for('admin_payment_queue', status='all') }}"
-           class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'all' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">
-            All
-        </a>
+        <a href="{{ url_for('admin_payment_queue', status='pending') }}" class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'pending' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">Pending</a>
+        <a href="{{ url_for('admin_payment_queue', status='verified') }}" class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'verified' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">Verified</a>
+        <a href="{{ url_for('admin_payment_queue', status='rejected') }}" class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'rejected' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">Rejected</a>
+        <a href="{{ url_for('admin_payment_queue', status='all') }}" class="px-4 py-2 rounded-lg text-sm font-semibold {% if status_filter == 'all' %}bg-green-700 text-white{% else %}bg-white border hover:bg-gray-50{% endif %}">All</a>
     </div>
 
     {% if not proofs %}
@@ -59,8 +47,7 @@
             {% for p in proofs %}
             <div class="bg-white border rounded-xl p-4 flex flex-col md:flex-row gap-4">
                 <a href="{{ p.screenshot_url }}" target="_blank" class="flex-shrink-0">
-                    <img src="{{ p.screenshot_url }}" alt="Proof"
-                         class="w-32 h-32 object-cover rounded-lg border hover:opacity-80 transition">
+                    <img src="{{ p.screenshot_url }}" alt="Proof" class="w-32 h-32 object-cover rounded-lg border hover:opacity-80 transition">
                 </a>
 
                 <div class="flex-1 min-w-0">
@@ -79,28 +66,14 @@
                     </div>
 
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        <div>
-                            <div class="text-xs text-gray-500">Amount</div>
-                            <div class="font-bold text-green-700">₹{{ p.amount_paid }}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-500">Method</div>
-                            <div class="font-semibold">{{ p.method.upper() }}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-500">Txn ID</div>
-                            <div class="font-semibold">{{ p.transaction_id or '—' }}</div>
-                        </div>
-                        <div>
-                            <div class="text-xs text-gray-500">Submitted</div>
-                            <div class="font-semibold">{{ p.created_at.strftime('%d %b, %H:%M') }}</div>
-                        </div>
+                        <div><div class="text-xs text-gray-500">Amount</div><div class="font-bold text-green-700">₹{{ p.amount_paid }}</div></div>
+                        <div><div class="text-xs text-gray-500">Method</div><div class="font-semibold">{{ p.method.upper() }}</div></div>
+                        <div><div class="text-xs text-gray-500">Txn ID</div><div class="font-semibold">{{ p.transaction_id or '—' }}</div></div>
+                        <div><div class="text-xs text-gray-500">Submitted</div><div class="font-semibold">{{ p.created_at.strftime('%d %b, %H:%M') }}</div></div>
                     </div>
 
                     {% if p.notes %}
-                    <div class="mt-2 text-xs text-gray-600">
-                        <strong>Notes:</strong> {{ p.notes }}
-                    </div>
+                    <div class="mt-2 text-xs text-gray-600"><strong>Notes:</strong> {{ p.notes }}</div>
                     {% endif %}
 
                     {% if p.status == 'rejected' and p.rejection_reason %}
@@ -110,9 +83,7 @@
                     {% endif %}
 
                     <div class="mt-2 text-xs text-gray-500">
-                        <a href="{{ url_for('admin_booking_detail', booking_id=p.booking.id) }}" class="text-blue-600 hover:underline">
-                            View Booking →
-                        </a>
+                        <a href="{{ url_for('admin_booking_detail', booking_id=p.booking.id) }}" class="text-blue-600 hover:underline">View Booking →</a>
                         <span class="ml-3">Total: ₹{{ p.booking.total_amount }}</span>
                     </div>
                 </div>
@@ -120,22 +91,13 @@
                 {% if p.status == 'pending' %}
                 <div class="flex md:flex-col gap-2 md:justify-center">
                     <form method="POST" action="{{ url_for('admin_verify_payment_proof', proof_id=p.id) }}">
-                        <button type="submit"
-                                class="w-full bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">
-                            ✓ Verify
-                        </button>
+                        <button type="submit" class="w-full bg-green-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-green-600">✓ Verify</button>
                     </form>
-                    <button onclick="openRejectModal({{ p.id }})"
-                            class="w-full bg-red-100 text-red-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-200">
-                        ✕ Reject
-                    </button>
+                    <button onclick="openRejectModal({{ p.id }})" class="w-full bg-red-100 text-red-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-200">✕ Reject</button>
                 </div>
                 {% else %}
                 <div class="text-xs text-gray-500 md:w-32 md:text-center">
-                    {% if p.verifier %}
-                        By {{ p.verifier.name }}<br>
-                        {{ p.verified_at.strftime('%d %b %Y') if p.verified_at else '' }}
-                    {% endif %}
+                    {% if p.verifier %}By {{ p.verifier.name }}<br>{{ p.verified_at.strftime('%d %b %Y') if p.verified_at else '' }}{% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -150,18 +112,10 @@
         <h3 class="text-lg font-bold mb-3">✕ Reject Payment Proof</h3>
         <form id="rejectForm" method="POST">
             <label class="block text-sm font-semibold mb-1">Rejection Reason *</label>
-            <textarea name="rejection_reason" required rows="4"
-                      placeholder="e.g. Screenshot is unclear / amount doesn't match / wrong UTR"
-                      class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+            <textarea name="rejection_reason" required rows="4" placeholder="e.g. Screenshot unclear" class="w-full border rounded-lg p-2.5 text-sm"></textarea>
             <div class="flex gap-2 mt-4 justify-end">
-                <button type="button" onclick="closeRejectModal()"
-                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-gray-200">
-                    Cancel
-                </button>
-                <button type="submit"
-                        class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500">
-                    Confirm Reject
-                </button>
+                <button type="button" onclick="closeRejectModal()" class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-500">Confirm Reject</button>
             </div>
         </form>
     </div>
