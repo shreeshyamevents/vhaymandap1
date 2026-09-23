@@ -2,7 +2,7 @@ services:
   - type: web
     name: vyahmandap
     runtime: python
-    repo: https://github.com/your-username/vyahmandap
+    repo: https://github.com/shreeshyamevents/vyahmandap1
     plan: free
     region: ohio
     buildCommand: pip install -r requirements.txt
