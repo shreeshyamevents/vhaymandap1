@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border shadow-sm">
+
+    <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-6 text-xs text-yellow-900">
+        ⚠️ <strong>Draft for review.</strong> These terms are pending legal review. Last updated: 23 Sep 2026.
+    </div>
+
+    <h1 class="text-3xl font-bold mb-2">Terms of Service</h1>
+    <p class="text-sm text-gray-500 mb-6">Effective date: 23 September 2026</p>
+
+    <div class="prose prose-sm max-w-none text-gray-700 space-y-4 leading-relaxed">
+
+        <p>By using VyahMandap, you agree to these Terms. If you do not agree, please do not use the platform.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">1. About VyahMandap</h2>
+        <p>VyahMandap is a marketplace connecting customers who need wedding equipment (tents, furniture, lighting, mandap, etc.) with vendors who rent it out. We facilitate bookings and payments but are not the actual rental provider.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">2. Account Responsibilities</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li>You must provide accurate, current information</li>
+            <li>You are responsible for your account credentials</li>
+            <li>One account per person/business</li>
+            <li>You must be 18+ or have guardian consent</li>
+            <li>Vendors must be legally authorized to rent the listed equipment</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">3. Bookings & Payments</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li>All bookings are subject to vendor acceptance and availability</li>
+            <li>Payment must be made via UPI/bank transfer before dispatch</li>
+            <li>Payment proofs are manually verified by our team</li>
+            <li>Bookings ≥ ₹30,000 require KYC (Aadhaar + PAN)</li>
+            <li>Platform commission: 5% on base rent (disclosed at booking)</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">4. Deposits & Refunds</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li>Security deposit is refunded after equipment is returned in good condition</li>
+            <li>Damage deductions may apply (documented via condition reports)</li>
+            <li>Refunds are processed within 7 business days</li>
+            <li>Cancellation policy: contact the vendor directly</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">5. Equipment Condition Reports</h2>
+        <p>Both parties must submit photos/video at dispatch and return. These reports are retained for 30 days and are used to resolve damage disputes. Reports with damage claims are retained until resolution.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">6. Prohibited Conduct</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li>Sharing contact details off-platform to bypass commission</li>
+            <li>Posting false or misleading listings</li>
+            <li>Harassment, abuse, or spam</li>
+            <li>Attempting to damage or defraud other users</li>
+            <li>Using automated bots</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">7. Chat Restrictions</h2>
+        <p>To protect both parties, we block sharing of phone numbers, email addresses, and UPI IDs in chat. This keeps transactions traceable and disputes resolvable.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">8. Reviews</h2>
+        <p>Reviews must reflect genuine experiences. Fake reviews will be removed and may result in account suspension.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">9. Limitation of Liability</h2>
+        <p>VyahMandap is a facilitator, not the equipment owner. We are not liable for equipment quality, damage, delays, or disputes between customers and vendors. Our maximum liability is limited to the commission we earned on the disputed booking.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">10. Account Termination</h2>
+        <p>We may suspend or terminate accounts that violate these Terms. You may delete your account anytime from <a href="{{ url_for('my_data') }}" class="text-green-700 underline">My Data</a>.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">11. Governing Law</h2>
+        <p>These Terms are governed by Indian law. Disputes are subject to the exclusive jurisdiction of courts in Harda, Madhya Pradesh.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">12. Contact</h2>
+        <p>For questions: <a href="mailto:{{ dpo_email }}" class="text-green-700">{{ dpo_email }}</a> or <a href="tel:{{ dpo_mobile }}" class="text-green-700">+91 {{ dpo_mobile }}</a></p>
+
+    </div>
+
+    <div class="mt-8 pt-6 border-t text-center">
+        <a href="{{ url_for('privacy') }}" class="text-sm text-green-700 hover:underline mr-4">Privacy Policy →</a>
+        <a href="{{ url_for('index') }}" class="text-sm text-gray-600 hover:underline">← Back to Home</a>
+    </div>
+</div>
+{% endblock %}
