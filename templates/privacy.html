@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl border shadow-sm">
+
+    <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-6 text-xs text-yellow-900">
+        ⚠️ <strong>Draft for review.</strong> This policy is pending legal review. Last updated: 23 Sep 2026.
+    </div>
+
+    <h1 class="text-3xl font-bold mb-2">Privacy Policy</h1>
+    <p class="text-sm text-gray-500 mb-6">Effective date: 23 September 2026</p>
+
+    <div class="prose prose-sm max-w-none text-gray-700 space-y-4 leading-relaxed">
+
+        <p>VyahMandap ("we", "us", "our") respects your privacy. This policy explains what personal data we collect, why we collect it, and your rights under India's Digital Personal Data Protection Act, 2023 ("DPDP Act").</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">1. Data We Collect</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li><strong>Identity data:</strong> Name, mobile number, email address, company name (vendors)</li>
+            <li><strong>Booking data:</strong> Equipment rented, dates, venue address, payment UTR</li>
+            <li><strong>KYC data (for bookings ≥ ₹30,000):</strong> Aadhaar number, PAN number</li>
+            <li><strong>Payment proof:</strong> Screenshots uploaded for verification</li>
+            <li><strong>Communication:</strong> In-app chat messages, support tickets</li>
+            <li><strong>Technical data:</strong> IP address, device info, timestamps</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">2. Why We Collect It</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li>To operate the equipment rental marketplace</li>
+            <li>To verify bookings and process payments</li>
+            <li>To comply with tax and KYC regulations</li>
+            <li>To resolve disputes and prevent fraud</li>
+            <li>To send booking notifications</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">3. How Long We Keep It</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li><strong>Account data:</strong> Until you delete your account</li>
+            <li><strong>Financial records:</strong> 7-8 years (Income Tax Act requirement)</li>
+            <li><strong>Equipment condition reports:</strong> 30 days (auto-deleted)</li>
+            <li><strong>Chat messages:</strong> Until account deletion</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">4. Who We Share It With</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li><strong>Vendors</strong> — see customer name, masked mobile, venue</li>
+            <li><strong>Customers</strong> — see vendor name, masked mobile</li>
+            <li><strong>Service providers</strong> — Cloudinary (image hosting), Telegram (notifications)</li>
+            <li><strong>Government authorities</strong> — when legally required</li>
+        </ul>
+        <p>We do <strong>not</strong> sell your data to third parties.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">5. Your Rights (DPDP Act)</h2>
+        <ul class="list-disc ml-6 space-y-1">
+            <li><strong>Right to access</strong> — view all data we hold. Visit <a href="{{ url_for('my_data') }}" class="text-green-700 underline">My Data</a>.</li>
+            <li><strong>Right to portability</strong> — download your data as JSON. Visit <a href="{{ url_for('my_data') }}" class="text-green-700 underline">My Data</a>.</li>
+            <li><strong>Right to erasure</strong> — request account deletion with a 30-day grace period. Visit <a href="{{ url_for('my_data') }}" class="text-green-700 underline">My Data</a>.</li>
+            <li><strong>Right to grievance redressal</strong> — contact our DPO (below).</li>
+        </ul>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">6. Grievance Officer (DPO)</h2>
+        <div class="bg-gray-50 border rounded-lg p-4 not-prose">
+            <div class="text-sm">
+                <div class="mb-2"><strong>Data Protection Officer</strong></div>
+                <div class="mb-1">📞 <a href="tel:{{ dpo_mobile }}" class="text-green-700">+91 {{ dpo_mobile }}</a></div>
+                <div class="mb-1">💬 <a href="https://wa.me/91{{ dpo_mobile }}" target="_blank" class="text-green-700">WhatsApp</a></div>
+                <div>✉️ <a href="mailto:{{ dpo_email }}" class="text-green-700">{{ dpo_email }}</a></div>
+            </div>
+        </div>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">7. Security</h2>
+        <p>We use industry-standard practices: encrypted transmission (HTTPS), password hashing, access controls, and Cloudinary for secure asset storage. However, no system is 100% secure — please use a strong password.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">8. Cookies</h2>
+        <p>We use session cookies for login. No third-party tracking cookies.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">9. Changes to This Policy</h2>
+        <p>We may update this policy. Material changes will be announced on the platform.</p>
+
+        <h2 class="text-lg font-bold mt-6 mb-2">10. Contact</h2>
+        <p>For privacy questions, contact our DPO above, or write to <a href="mailto:{{ dpo_email }}" class="text-green-700">{{ dpo_email }}</a>.</p>
+
+    </div>
+
+    <div class="mt-8 pt-6 border-t text-center">
+        <a href="{{ url_for('terms') }}" class="text-sm text-green-700 hover:underline mr-4">Terms of Service →</a>
+        <a href="{{ url_for('index') }}" class="text-sm text-gray-600 hover:underline">← Back to Home</a>
+    </div>
+</div>
+{% endblock %}
