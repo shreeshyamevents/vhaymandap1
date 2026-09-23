@@ -99,6 +99,11 @@ class Config:
     ADMIN_MOBILE = "8319337063"
     ADMIN_PASSWORD = "123456"
     
+    # DPDP compliance
+    DPO_MOBILE = "8319337063"
+    DPO_EMAIL = "privacy@vyahmandap.com"
+    DELETION_GRACE_DAYS = 30
+    
     TRANSPORT_RATES = {
         'city': {'till_20': 600, 'above_20': 1100},
         'outskirts': {'till_20': 1500, 'above_20': 2000}
@@ -154,6 +159,12 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # DPDP fields
+    deletion_requested_at = db.Column(db.DateTime, nullable=True)
+    deletion_scheduled_at = db.Column(db.DateTime, nullable=True)
+    is_deleted            = db.Column(db.Boolean, default=False)
+    anonymized_at         = db.Column(db.DateTime, nullable=True)
+    
     items = db.relationship('Item', backref='vendor', lazy=True)
     bookings = db.relationship('Booking', backref='customer', lazy=True)
     
@@ -177,6 +188,13 @@ class User(UserMixin, db.Model):
     
     def get_id(self):
         return str(self.id)
+    
+    @property
+    def days_until_deletion(self):
+        if not self.deletion_scheduled_at:
+            return 0
+        delta = self.deletion_scheduled_at - datetime.utcnow()
+        return max(0, delta.days)
 
 
 class Item(db.Model):
@@ -300,7 +318,6 @@ class EquipmentReport(db.Model):
 
 
 class AdminPaymentConfig(db.Model):
-    """Single global row holding admin's payment details."""
     __tablename__ = 'admin_payment_config'
     id = db.Column(db.Integer, primary_key=True)
     upi_id          = db.Column(db.String(120))
@@ -325,7 +342,6 @@ class AdminPaymentConfig(db.Model):
 
 
 class PaymentProof(db.Model):
-    """Customer-uploaded payment evidence. Multiple per booking allowed."""
     __tablename__ = 'payment_proof'
     id              = db.Column(db.Integer, primary_key=True)
     booking_id      = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)
@@ -352,6 +368,34 @@ class PaymentProof(db.Model):
     booking   = db.relationship('Booking', backref='payment_proofs')
     uploader  = db.relationship('User', foreign_keys=[uploaded_by])
     verifier  = db.relationship('User', foreign_keys=[verified_by])
+
+
+class ConsentLog(db.Model):
+    """DPDP — audit trail of user consents."""
+    __tablename__ = 'consent_log'
+    id           = db.Column(db.Integer, primary_key=True)
+    user_id      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    purpose      = db.Column(db.String(100), nullable=False)
+    granted      = db.Column(db.Boolean, default=True)
+    ip_address   = db.Column(db.String(45))
+    user_agent   = db.Column(db.String(300))
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref='consent_logs')
+
+
+class DataRequest(db.Model):
+    """DPDP — audit log of data principal rights requests."""
+    __tablename__ = 'data_request'
+    id           = db.Column(db.Integer, primary_key=True)
+    user_id      = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    request_type = db.Column(db.String(30), nullable=False)
+    status       = db.Column(db.String(20), default='pending')
+    details      = db.Column(db.Text)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    
+    user = db.relationship('User', backref='data_requests')
 
 
 class Message(db.Model):
@@ -426,6 +470,25 @@ login_manager.init_app(app)
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+# ============================================
+# DPDP — PENDING DELETION ENFORCEMENT
+# ============================================
+@app.before_request
+def enforce_deletion_pending():
+    """If user has pending deletion, restrict them to /my-data & logout."""
+    if not current_user.is_authenticated:
+        return
+    if not current_user.deletion_requested_at:
+        return
+    # Allow these endpoints only
+    allowed = {'my_data', 'my_data_cancel_deletion', 'logout', 'static',
+               'my_data_export'}
+    if request.endpoint in allowed:
+        return
+    flash('Your account is scheduled for deletion. Cancel to restore access.', 'warning')
+    return redirect(url_for('my_data'))
 
 
 # ============================================
@@ -609,6 +672,21 @@ def get_longest_digit_sequence(text):
     return max(len(s) for s in sequences)
 
 
+def extract_cloudinary_public_id(url):
+    """Extract public_id from a Cloudinary URL."""
+    try:
+        if not url or 'cloudinary.com' not in url or '/upload/' not in url:
+            return None
+        after = url.split('/upload/')[-1]
+        if after.startswith('v'):
+            parts = after.split('/', 1)
+            if len(parts) > 1:
+                after = parts[1]
+        return after.rsplit('.', 1)[0]
+    except Exception:
+        return None
+
+
 # ============================================
 # CONTACT INFO FILTERING
 # ============================================
@@ -661,7 +739,6 @@ def upload_base64_to_cloudinary(base64_string, folder='vyahmandap/reports'):
 
 
 def upload_file_to_cloudinary(file_obj, folder='vyahmandap/payments'):
-    """Upload a FileStorage object. Returns dict {'url', 'public_id'} or None."""
     if not Config.CLOUDINARY_CLOUD_NAME or not file_obj:
         return None
     temp_path = None
@@ -737,6 +814,118 @@ def upload_video_to_cloudinary(file_obj, folder='vyahmandap/reports/videos'):
 
 
 # ============================================
+# DPDP — PURGE + ANONYMIZE
+# ============================================
+def purge_user_cloudinary_assets(user_id):
+    """Delete all Cloudinary assets belonging to user."""
+    deleted = {'payment_proofs': 0, 'equipment_reports': 0, 'item_images': 0}
+    
+    # Payment proofs
+    proofs = PaymentProof.query.filter_by(uploaded_by=user_id).all()
+    for p in proofs:
+        pid = p.screenshot_public_id or extract_cloudinary_public_id(p.screenshot_url)
+        if pid:
+            try:
+                cloudinary.uploader.destroy(pid)
+                deleted['payment_proofs'] += 1
+            except Exception as e:
+                app.logger.warning(f"Cloudinary delete failed: {pid}: {e}")
+        p.screenshot_url = None
+        p.screenshot_public_id = None
+    
+    # Equipment reports (photos_json has {url, caption, item_title} — no public_id)
+    reports = EquipmentReport.query.filter_by(reporter_id=user_id).all()
+    for r in reports:
+        if r.video_public_id:
+            try:
+                cloudinary.uploader.destroy(r.video_public_id, resource_type='video')
+                deleted['equipment_reports'] += 1
+            except Exception as e:
+                app.logger.warning(f"Video delete failed: {e}")
+        if r.photos_json:
+            try:
+                photos = json_lib.loads(r.photos_json)
+                for photo in photos:
+                    pid = photo.get('public_id') or extract_cloudinary_public_id(photo.get('url', ''))
+                    if pid:
+                        try:
+                            cloudinary.uploader.destroy(pid)
+                            deleted['equipment_reports'] += 1
+                        except Exception as e:
+                            app.logger.warning(f"Photo delete failed: {pid}: {e}")
+            except Exception as e:
+                app.logger.warning(f"photos_json parse failed: {e}")
+        r.photos_json = None
+        r.video_url = None
+        r.video_public_id = None
+    
+    # Item images (if vendor)
+    items = Item.query.filter_by(vendor_id=user_id).all()
+    for it in items:
+        if it.image_filename and 'cloudinary' in (it.image_filename or ''):
+            try:
+                cloudinary.uploader.destroy(it.image_filename)
+                deleted['item_images'] += 1
+            except Exception:
+                pass
+    
+    db.session.commit()
+    return deleted
+
+
+def anonymize_user(user):
+    """
+    Strip PII from user + linked records. Keeps financial records
+    for tax compliance (~7-8 years).
+    NOTE: User model has NO aadhaar_number/pan_number fields —
+    those live on Booking, handled below.
+    """
+    anon_id = f"DELETED_{user.id}"
+    
+    # User row — strip PII
+    user.name = anon_id
+    user.email = None
+    user.mobile = f"000000{user.id:04d}"[:10]
+    user.password_hash = 'DELETED'
+    user.telegram_chat_id = None
+    
+    # Chat messages — delete entirely (communication, not financial)
+    Message.query.filter(
+        (Message.sender_id == user.id) | (Message.receiver_id == user.id)
+    ).delete(synchronize_session=False)
+    
+    # Bookings as customer — keep financials, strip PII
+    for b in Booking.query.filter_by(customer_id=user.id).all():
+        b.venue_address = '[deleted]'
+        b.aadhaar_number = None
+        b.pan_number = None
+    
+    # Bookings as vendor — same
+    for b in Booking.query.join(Item, Booking.item_id == Item.id).filter(
+        Item.vendor_id == user.id
+    ).all():
+        b.venue_address = '[deleted]'
+        b.aadhaar_number = None
+        b.pan_number = None
+    
+    # Reviews — keep rating, blank comment
+    for rv in Review.query.filter_by(customer_id=user.id).all():
+        rv.comment = '[removed]'
+    
+    # Tickets — delete entirely (support convos)
+    TicketReply.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    Ticket.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    
+    # Items (vendor) — deactivate, keep for record
+    for it in Item.query.filter_by(vendor_id=user.id).all():
+        it.is_available = False
+    
+    # Consent logs & data requests — keep (audit trail)
+    
+    db.session.commit()
+
+
+# ============================================
 # UPI QR GENERATOR
 # ============================================
 def generate_upi_qr_base64(upi_id, name='VyahMandap', amount=None, box_size=8):
@@ -746,12 +935,10 @@ def generate_upi_qr_base64(upi_id, name='VyahMandap', amount=None, box_size=8):
     if amount:
         params += f"&am={amount}&cu=INR"
     upi_url = f"upi://pay?{params}"
-
     qr = qrcode.QRCode(version=1, box_size=box_size, border=2)
     qr.add_data(upi_url)
     qr.make(fit=True)
     img = qr.make_image(fill_color='black', back_color='white')
-
     buf = BytesIO()
     img.save(buf, format='PNG')
     return base64.b64encode(buf.getvalue()).decode()
@@ -766,7 +953,7 @@ def get_client_info(request_obj):
 
 
 # ============================================
-# TELEGRAM NOTIFICATION HELPERS
+# TELEGRAM HELPERS
 # ============================================
 def send_telegram_notification(chat_id, message):
     token = Config.TELEGRAM_BOT_TOKEN
@@ -792,7 +979,6 @@ def send_telegram_notification_async(chat_id, message):
 
 
 def notify_all_admins(message):
-    """Send a Telegram message to every admin with a linked chat_id."""
     admins = User.query.filter_by(role='admin').all()
     for admin_user in admins:
         if admin_user.telegram_chat_id:
@@ -855,6 +1041,21 @@ def register():
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
+        
+        # DPDP: log consent
+        try:
+            consent = ConsentLog(
+                user_id=user.id,
+                purpose='terms',
+                granted=True,
+                ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+                user_agent=request.headers.get('User-Agent', '')[:300]
+            )
+            db.session.add(consent)
+            db.session.commit()
+        except Exception as e:
+            print(f"⚠️ ConsentLog create failed: {e}")
+        
         flash('✅ Account created successfully! Please login.', 'success')
         return redirect(url_for('login'))
     return render_template('auth/register.html')
@@ -889,7 +1090,7 @@ def link_telegram():
                 f"Taiyari Hamari, Celebration Aapka! 🎉"
             )
             send_telegram_notification_async(chat_id, test_msg)
-            flash('✅ Telegram linked! Check your Telegram for confirmation.', 'success')
+            flash('✅ Telegram linked!', 'success')
             return redirect(url_for('link_telegram'))
         else:
             flash('⚠️ Please enter a valid Chat ID.', 'danger')
@@ -903,6 +1104,285 @@ def unlink_telegram():
     db.session.commit()
     flash('🔓 Telegram unlinked.', 'info')
     return redirect(url_for('link_telegram'))
+
+
+# ============================================
+# DPDP — MY DATA ROUTES
+# ============================================
+@app.route('/my-data')
+@login_required
+def my_data():
+    user = current_user
+    
+    bookings_cust = Booking.query.filter_by(customer_id=user.id)\
+        .order_by(Booking.created_at.desc()).all()
+    
+    bookings_vend = []
+    items = []
+    if user.role in ['vendor', 'admin']:
+        items = Item.query.filter_by(vendor_id=user.id).all()
+        item_ids = [i.id for i in items]
+        if item_ids:
+            bookings_vend = Booking.query.filter(Booking.item_id.in_(item_ids))\
+                .order_by(Booking.created_at.desc()).all()
+    
+    msg_count = Message.query.filter(
+        (Message.sender_id == user.id) | (Message.receiver_id == user.id)
+    ).count()
+    
+    payments = PaymentProof.query.filter_by(uploaded_by=user.id)\
+        .order_by(PaymentProof.created_at.desc()).all()
+    
+    reviews = Review.query.filter_by(customer_id=user.id)\
+        .order_by(Review.created_at.desc()).all()
+    
+    tickets = Ticket.query.filter_by(user_id=user.id)\
+        .order_by(Ticket.created_at.desc()).all()
+    
+    reports = EquipmentReport.query.filter_by(reporter_id=user.id)\
+        .order_by(EquipmentReport.created_at.desc()).all()
+    
+    consents = ConsentLog.query.filter_by(user_id=user.id)\
+        .order_by(ConsentLog.created_at.desc()).all()
+    
+    return render_template('my_data.html',
+                         user=user,
+                         bookings_cust=bookings_cust,
+                         bookings_vend=bookings_vend,
+                         items=items,
+                         msg_count=msg_count,
+                         payments=payments,
+                         reviews=reviews,
+                         tickets=tickets,
+                         reports=reports,
+                         consents=consents,
+                         dpo_mobile=Config.DPO_MOBILE,
+                         dpo_email=Config.DPO_EMAIL)
+
+
+@app.route('/my-data/export')
+@login_required
+def my_data_export():
+    user = current_user
+    
+    data = {
+        'exported_at': datetime.utcnow().isoformat(),
+        'export_format_version': '1.0',
+        'profile': {
+            'id': user.id,
+            'name': user.name,
+            'mobile': user.mobile,
+            'email': user.email,
+            'role': user.role,
+            'joined_at': user.created_at.isoformat() if user.created_at else None,
+            'is_verified': user.is_verified,
+        },
+        'bookings_as_customer': [{
+            'reference': b.booking_reference,
+            'item': b.item.title if b.item else None,
+            'vendor': b.item.vendor.name if b.item and b.item.vendor else None,
+            'start_date': b.start_date.isoformat() if b.start_date else None,
+            'end_date': b.end_date.isoformat() if b.end_date else None,
+            'quantity': b.quantity,
+            'total_amount': b.total_amount,
+            'status': b.booking_status,
+            'payment_status': b.payment_status,
+            'venue_address': b.venue_address,
+            'created_at': b.created_at.isoformat() if b.created_at else None,
+        } for b in Booking.query.filter_by(customer_id=user.id).all()],
+        'bookings_as_vendor': [],
+        'items_listed': [],
+        'payment_proofs': [{
+            'booking_ref': p.booking.booking_reference if p.booking else None,
+            'amount_paid': p.amount_paid,
+            'method': p.method,
+            'transaction_id': p.transaction_id,
+            'status': p.status,
+            'created_at': p.created_at.isoformat() if p.created_at else None,
+        } for p in PaymentProof.query.filter_by(uploaded_by=user.id).all()],
+        'reviews': [{
+            'booking_ref': r.booking_id,
+            'rating': r.rating,
+            'comment': r.comment,
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+        } for r in Review.query.filter_by(customer_id=user.id).all()],
+        'messages_count': Message.query.filter(
+            (Message.sender_id == user.id) | (Message.receiver_id == user.id)
+        ).count(),
+        'support_tickets': [{
+            'ticket_number': t.ticket_number,
+            'subject': t.subject,
+            'status': t.status,
+            'priority': t.priority,
+            'created_at': t.created_at.isoformat() if t.created_at else None,
+        } for t in Ticket.query.filter_by(user_id=user.id).all()],
+        'equipment_reports': [{
+            'booking_id': r.booking_id,
+            'report_type': r.report_type,
+            'condition_rating': r.condition_rating,
+            'damage_flagged': r.damage_flagged,
+            'created_at': r.created_at.isoformat() if r.created_at else None,
+        } for r in EquipmentReport.query.filter_by(reporter_id=user.id).all()],
+        'consents': [{
+            'purpose': c.purpose,
+            'granted': c.granted,
+            'created_at': c.created_at.isoformat() if c.created_at else None,
+        } for c in ConsentLog.query.filter_by(user_id=user.id).all()],
+    }
+    
+    # Add vendor data
+    if user.role in ['vendor', 'admin']:
+        items = Item.query.filter_by(vendor_id=user.id).all()
+        data['items_listed'] = [{
+            'title': it.title,
+            'category': it.category,
+            'rate_per_day': it.rate_per_day,
+            'stock': it.stock,
+            'is_available': it.is_available,
+            'is_verified': it.is_verified,
+        } for it in items]
+        
+        item_ids = [i.id for i in items]
+        if item_ids:
+            vendor_bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).all()
+            data['bookings_as_vendor'] = [{
+                'reference': b.booking_reference,
+                'customer': b.customer.name if b.customer else None,
+                'item': b.item.title if b.item else None,
+                'start_date': b.start_date.isoformat() if b.start_date else None,
+                'end_date': b.end_date.isoformat() if b.end_date else None,
+                'total_amount': b.total_amount,
+                'base_rent': b.base_rent,
+                'status': b.booking_status,
+            } for b in vendor_bookings]
+    
+    # Log the export
+    try:
+        dr = DataRequest(
+            user_id=user.id,
+            request_type='export',
+            status='completed',
+            completed_at=datetime.utcnow()
+        )
+        db.session.add(dr)
+        db.session.commit()
+    except Exception as e:
+        print(f"⚠️ DataRequest export log failed: {e}")
+    
+    # Return as downloadable JSON
+    response = app.response_class(
+        response=json_lib.dumps(data, indent=2, default=str),
+        status=200,
+        mimetype='application/json'
+    )
+    filename = f"vyahmandap_data_{user.id}_{datetime.utcnow().strftime('%Y%m%d')}.json"
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    return response
+
+
+@app.route('/my-data/delete-request', methods=['POST'])
+@login_required
+def my_data_delete_request():
+    user = current_user
+    
+    # Block admin self-deletion
+    if user.role == 'admin':
+        flash('⚠️ Admin accounts cannot be self-deleted.', 'danger')
+        return redirect(url_for('my_data'))
+    
+    # Already requested?
+    if user.deletion_requested_at:
+        flash('ℹ️ Deletion already requested.', 'info')
+        return redirect(url_for('my_data'))
+    
+    # Check active bookings
+    active_statuses = ['pending', 'confirmed', 'dispatched', 'return_initiated']
+    active_count = Booking.query.filter(
+        Booking.customer_id == user.id,
+        Booking.booking_status.in_(active_statuses)
+    ).count()
+    
+    if user.role == 'vendor':
+        item_ids = [i.id for i in Item.query.filter_by(vendor_id=user.id).all()]
+        if item_ids:
+            active_count += Booking.query.filter(
+                Booking.item_id.in_(item_ids),
+                Booking.booking_status.in_(active_statuses)
+            ).count()
+    
+    if active_count > 0:
+        flash('⚠️ You have active bookings. Complete or cancel them first.', 'danger')
+        return redirect(url_for('my_data'))
+    
+    now = datetime.utcnow()
+    user.deletion_requested_at = now
+    user.deletion_scheduled_at = now + timedelta(days=Config.DELETION_GRACE_DAYS)
+    
+    try:
+        dr = DataRequest(
+            user_id=user.id,
+            request_type='deletion_request',
+            status='pending',
+            details=json_lib.dumps({'scheduled_at': user.deletion_scheduled_at.isoformat()})
+        )
+        db.session.add(dr)
+        
+        consent = ConsentLog(
+            user_id=user.id,
+            purpose='deletion',
+            granted=True,
+            ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+            user_agent=request.headers.get('User-Agent', '')[:300]
+        )
+        db.session.add(consent)
+    except Exception as e:
+        print(f"⚠️ Audit log failed: {e}")
+    
+    db.session.commit()
+    
+    notify_all_admins(
+        f"🗑️ Deletion requested\n\n"
+        f"User: {user.name} ({user.mobile})\n"
+        f"Scheduled: {user.deletion_scheduled_at.strftime('%d %b %Y')}"
+    )
+    
+    flash(f'⚠️ Deletion scheduled for {user.deletion_scheduled_at.strftime("%d %b %Y")}. '
+          f'You have {Config.DELETION_GRACE_DAYS} days to cancel.', 'warning')
+    logout_user()
+    return redirect(url_for('login'))
+
+
+@app.route('/my-data/cancel-deletion', methods=['POST'])
+@login_required
+def my_data_cancel_deletion():
+    user = current_user
+    
+    if not user.deletion_requested_at:
+        flash('ℹ️ No pending deletion to cancel.', 'info')
+        return redirect(url_for('my_data'))
+    
+    if user.deletion_scheduled_at and user.deletion_scheduled_at <= datetime.utcnow():
+        flash('⚠️ Deletion grace period has passed.', 'danger')
+        return redirect(url_for('my_data'))
+    
+    user.deletion_requested_at = None
+    user.deletion_scheduled_at = None
+    
+    try:
+        dr = DataRequest(
+            user_id=user.id,
+            request_type='deletion_cancelled',
+            status='completed',
+            completed_at=datetime.utcnow()
+        )
+        db.session.add(dr)
+    except Exception as e:
+        print(f"⚠️ Audit log failed: {e}")
+    
+    db.session.commit()
+    
+    flash('✅ Deletion cancelled. Your account is fully restored.', 'success')
+    return redirect(url_for('my_data'))
 
 
 # ============================================
@@ -1365,8 +1845,8 @@ def report_view(booking_id):
     
     dispatch_report = EquipmentReport.query.filter_by(booking_id=booking_id, report_type='dispatch').first()
     return_report = EquipmentReport.query.filter_by(booking_id=booking_id, report_type='return').first()
-    dispatch_photos = json_lib.loads(dispatch_report.photos_json) if dispatch_report else []
-    return_photos = json_lib.loads(return_report.photos_json) if return_report else []
+    dispatch_photos = json_lib.loads(dispatch_report.photos_json) if dispatch_report and dispatch_report.photos_json else []
+    return_photos = json_lib.loads(return_report.photos_json) if return_report and return_report.photos_json else []
     
     return render_template('reports/view.html',
                          booking=booking, dispatch_report=dispatch_report,
@@ -1377,18 +1857,14 @@ def report_view(booking_id):
 # ============================================
 # PAYMENT PROOF ROUTES
 # ============================================
-
-# ---- ORIGINAL UTR TRACKING PAGE (RESTORED) ----
 @app.route('/admin/payments')
 @login_required
 def admin_payments():
-    """Original UTR tracking page — lists all bookings with UTR numbers."""
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
     
     bookings = Booking.query.order_by(Booking.created_at.desc()).all()
-    
     total_utr_count = len(bookings)
     total_collected = sum(b.total_amount for b in bookings)
     total_commission = sum(b.commission for b in bookings)
@@ -1404,7 +1880,6 @@ def admin_payments():
                          total_transport=total_transport)
 
 
-# ---- NEW: PAYMENT CONFIG ----
 @app.route('/admin/payment-config', methods=['GET', 'POST'])
 @login_required
 def admin_payment_config():
@@ -1437,11 +1912,9 @@ def admin_payment_config():
     if cfg.upi_id:
         qr_base64 = generate_upi_qr_base64(cfg.upi_id, cfg.upi_name)
     
-    return render_template('admin/payment_config.html',
-                         cfg=cfg, qr_base64=qr_base64)
+    return render_template('admin/payment_config.html', cfg=cfg, qr_base64=qr_base64)
 
 
-# ---- NEW: PAYMENT PROOFS QUEUE ----
 @app.route('/admin/payment-proofs')
 @login_required
 def admin_payment_queue():
@@ -1466,7 +1939,6 @@ def admin_payment_queue():
                          rejected_count=rejected_count)
 
 
-# ---- NEW: VERIFY PAYMENT PROOF ----
 @app.route('/admin/payment-proof/<int:proof_id>/verify', methods=['POST'])
 @login_required
 def admin_verify_payment_proof(proof_id):
@@ -1475,9 +1947,8 @@ def admin_verify_payment_proof(proof_id):
         return redirect(url_for('index'))
     
     proof = PaymentProof.query.get_or_404(proof_id)
-    
     if proof.status != 'pending':
-        flash('⚠️ This proof has already been reviewed.', 'info')
+        flash('⚠️ Already reviewed.', 'info')
         return redirect(request.referrer or url_for('admin_payment_queue'))
     
     proof.status = 'verified'
@@ -1497,11 +1968,10 @@ def admin_verify_payment_proof(proof_id):
             f"✅ Payment Verified!\n\nBooking: {booking.booking_reference}\n"
             f"Amount: ₹{proof.amount_paid:,.2f}\nMethod: {proof.method.upper()}")
     
-    flash(f'✅ Payment proof verified.', 'success')
+    flash('✅ Payment proof verified.', 'success')
     return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
-# ---- NEW: REJECT PAYMENT PROOF ----
 @app.route('/admin/payment-proof/<int:proof_id>/reject', methods=['POST'])
 @login_required
 def admin_reject_payment_proof(proof_id):
@@ -1510,9 +1980,8 @@ def admin_reject_payment_proof(proof_id):
         return redirect(url_for('index'))
     
     proof = PaymentProof.query.get_or_404(proof_id)
-    
     if proof.status != 'pending':
-        flash('⚠️ This proof has already been reviewed.', 'info')
+        flash('⚠️ Already reviewed.', 'info')
         return redirect(request.referrer or url_for('admin_payment_queue'))
     
     reason = request.form.get('rejection_reason', '').strip()
@@ -1529,37 +1998,34 @@ def admin_reject_payment_proof(proof_id):
     if proof.booking.customer.telegram_chat_id:
         send_telegram_notification_async(proof.booking.customer.telegram_chat_id,
             f"❌ Payment Proof Rejected\n\nBooking: {proof.booking.booking_reference}\n"
-            f"Reason: {reason}\n\nPlease re-upload.")
+            f"Reason: {reason}")
     
     flash('Payment proof rejected.', 'info')
     return redirect(request.referrer or url_for('admin_payment_queue'))
 
 
-# ---- NEW: CUSTOMER SUBMITS PAYMENT PROOF ----
 @app.route('/booking/<int:booking_id>/payment-proof', methods=['POST'])
 @login_required
 def submit_payment_proof(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    
     if booking.customer_id != current_user.id and current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
     
     if 'screenshot' not in request.files or not request.files['screenshot'].filename:
-        flash('⚠️ Payment screenshot is required.', 'danger')
+        flash('⚠️ Screenshot is required.', 'danger')
         return redirect(url_for('my_booking_detail', booking_id=booking.id))
     
     screenshot = request.files['screenshot']
-    
     if not Config.CLOUDINARY_CLOUD_NAME:
-        flash('⚠️ Cloudinary not configured. Contact admin.', 'danger')
+        flash('⚠️ Cloudinary not configured.', 'danger')
         return redirect(url_for('my_booking_detail', booking_id=booking.id))
     
     folder = f"vyahmandap/payments/booking_{booking_id}"
     upload_result = upload_file_to_cloudinary(screenshot, folder=folder)
     
     if not upload_result or not upload_result.get('url'):
-        flash('⚠️ Screenshot upload failed. Please try again.', 'danger')
+        flash('⚠️ Upload failed.', 'danger')
         return redirect(url_for('my_booking_detail', booking_id=booking.id))
     
     payment_date = None
@@ -1592,12 +2058,8 @@ def submit_payment_proof(booking_id):
     db.session.commit()
     
     notify_all_admins(
-        f"💰 New Payment Proof Submitted\n\n"
-        f"Booking: {booking.booking_reference}\n"
-        f"Customer: {current_user.name}\n"
-        f"Amount: ₹{proof.amount_paid:,.2f}\n"
-        f"Method: {proof.method.upper()}\n\n"
-        f"Review at /admin/payment-proofs"
+        f"💰 New Payment Proof\n\nBooking: {booking.booking_reference}\n"
+        f"Amount: ₹{proof.amount_paid:,.2f}\nMethod: {proof.method.upper()}"
     )
     
     flash('✅ Payment proof submitted! Admin will verify shortly.', 'success')
@@ -1613,22 +2075,18 @@ def vendor_sales():
     if current_user.role not in ['admin', 'vendor']:
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
-    try:
-        items = Item.query.filter_by(vendor_id=current_user.id).order_by(Item.created_at.desc()).all()
-        item_ids = [i.id for i in items]
-        bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).order_by(Booking.created_at.desc()).all() if item_ids else []
-        total_earnings = sum(b.base_rent for b in bookings)
-        return render_template('vendor/dashboard.html',
-                             items=items, bookings=bookings,
-                             total_earnings=total_earnings,
-                             total_bookings=len(bookings),
-                             active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched']),
-                             total_items=len(items),
-                             upcoming_bookings=[b for b in bookings if b.start_date >= datetime.utcnow().date() and b.start_date <= datetime.utcnow().date() + timedelta(days=30)],
-                             pending_dispatch=[b for b in bookings if not b.dispatch_report_done and b.booking_status == 'confirmed'])
-    except Exception as e:
-        flash(f'Error: {str(e)}', 'danger')
-        return redirect(url_for('index'))
+    items = Item.query.filter_by(vendor_id=current_user.id).order_by(Item.created_at.desc()).all()
+    item_ids = [i.id for i in items]
+    bookings = Booking.query.filter(Booking.item_id.in_(item_ids)).order_by(Booking.created_at.desc()).all() if item_ids else []
+    total_earnings = sum(b.base_rent for b in bookings)
+    return render_template('vendor/dashboard.html',
+                         items=items, bookings=bookings,
+                         total_earnings=total_earnings,
+                         total_bookings=len(bookings),
+                         active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched']),
+                         total_items=len(items),
+                         upcoming_bookings=[b for b in bookings if b.start_date >= datetime.utcnow().date() and b.start_date <= datetime.utcnow().date() + timedelta(days=30)],
+                         pending_dispatch=[b for b in bookings if not b.dispatch_report_done and b.booking_status == 'confirmed'])
 
 
 @app.route('/vendor/rentals')
@@ -1685,16 +2143,13 @@ def api_vendor_calendar():
     item_ids = [i.id for i in items]
     if not item_ids:
         return jsonify([])
-    
     item_filter = request.args.get('item_id', 'all')
     query = Booking.query.filter(Booking.item_id.in_(item_ids))
     if item_filter != 'all':
         query = query.filter_by(item_id=int(item_filter))
     bookings = query.all()
-    
     colors = ['#2d5a3d', '#b45309', '#1e40af', '#7c2d12', '#166534', '#9a3412', '#a16207']
     item_color_map = {item.id: colors[idx % len(colors)] for idx, item in enumerate(items)}
-    
     events = []
     for b in bookings:
         events.append({
@@ -1887,7 +2342,6 @@ def chat_list():
     messages = Message.query.filter(
         (Message.sender_id == current_user.id) | (Message.receiver_id == current_user.id)
     ).order_by(Message.created_at.desc()).all()
-    
     conversations = {}
     for msg in messages:
         other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
@@ -1912,7 +2366,6 @@ def chat_with(user_id):
     if request.method == 'POST':
         body = request.form.get('body', '').strip()
         apply_filter = should_filter_contact_info(current_user, other_user)
-        
         if not body:
             flash('Message cannot be empty.', 'danger')
         elif len(body) > MAX_CHAT_CHARS:
@@ -1928,12 +2381,10 @@ def chat_with(user_id):
                          item_id=item_id, body=masked_body)
             db.session.add(msg)
             db.session.commit()
-            
             if other_user.telegram_chat_id:
                 preview = masked_body[:100] + ('...' if len(masked_body) > 100 else '')
                 send_telegram_notification_async(other_user.telegram_chat_id,
                     f"💬 New Message from {current_user.name}\n\n{preview}")
-            
             if masked_body != body:
                 flash('ℹ️ Some numbers masked for privacy.', 'info')
             return redirect(url_for('chat_with', user_id=other_user.id))
@@ -1942,12 +2393,10 @@ def chat_with(user_id):
         ((Message.sender_id == current_user.id) & (Message.receiver_id == other_user.id)) |
         ((Message.sender_id == other_user.id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.created_at.asc()).all()
-    
     for msg in messages:
         if msg.receiver_id == current_user.id and not msg.is_read:
             msg.is_read = True
     db.session.commit()
-    
     item = Item.query.get(item_id) if item_id else None
     return render_template('chat/conversation.html', other_user=other_user, messages=messages, item=item)
 
@@ -1959,15 +2408,12 @@ def api_chat_send():
     receiver_id = data.get('receiver_id')
     body = data.get('body', '').strip()
     item_id = data.get('item_id')
-    
     if not receiver_id or not body:
         return jsonify({'error': 'Missing fields'}), 400
     other_user = User.query.get(receiver_id)
     if not other_user:
         return jsonify({'error': 'User not found'}), 404
-    
     apply_filter = should_filter_contact_info(current_user, other_user)
-    
     if len(body) > MAX_CHAT_CHARS:
         return jsonify({'error': f'Message too long. Max {MAX_CHAT_CHARS}.'}), 400
     if apply_filter and contains_email(body):
@@ -1975,17 +2421,14 @@ def api_chat_send():
         return jsonify({'error': f'Email/UPI not allowed (found: {found}).'}), 400
     if apply_filter and contains_too_many_digits(body, max_consecutive=4):
         return jsonify({'error': 'Cannot share >4 consecutive digits.'}), 400
-    
     masked_body = mask_phone_numbers(body)
     msg = Message(sender_id=current_user.id, receiver_id=other_user.id, item_id=item_id, body=masked_body)
     db.session.add(msg)
     db.session.commit()
-    
     if other_user.telegram_chat_id:
         preview = masked_body[:100] + ('...' if len(masked_body) > 100 else '')
         send_telegram_notification_async(other_user.telegram_chat_id,
             f"💬 New Message from {current_user.name}\n\n{preview}")
-    
     return jsonify({'success': True, 'message': {
         'id': msg.id, 'body': msg.body, 'masked': masked_body != body,
         'created_at': msg.created_at.strftime('%H:%M')
@@ -2036,7 +2479,7 @@ def ticket_new():
                        priority=priority, status='open')
         db.session.add(ticket)
         db.session.commit()
-        notify_all_admins(f"🎫 New Ticket!\n\nFrom: {current_user.name}\n#{ticket.ticket_number}\nSubject: {subject}")
+        notify_all_admins(f"🎫 New Ticket!\n\nFrom: {current_user.name}\n#{ticket.ticket_number}")
         flash(f'✅ Ticket {ticket.ticket_number} created!', 'success')
         return redirect(url_for('ticket_detail', ticket_id=ticket.id))
     return render_template('tickets/new.html')
@@ -2126,7 +2569,7 @@ def admin_ticket_detail(ticket_id):
             if new_status in ['open', 'in_progress', 'resolved', 'closed']:
                 ticket.status = new_status
                 db.session.commit()
-                flash(f'Status updated.', 'success')
+                flash('Status updated.', 'success')
             return redirect(url_for('admin_ticket_detail', ticket_id=ticket.id))
         elif action == 'priority':
             new_priority = request.form.get('priority', '')
@@ -2160,7 +2603,6 @@ def calculate_leaderboard(period='all_time', category='all'):
     cutoff_date = datetime.utcnow() - timedelta(days=30) if period == 'monthly' else None
     vendors = User.query.filter_by(role='vendor').all()
     rankings = []
-    
     for vendor in vendors:
         vendor_items = Item.query.filter_by(vendor_id=vendor.id).all()
         if not vendor_items:
@@ -2275,13 +2717,59 @@ def admin_toggle_report_protection(report_id):
     return redirect(request.referrer or url_for('admin_storage'))
 
 
+# ============================================
+# CRON — EXTENDED WITH DPDP DELETION PROCESSING
+# ============================================
 @app.route('/api/cron/cleanup', methods=['GET', 'POST'])
 def cron_cleanup():
     token = request.args.get('token') or request.form.get('token')
     if token != Config.CRON_SECRET:
         return jsonify({'error': 'Unauthorized'}), 401
+    
+    # 1. Existing equipment report cleanup
     stats = cleanup_old_reports(dry_run=False)
-    return jsonify({'success': True, 'stats': stats})
+    
+    # 2. NEW: Process pending account deletions
+    NOW = datetime.utcnow()
+    pending_deletions = User.query.filter(
+        User.deletion_scheduled_at != None,
+        User.deletion_scheduled_at <= NOW,
+        User.is_deleted == False
+    ).all()
+    
+    deletion_stats = {'processed': 0, 'failed': 0, 'cloudinary_purged': {}}
+    
+    for u in pending_deletions:
+        try:
+            cloudinary_deleted = purge_user_cloudinary_assets(u.id)
+            anonymize_user(u)
+            u.is_deleted = True
+            u.anonymized_at = NOW
+            
+            dr = DataRequest(
+                user_id=u.id,
+                request_type='deletion_completed',
+                status='completed',
+                completed_at=NOW,
+                details=json_lib.dumps(cloudinary_deleted)
+            )
+            db.session.add(dr)
+            db.session.commit()
+            
+            deletion_stats['processed'] += 1
+            deletion_stats['cloudinary_purged'][u.id] = cloudinary_deleted
+            print(f"✅ Deleted user {u.id}")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Deletion failed for user {u.id}: {e}")
+            deletion_stats['failed'] += 1
+    
+    return jsonify({
+        'success': True,
+        'report_cleanup': stats,
+        'account_deletions': deletion_stats,
+        'timestamp': NOW.isoformat()
+    })
 
 
 # ============================================
@@ -2319,9 +2807,14 @@ def admin_dashboard():
     reports_pending_return = Booking.query.filter_by(dispatch_report_done=True, return_report_done=False)\
         .filter(Booking.booking_status.in_(['dispatched', 'confirmed'])).count()
     damage_flagged_count = Booking.query.filter_by(damage_flagged=True).count()
-    
     all_reports = EquipmentReport.query.all()
     pending_payment_proofs = PaymentProof.query.filter_by(status='pending').count()
+    
+    # DPDP metrics
+    pending_deletions_count = User.query.filter(
+        User.deletion_requested_at != None,
+        User.is_deleted == False
+    ).count()
     
     return render_template('admin/dashboard.html',
                          total_bookings=total_bookings, total_commission=total_commission,
@@ -2343,6 +2836,7 @@ def admin_dashboard():
                          protected_reports=sum(1 for r in all_reports if r.keep_forever),
                          disputed_reports=sum(1 for r in all_reports if r.damage_flagged),
                          pending_payment_proofs=pending_payment_proofs,
+                         pending_deletions_count=pending_deletions_count,
                          recent_bookings=Booking.query.order_by(Booking.created_at.desc()).limit(10).all(),
                          recent_users=User.query.order_by(User.created_at.desc()).limit(5).all(),
                          recent_items=Item.query.order_by(Item.created_at.desc()).limit(5).all())
@@ -2546,7 +3040,7 @@ def admin_update_user_role(user_id):
     if new_role in ['admin', 'customer', 'vendor'] and user.id != current_user.id:
         user.role = new_role
         db.session.commit()
-        flash(f'Role updated.', 'success')
+        flash('Role updated.', 'success')
     return redirect(url_for('admin_users'))
 
 
@@ -2619,6 +3113,7 @@ def utility_processor():
         business_phone=Config.BUSINESS_PHONE,
         business_phone_alt=Config.BUSINESS_PHONE_ALT,
         business_location=Config.BUSINESS_LOCATION,
+        dpo_mobile=Config.DPO_MOBILE, dpo_email=Config.DPO_EMAIL,
         categories=Config.CATEGORIES, format_currency=format_currency,
         unread_message_count=unread_count(),
         open_tickets_count=open_tickets_count(),
@@ -2649,6 +3144,11 @@ def init_database():
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS verified_until TIMESTAMP",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)",
+                # DPDP new columns
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMP",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_scheduled_at TIMESTAMP",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMP",
             ]
             with db.engine.connect() as conn:
                 for sql in migrations:
@@ -2730,6 +3230,7 @@ with app.app_context():
     print(f"📱 Telegram: {'Enabled' if Config.TELEGRAM_BOT_TOKEN else 'Disabled'}")
     print(f"📷 Cloudinary: {'Configured' if Config.CLOUDINARY_CLOUD_NAME else 'Not configured'}")
     print(f"🗄️  DB: {'PostgreSQL' if 'postgres' in Config.SQLALCHEMY_DATABASE_URI else 'SQLite'}")
+    print(f"🔐 DPO: {Config.DPO_EMAIL} / {Config.DPO_MOBILE}")
     print("=" * 50)
     init_database()
 
