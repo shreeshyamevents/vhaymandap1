@@ -2,6 +2,14 @@
 
 {% block title %}Admin Dashboard - VyahMandap{% endblock %}
 
+{% if pending_deletions_count and pending_deletions_count > 0 %}
+<a href="{{ url_for('admin_users') }}" class="bg-red-50 border border-red-200 rounded-xl p-4 hover:bg-red-100 transition">
+    <div class="text-xs text-red-700 font-semibold uppercase">🗑️ Pending Deletions</div>
+    <div class="text-2xl font-bold text-red-900">{{ pending_deletions_count }}</div>
+    <div class="text-[10px] text-red-600 mt-1">Tap to view users</div>
+</a>
+{% endif %}
+
 {% block content %}
 <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
     <div>
