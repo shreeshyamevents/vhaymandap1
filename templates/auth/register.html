@@ -39,6 +39,18 @@
                 <label class="block font-semibold text-sm mb-1">Confirm Password *</label>
                 <input type="password" name="confirm_password" required placeholder="Re-enter password" class="w-full border rounded-lg p-3 text-sm">
             </div>
+
+            <!-- DPDP Consent Checkbox -->
+            <div class="flex items-start gap-2 pt-2">
+                <input type="checkbox" name="terms_accepted" id="terms_accepted" required
+                       class="mt-1 w-4 h-4 cursor-pointer accent-green-700">
+                <label for="terms_accepted" class="text-xs text-gray-700 cursor-pointer leading-relaxed">
+                    I agree to the <a href="#" class="text-green-700 underline font-semibold" target="_blank">Terms of Service</a>
+                    and <a href="#" class="text-green-700 underline font-semibold" target="_blank">Privacy Policy</a>.
+                    I understand my data will be processed as described.
+                </label>
+            </div>
+
             <button type="submit" class="w-full bg-green-700 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition">
                 Create Account
             </button>
