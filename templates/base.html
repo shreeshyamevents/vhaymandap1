@@ -294,6 +294,12 @@
                         
                         <div class="dropdown-divider"></div>
                         
+                        {% if current_user.role != 'admin' %}
+                        <a href="{{ url_for('my_data') }}" class="dropdown-item">
+                            <i class="fa-solid fa-shield-halved w-4 text-blue-600"></i>My Data
+                        </a>
+                        {% endif %}
+                        
                         <a href="{{ url_for('link_telegram') }}" class="dropdown-item">
                             <i class="fa-brands fa-telegram w-4 text-blue-500"></i>Link Telegram
                         </a>
@@ -351,12 +357,12 @@
                         <a href="{{ url_for('admin_payment_queue') }}" class="dropdown-item">
                             <i class="fa-solid fa-receipt w-4 text-emerald-600"></i>Payment Proofs Queue
                             {% if pending_payments_count > 0 %}
-                            <span class="badge-count">{{ pending_payments_count }}</span>
-                        {% endif %}
+                                <span class="badge-count">{{ pending_payments_count }}</span>
+                            {% endif %}
                         </a>
                         <a href="{{ url_for('admin_payment_config') }}" class="dropdown-item">
                             <i class="fa-solid fa-credit-card w-4 text-emerald-600"></i>Payment Config
-                       </a>
+                        </a>
                         <a href="{{ url_for('admin_items') }}" class="dropdown-item">
                             <i class="fa-solid fa-box w-4 text-gray-400"></i>All Items
                         </a>
@@ -406,122 +412,127 @@
     <!-- Mobile Sidebar -->
     {% if current_user.is_authenticated %}
     <aside id="mobileSidebar" class="mobile-sidebar">
-    
-    <!-- Sidebar Header -->
-    <div class="bg-green-700 text-white p-5">
-        <div class="flex justify-between items-start">
-            <div>
-                <p class="text-xs opacity-90">Welcome back</p>
-                <h3 class="font-bold text-lg">{{ current_user.name }}</h3>
-                <span class="text-xs bg-white/20 px-2 py-0.5 rounded mt-1 inline-block">{{ current_user.role|title }}</span>
+        
+        <!-- Sidebar Header -->
+        <div class="bg-green-700 text-white p-5">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs opacity-90">Welcome back</p>
+                    <h3 class="font-bold text-lg">{{ current_user.name }}</h3>
+                    <span class="text-xs bg-white/20 px-2 py-0.5 rounded mt-1 inline-block">{{ current_user.role|title }}</span>
+                </div>
+                <button onclick="closeMobileMenu()" class="text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            <button onclick="closeMobileMenu()" class="text-white text-xl">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
         </div>
-    </div>
 
-    <!-- Browse Section -->
-    <div class="mobile-section-title">Browse</div>
-    <a href="{{ url_for('index') }}" class="mobile-link">
-        <i class="fa-solid fa-home w-5"></i>Home
-    </a>
-    <a href="{{ url_for('index') }}#marketplace" class="mobile-link">
-        <i class="fa-solid fa-boxes-stacked w-5"></i>Marketplace
-    </a>
-    <a href="{{ url_for('leaderboard') }}" class="mobile-link">
-        <i class="fa-solid fa-trophy w-5 text-yellow-500"></i>Leaderboard
-    </a>
+        <!-- Browse Section -->
+        <div class="mobile-section-title">Browse</div>
+        <a href="{{ url_for('index') }}" class="mobile-link">
+            <i class="fa-solid fa-home w-5"></i>Home
+        </a>
+        <a href="{{ url_for('index') }}#marketplace" class="mobile-link">
+            <i class="fa-solid fa-boxes-stacked w-5"></i>Marketplace
+        </a>
+        <a href="{{ url_for('leaderboard') }}" class="mobile-link">
+            <i class="fa-solid fa-trophy w-5 text-yellow-500"></i>Leaderboard
+        </a>
 
-    <!-- Vendor Section -->
-    {% if current_user.role in ['admin', 'vendor'] %}
-    <div class="mobile-section-title">Vendor Tools</div>
-    <a href="{{ url_for('vendor_dashboard') }}" class="mobile-link">
-        <i class="fa-solid fa-store w-5 text-green-700"></i>Vendor Dashboard
-    </a>
-    <a href="{{ url_for('vendor_sales') }}" class="mobile-link" style="padding-left: 40px;">
-        <i class="fa-solid fa-arrow-up w-4 text-blue-600"></i>My Sales
-    </a>
-    <a href="{{ url_for('vendor_rentals') }}" class="mobile-link" style="padding-left: 40px;">
-        <i class="fa-solid fa-arrow-down w-4 text-orange-600"></i>My Rentals
-    </a>
-    <a href="{{ url_for('vendor_calendar') }}" class="mobile-link">
-        <i class="fa-regular fa-calendar w-5 text-blue-600"></i>Booking Calendar
-    </a>
-    <a href="{{ url_for('vendor_add_item') }}" class="mobile-link">
-        <i class="fa-solid fa-plus w-5 text-green-600"></i>Add New Item
-    </a>
-    {% endif %}
-
-    <!-- Customer Section -->
-    {% if current_user.role == 'customer' %}
-    <div class="mobile-section-title">My Account</div>
-    <a href="{{ url_for('dashboard') }}" class="mobile-link">
-        <i class="fa-solid fa-gauge w-5 text-green-700"></i>My Dashboard
-    </a>
-    {% endif %}
-
-    <!-- Messages & Support -->
-    <div class="mobile-section-title">Communication</div>
-    <a href="{{ url_for('chat_list') }}" class="mobile-link">
-        <i class="fa-regular fa-comments w-5"></i>Messages
-        {% if unread_message_count > 0 %}
-            <span class="badge-count ml-auto">{{ unread_message_count }}</span>
+        <!-- Vendor Section (if applicable) -->
+        {% if current_user.role in ['admin', 'vendor'] %}
+        <div class="mobile-section-title">Vendor Tools</div>
+        <a href="{{ url_for('vendor_dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-store w-5 text-green-700"></i>Vendor Dashboard
+        </a>
+        <a href="{{ url_for('vendor_sales') }}" class="mobile-link" style="padding-left: 40px;">
+            <i class="fa-solid fa-arrow-up w-4 text-blue-600"></i>My Sales
+        </a>
+        <a href="{{ url_for('vendor_rentals') }}" class="mobile-link" style="padding-left: 40px;">
+            <i class="fa-solid fa-arrow-down w-4 text-orange-600"></i>My Rentals
+        </a>
+        <a href="{{ url_for('vendor_calendar') }}" class="mobile-link">
+            <i class="fa-regular fa-calendar w-5 text-blue-600"></i>Booking Calendar
+        </a>
+        <a href="{{ url_for('vendor_add_item') }}" class="mobile-link">
+            <i class="fa-solid fa-plus w-5 text-green-600"></i>Add New Item
+        </a>
         {% endif %}
-    </a>
-    <a href="{{ url_for('tickets_list') }}" class="mobile-link">
-        <i class="fa-regular fa-ticket w-5"></i>Support
-        {% if current_user.role == 'admin' and open_tickets_count > 0 %}
-            <span class="badge-count ml-auto">{{ open_tickets_count }}</span>
-        {% endif %}
-    </a>
 
-    <!-- Admin Section -->
-    {% if current_user.role == 'admin' %}
-    <div class="mobile-section-title">Admin</div>
-    <a href="{{ url_for('admin_dashboard') }}" class="mobile-link">
-        <i class="fa-solid fa-gauge w-5 text-purple-600"></i>Admin Dashboard
-    </a>
-    <a href="{{ url_for('admin_bookings') }}" class="mobile-link">
-        <i class="fa-solid fa-clipboard-list w-5 text-blue-600"></i>All Bookings
-    </a>
-    <a href="{{ url_for('admin_users') }}" class="mobile-link">
-        <i class="fa-solid fa-users w-5"></i>All Users
-    </a>
-    <a href="{{ url_for('admin_storage') }}" class="mobile-link">
-        <i class="fa-solid fa-database w-5 text-purple-500"></i>Storage
-    </a>
-    <a href="{{ url_for('admin_payments') }}" class="mobile-link">
-        <i class="fa-solid fa-indian-rupee-sign w-5 text-green-600"></i>UTR Tracking
-    </a>
-    <a href="{{ url_for('admin_payment_queue') }}" class="mobile-link">
-        <i class="fa-solid fa-receipt w-5 text-emerald-600"></i>Payment Proofs Queue
-        {% if pending_payments_count > 0 %}
-            <span class="badge-count ml-auto">{{ pending_payments_count }}</span>
+        <!-- Customer Section -->
+        {% if current_user.role == 'customer' %}
+        <div class="mobile-section-title">My Account</div>
+        <a href="{{ url_for('dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-gauge w-5 text-green-700"></i>My Dashboard
+        </a>
         {% endif %}
-    </a>
-    <a href="{{ url_for('admin_payment_config') }}" class="mobile-link">
-        <i class="fa-solid fa-credit-card w-5 text-emerald-600"></i>Payment Config
-    </a>
+
+        <!-- Messages & Support -->
+        <div class="mobile-section-title">Communication</div>
+        <a href="{{ url_for('chat_list') }}" class="mobile-link">
+            <i class="fa-regular fa-comments w-5"></i>Messages
+            {% if unread_message_count > 0 %}
+                <span class="badge-count ml-auto">{{ unread_message_count }}</span>
+            {% endif %}
+        </a>
+        <a href="{{ url_for('tickets_list') }}" class="mobile-link">
+            <i class="fa-regular fa-ticket w-5"></i>Support
+            {% if current_user.role == 'admin' and open_tickets_count > 0 %}
+                <span class="badge-count ml-auto">{{ open_tickets_count }}</span>
+            {% endif %}
+        </a>
+
+        <!-- Admin Section -->
+        {% if current_user.role == 'admin' %}
+        <div class="mobile-section-title">Admin</div>
+        <a href="{{ url_for('admin_dashboard') }}" class="mobile-link">
+            <i class="fa-solid fa-gauge w-5 text-purple-600"></i>Admin Dashboard
+        </a>
+        <a href="{{ url_for('admin_bookings') }}" class="mobile-link">
+            <i class="fa-solid fa-clipboard-list w-5 text-blue-600"></i>All Bookings
+        </a>
+        <a href="{{ url_for('admin_payments') }}" class="mobile-link">
+            <i class="fa-solid fa-indian-rupee-sign w-5 text-green-600"></i>UTR Tracking
+        </a>
+        <a href="{{ url_for('admin_payment_queue') }}" class="mobile-link">
+            <i class="fa-solid fa-receipt w-5 text-emerald-600"></i>Payment Proofs Queue
+            {% if pending_payments_count > 0 %}
+                <span class="badge-count ml-auto">{{ pending_payments_count }}</span>
+            {% endif %}
+        </a>
+        <a href="{{ url_for('admin_payment_config') }}" class="mobile-link">
+            <i class="fa-solid fa-credit-card w-5 text-emerald-600"></i>Payment Config
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="mobile-link">
+            <i class="fa-solid fa-users w-5"></i>All Users
+        </a>
+        <a href="{{ url_for('admin_storage') }}" class="mobile-link">
+            <i class="fa-solid fa-database w-5 text-purple-500"></i>Storage
+        </a>
+        {% endif %}
+
+        <!-- Settings -->
+        <div class="mobile-section-title">Settings</div>
+        {% if current_user.role != 'admin' %}
+        <a href="{{ url_for('my_data') }}" class="mobile-link">
+            <i class="fa-solid fa-shield-halved w-5 text-blue-600"></i>My Data
+        </a>
+        {% endif %}
+        <a href="{{ url_for('link_telegram') }}" class="mobile-link">
+            <i class="fa-brands fa-telegram w-5 text-blue-500"></i>Link Telegram
+        </a>
+        <a href="https://wa.me/918319337063" target="_blank" class="mobile-link">
+            <i class="fa-brands fa-whatsapp w-5 text-green-600"></i>WhatsApp Support
+        </a>
+
+        <div class="mobile-section-title">Account</div>
+        <a href="{{ url_for('logout') }}" class="mobile-link danger">
+            <i class="fa-solid fa-right-from-bracket w-5"></i>Logout
+        </a>
+
+        <div class="h-8"></div>
+    </aside>
     {% endif %}
-
-    <!-- Settings -->
-    <div class="mobile-section-title">Settings</div>
-    <a href="{{ url_for('link_telegram') }}" class="mobile-link">
-        <i class="fa-brands fa-telegram w-5 text-blue-500"></i>Link Telegram
-    </a>
-    <a href="https://wa.me/918319337063" target="_blank" class="mobile-link">
-        <i class="fa-brands fa-whatsapp w-5 text-green-600"></i>WhatsApp Support
-    </a>
-
-    <div class="mobile-section-title">Account</div>
-    <a href="{{ url_for('logout') }}" class="mobile-link danger">
-        <i class="fa-solid fa-right-from-bracket w-5"></i>Logout
-    </a>
-
-    <div class="h-8"></div>
-</aside>
-{% endif %}
 
     <!-- Flash Messages -->
     <div class="max-w-7xl mx-auto px-4 pt-4">
@@ -580,11 +591,9 @@
             const button = event.currentTarget;
             const isOpen = menu.classList.contains('open');
             
-            // Close all other dropdowns
             document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('open'));
             
-            // Toggle this one
             if (!isOpen) {
                 menu.classList.add('open');
                 button.classList.add('open');
@@ -594,7 +603,6 @@
             }
         }
         
-        // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.relative')) {
                 document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
@@ -603,7 +611,6 @@
             }
         });
         
-        // Close on Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
