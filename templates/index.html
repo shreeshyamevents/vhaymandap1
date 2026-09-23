@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}VyahMandap - Browse Wedding Equipment{% endblock %}
+
+{% block content %}
+<!-- Hero Banner -->
+<div class="relative bg-gradient-to-r from-green-800 to-green-900 text-white rounded-2xl overflow-hidden px-6 py-12 mb-8">
+    <div class="relative z-10 max-w-2xl">
+        <span class="inline-block bg-white/20 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-3">
+            📢 Booking Open 2026-27
+        </span>
+        <h2 class="text-3xl md:text-4xl font-extrabold leading-tight">
+            Aapke sapno ki shaadi <br class="hidden sm:block"/>ho ya koi khaas celebration!
+        </h2>
+        <p class="text-sm text-white/80 max-w-lg mt-2 font-light">
+            From elegant decor to seamless execution — {{ app_name }} brings your vision to life.
+        </p>
+        <div class="flex flex-wrap gap-3 mt-4">
+            <button onclick="document.getElementById('marketplace').scrollIntoView({behavior:'smooth'})" 
+                    class="bg-white text-green-800 font-bold text-sm px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition">
+                Explore Items
+            </button>
+            {% if not current_user.is_authenticated %}
+                <a href="{{ url_for('register') }}" class="border border-white/40 text-white font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-white/10 transition">
+                    Join Now
+                </a>
+            {% endif %}
+        </div>
+        <div class="flex gap-6 mt-5 text-xs font-medium text-white/60 flex-wrap">
+            <span><i class="fa-regular fa-circle-check text-white/80 mr-1"></i> Premium Equipment</span>
+            <span><i class="fa-regular fa-circle-check text-white/80 mr-1"></i> 5% Platform Fee</span>
+            <span><i class="fa-regular fa-circle-check text-white/80 mr-1"></i> Secure UTR Verify</span>
+            <span><i class="fa-regular fa-circle-check text-white/80 mr-1"></i> In-App Chat</span>
+        </div>
+    </div>
+    <div class="absolute right-0 bottom-0 opacity-10 text-[180px] leading-none font-black select-none">VM</div>
+</div>
+
+<!-- Marketplace -->
+<div id="marketplace">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div class="flex flex-wrap gap-2">
+            <button onclick="filterItems('all')" class="category-btn bg-green-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">
+                All Items
+            </button>
+            {% for value, label in categories %}
+                <button onclick="filterItems('{{ value }}')" class="category-btn bg-white border px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition">
+                    {{ label }}
+                </button>
+            {% endfor %}
+        </div>
+        <span id="itemCount" class="text-xs text-gray-500 font-medium">Loading...</span>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="bg-white p-4 rounded-2xl border shadow-sm mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Search</label>
+                <input type="text" id="searchInput" placeholder="Search equipment..."
+                       class="w-full border rounded-lg p-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Min Price (₹/day)</label>
+                <input type="number" id="minPrice" min="0" placeholder="0"
+                       class="w-full border rounded-lg p-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Max Price (₹/day)</label>
+                <input type="number" id="maxPrice" min="0" placeholder="Any"
+                       class="w-full border rounded-lg p-2 text-sm">
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-3 items-center">
+            <div class="flex-1 min-w-[180px]">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Sort By</label>
+                <select id="sortSelect" class="w-full border rounded-lg p-2 text-sm bg-white">
+                    <option value="newest">Newest First</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                    <option value="rating">Highest Rated</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2 pt-5">
+                <input type="checkbox" id="verifiedOnly" class="w-4 h-4 cursor-pointer accent-green-700">
+                <label for="verifiedOnly" class="text-sm font-semibold text-gray-700 cursor-pointer">✅ Verified items only</label>
+            </div>
+            <button onclick="clearFilters()" class="text-xs text-gray-600 hover:text-gray-900 underline pt-5">Clear filters</button>
+        </div>
+    </div>
+
+    <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Items loaded via JS -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentFilters = {
+    category: 'all',
+    search: '',
+    min_price: null,
+    max_price: null,
+    sort: 'newest',
+    verified_only: false
+};
+
+function buildQuery() {
+    const params = new URLSearchParams();
+    if (currentFilters.category && currentFilters.category !== 'all') params.append('category', currentFilters.category);
+    if (currentFilters.search) params.append('search', currentFilters.search);
+    if (currentFilters.min_price !== null) params.append('min_price', currentFilters.min_price);
+    if (currentFilters.max_price !== null) params.append('max_price', currentFilters.max_price);
+    if (currentFilters.sort) params.append('sort', currentFilters.sort);
+    if (currentFilters.verified_only) params.append('verified_only', 'true');
+    params.append('show_unavailable', 'true');
+    return params.toString();
+}
+
+function clearFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('minPrice').value = '';
+    document.getElementById('maxPrice').value = '';
+    document.getElementById('sortSelect').value = 'newest';
+    document.getElementById('verifiedOnly').checked = false;
+    currentFilters.search = '';
+    currentFilters.min_price = null;
+    currentFilters.max_price = null;
+    currentFilters.sort = 'newest';
+    currentFilters.verified_only = false;
+    loadItems();
+}
+
+function filterItems(category) {
+    currentFilters.category = category;
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('bg-green-700', 'text-white');
+        btn.classList.add('bg-white', 'text-black');
+        if (btn.textContent.trim().toLowerCase() === category || 
+            (category === 'all' && btn.textContent.trim() === 'All Items')) {
+            btn.classList.remove('bg-white', 'text-black');
+            btn.classList.add('bg-green-700', 'text-white');
+        }
+    });
+    loadItems();
+}
+
+function loadItems() {
+    const url = '/api/items?' + buildQuery();
+    const grid = document.getElementById('productGrid');
+    const count = document.getElementById('itemCount');
+    
+    grid.innerHTML = `
+        <div class="col-span-full flex justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
+        </div>
+    `;
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(items => {
+            // Sort: available items first, then unavailable
+            items.sort((a, b) => {
+                if (a.is_available === b.is_available) return 0;
+                return a.is_available ? -1 : 1;
+            });
+            
+            const availableCount = items.filter(i => i.is_available).length;
+            count.textContent = availableCount + ' of ' + items.length + ' items available';
+            
+            if (!items.length) {
+                grid.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12 text-sm">No items match your filters.</div>`;
+                return;
+            }
+            
+            grid.innerHTML = items.map(item => {
+                let ratingHtml = '';
+                if (item.review_count > 0) {
+                    ratingHtml = `
+                        <div class="flex items-center gap-1 mt-1">
+                            <span class="text-yellow-400 text-xs">★</span>
+                            <span class="text-xs font-bold">${item.avg_rating}</span>
+                            <span class="text-xs text-gray-500">(${item.review_count})</span>
+                            ${item.item_verified ? '<span class="ml-auto text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">✓ Verified</span>' : ''}
+                        </div>
+                    `;
+                } else if (item.item_verified) {
+                    ratingHtml = `
+                        <div class="mt-1">
+                            <span class="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">✓ Verified</span>
+                        </div>
+                    `;
+                }
+                
+                return `
+                <div class="bg-white rounded-2xl overflow-hidden border shadow-sm hover:shadow-lg transition flex flex-col ${!item.is_available ? 'opacity-90' : ''}">
+                    <div class="h-48 bg-gray-100 overflow-hidden relative">
+                        <img src="${item.image || '/static/images/default-item.jpg'}" 
+                             class="w-full h-full object-cover ${!item.is_available ? 'grayscale' : ''}" 
+                             alt="${item.title}" 
+                             loading="lazy"
+                             onerror="this.src='/static/images/default-item.jpg'">
+                        ${!item.is_available ? `
+                            <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
+                                <span class="bg-gray-800 text-white text-xs font-bold px-3 py-2 rounded-full">
+                                    ⚪ Currently Unavailable
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col">
+                        <div class="flex justify-between text-[10px] font-semibold text-gray-500 uppercase">
+                            <span>${item.category}</span>
+                            <span>${item.vendor} ${item.vendor_verified ? '<i class="fa-solid fa-circle-check text-blue-600"></i>' : ''}</span>
+                        </div>
+                        <h3 class="font-bold text-base mt-1">${item.title}</h3>
+                        ${ratingHtml}
+                        <div class="flex justify-between text-xs mt-2 bg-gray-50 p-2 rounded-lg">
+                            <span>Rent: <strong class="text-green-700">₹${item.rate_with_commission}</strong>/day</span>
+                            <span>Deposit: ₹${item.deposit}</span>
+                        </div>
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[10px] font-medium text-gray-500">
+                                    <i class="fa-regular fa-box mr-1"></i>${item.stock} left
+                                </span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <a href="/chat/${item.vendor_id}?item_id=${item.id}" 
+                                   class="bg-blue-600 text-white text-xs font-bold px-2 py-2 rounded-lg hover:bg-blue-700 transition text-center">
+                                    <i class="fa-regular fa-comment mr-1"></i>Chat
+                                </a>
+                                ${item.is_available ? `
+                                    <a href="/book/${item.id}" 
+                                       class="bg-green-700 text-white text-xs font-bold px-2 py-2 rounded-lg hover:bg-green-600 transition text-center">
+                                        Book Now
+                                    </a>
+                                ` : `
+                                    <button disabled 
+                                            class="bg-gray-300 text-gray-500 text-xs font-bold px-2 py-2 rounded-lg cursor-not-allowed text-center"
+                                            title="This item is currently unavailable">
+                                        Not Available
+                                    </button>
+                                `}
+                            </div>
+                            <a href="/item/${item.id}/reviews" class="block text-center text-xs text-gray-500 hover:text-green-700 mt-2">
+                                <i class="fa-regular fa-star mr-1"></i>View Reviews
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        })
+        .catch(err => {
+            console.error('Error loading items:', err);
+            grid.innerHTML = `<div class="col-span-full text-center text-red-500 py-12">Error loading items. Please refresh.</div>`;
+        });
+}
+
+// Load items on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const minPrice = document.getElementById('minPrice');
+    const maxPrice = document.getElementById('maxPrice');
+    const sortSelect = document.getElementById('sortSelect');
+    const verifiedOnly = document.getElementById('verifiedOnly');
+
+    let debounceTimer;
+    function debouncedLoad() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(loadItems, 350);
+    }
+
+    searchInput.addEventListener('input', function(e) {
+        currentFilters.search = e.target.value.trim();
+        debouncedLoad();
+    });
+    minPrice.addEventListener('input', function(e) {
+        currentFilters.min_price = e.target.value ? parseFloat(e.target.value) : null;
+        debouncedLoad();
+    });
+    maxPrice.addEventListener('input', function(e) {
+        currentFilters.max_price = e.target.value ? parseFloat(e.target.value) : null;
+        debouncedLoad();
+    });
+    sortSelect.addEventListener('change', function(e) {
+        currentFilters.sort = e.target.value;
+        loadItems();
+    });
+    verifiedOnly.addEventListener('change', function(e) {
+        currentFilters.verified_only = e.target.checked;
+        loadItems();
+    });
+
+    loadItems();
+});
+</script>
+{% endblock %}
