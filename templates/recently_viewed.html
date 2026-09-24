@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Recently Viewed — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-plum-700">Recently Viewed</h1>
+    <p class="text-sm text-gray-500 mt-1">Items you have looked at recently</p>
+  </div>
+
+  {% if items %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for item in items %}
+    <a href="/item/{{ item.id }}"
+       class="block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+      <div class="aspect-video bg-plum-50 overflow-hidden">
+        <img src="{{ item.get_image() }}" alt="{{ item.title }}"
+             class="w-full h-full object-cover">
+      </div>
+      <div class="p-4">
+        <div class="flex items-start justify-between gap-2">
+          <h3 class="font-medium text-gray-900 text-sm leading-snug">{{ item.title }}</h3>
+          {% if item.is_currently_verified %}
+          <i class="fas fa-check-circle text-emerald-500 text-sm flex-shrink-0"></i>
+          {% endif %}
+        </div>
+        <p class="text-xs text-gray-500 mt-1 capitalize">{{ item.category }}</p>
+        <div class="flex items-baseline gap-1 mt-2">
+          <span class="text-plum-700 font-bold">₹{{ '%.0f'|format(item.rate_with_commission) }}</span>
+          <span class="text-xs text-gray-500">/day</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="fas fa-history text-4xl text-plum-200 mb-3"></i>
+    <p class="text-gray-500 mb-4">No recently viewed items.</p>
+    <a href="{{ url_for('index') }}"
+       class="inline-block bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-5 py-2 rounded-lg">
+      Browse Marketplace
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
