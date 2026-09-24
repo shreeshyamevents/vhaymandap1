@@ -4,9 +4,20 @@
 
 {% block content %}
 <div class="max-w-3xl mx-auto">
-    <div class="flex justify-between items-center mb-6">
+        <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold">📋 Booking Details</h2>
         <a href="{{ url_for('dashboard') }}" class="text-sm text-gray-600 hover:text-gray-900">← Back to Dashboard</a>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-4">
+        <a href="{{ url_for('booking_receipt', booking_id=booking.id) }}"
+           class="inline-flex items-center bg-plum-600 hover:bg-plum-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition">
+            <i class="fa-solid fa-receipt mr-1.5"></i> Receipt
+        </a>
+        <a href="{{ url_for('booking_timeline', booking_id=booking.id) }}"
+           class="inline-flex items-center bg-white hover:bg-plum-50 text-plum-700 border border-plum-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
+            <i class="fa-solid fa-timeline mr-1.5"></i> Timeline
+        </a>
     </div>
 
     <div class="bg-white p-6 rounded-2xl border shadow-sm mb-6">
