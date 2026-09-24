@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Timeline — {{ booking.booking_reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">Booking Timeline</h1>
+      <p class="text-sm text-gray-500 mt-1 font-mono">{{ booking.booking_reference }}</p>
+    </div>
+    <a href="{{ url_for('booking_receipt', booking_id=booking.id) }}"
+       class="text-sm text-plum-600 hover:text-plum-800">
+      <i class="fas fa-receipt mr-1"></i> Receipt
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <p class="text-sm text-gray-700"><strong>{{ booking.item.title }}</strong></p>
+    <p class="text-xs text-gray-500 mt-1">
+      {{ booking.start_date.strftime('%d %b %Y') }} → {{ booking.end_date.strftime('%d %b %Y') }}
+    </p>
+  </div>
+
+  {% set reports = booking.equipment_reports|sort(attribute='created_at') %}
+  {% set dispatch_report = reports|selectattr('report_type', 'equalto', 'dispatch')|list|first %}
+  {% set return_report = reports|selectattr('report_type', 'equalto', 'return')|list|first %}
+
+  <div class="relative pl-8">
+    <div class="absolute left-3 top-2 bottom-2 w-0.5 bg-plum-200"></div>
+
+    {# 1. Booking Created #}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-plum-600 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-check"></i>
+      </div>
+      <p class="font-semibold text-gray-900">Booking Created</p>
+      <p class="text-xs text-gray-500">{{ booking.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+    </div>
+
+    {# 2. Payment Submitted #}
+    {% if booking.utr_number %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-plum-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-rupee-sign"></i>
+      </div>
+      <p class="font-semibold text-gray-900">Payment Submitted</p>
+      <p class="text-xs text-gray-500">UTR: <span class="font-mono">{{ booking.utr_number }}</span></p>
+      <p class="text-xs text-gray-500 capitalize">Status: {{ booking.payment_status }}</p>
+    </div>
+    {% endif %}
+
+    {# 3. Payment Verified #}
+    {% if booking.payment_status == 'paid' %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-check-double"></i>
+      </div>
+      <p class="font-semibold text-gray-900">Payment Verified</p>
+      <p class="text-xs text-gray-500">Amount: ₹{{ '%.2f'|format(booking.total_amount) }}</p>
+    </div>
+    {% endif %}
+
+    {# 4. Dispatch Report #}
+    {% if dispatch_report or booking.dispatch_report_done %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-truck"></i>
+      </div>
+      <p class="font-semibold text-gray-900">Dispatched</p>
+      {% if dispatch_report %}
+      <p class="text-xs text-gray-500">{{ dispatch_report.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+      <a href="{{ url_for('report_view', booking_id=booking.id) }}"
+         class="text-xs text-plum-600 hover:underline">View report →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# 5. Return Report #}
+    {% if return_report or booking.return_report_done %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-undo"></i>
+      </div>
+      <p class="font-semibold text-gray-900">Returned</p>
+      {% if return_report %}
+      <p class="text-xs text-gray-500">{{ return_report.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# 6. Damage Flagged #}
+    {% if booking.damage_flagged %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <p class="font-semibold text-red-700">Damage Flagged</p>
+      <p class="text-xs text-gray-500">Admin notified</p>
+    </div>
+    {% endif %}
+
+    {# 7. Final Status #}
+    {% if booking.booking_status in ('completed', 'cancelled') %}
+    <div class="relative">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full
+                  {% if booking.booking_status == 'completed' %}bg-emerald-600{% else %}bg-gray-500{% endif %}
+                  text-white flex items-center justify-center text-xs">
+        <i class="fas fa-flag"></i>
+      </div>
+      <p class="font-semibold
+                {% if booking.booking_status == 'completed' %}text-emerald-700{% else %}text-gray-700{% endif %} capitalize">
+        {{ booking.booking_status }}
+      </p>
+      <p class="text-xs text-gray-500">{{ booking.updated_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+    </div>
+    {% else %}
+    <div class="relative">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-gray-300 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-clock"></i>
+      </div>
+      <p class="text-sm text-gray-500 italic">Current status: <span class="capitalize font-medium">{{ booking.booking_status }}</span></p>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+{% endblock %}
