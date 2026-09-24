@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}FAQ — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-10 px-4">
+
+  <div class="text-center mb-10">
+    <h1 class="text-3xl font-bold text-plum-700">Frequently Asked Questions</h1>
+    <p class="text-gray-500 mt-2 text-sm">Sab kuch jo jaanna zaroori hai</p>
+  </div>
+
+  {% set faqs = [
+    ('Booking', [
+      ('How do I book an item?',
+       'Browse the marketplace, open an item, choose dates and quantity, and confirm. You will get a booking reference (VM + 8 digits). Complete the payment by uploading a UTR/proof, and the vendor will be notified.'),
+      ('Can I book for a single day?',
+       'Yes. Minimum booking is 1 day. Maximum is 365 days.'),
+      ('What if the item is not available on my dates?',
+       'The system checks stock in real time. If the item is fully booked for your dates, you will see an "Item Not Available" message and can pick different dates or a similar item.'),
+    ]),
+    ('Payment', [
+      ('How do I pay?',
+       'VyahMandap uses manual UPI/bank transfer. After booking, go to My Booking → upload payment proof (screenshot + UTR). Admin verifies within 24 hours.'),
+      ('Is there a payment gateway?',
+       'No. We use manual UTR verification to keep costs low and support all UPI apps without transaction fees.'),
+      ('When is the security deposit refunded?',
+       'After the item is returned and inspected without damage, the deposit is refunded per the vendor terms.'),
+    ]),
+    ('KYC', [
+      ('When is KYC required?',
+       'For bookings of ₹30,000 or more, Aadhaar (12 digits) and PAN (ABCDE1234F format) are required.'),
+      ('Is my KYC data safe?',
+       'Yes. KYC data is only used for compliance and is never shared with third parties. It is auto-deleted per our DPDP-compliant retention policy.'),
+    ]),
+    ('Item Condition', [
+      ('Who verifies item condition?',
+       'Both sides. Vendor submits a dispatch report (photos + optional video), and customer submits a return report. Both include GPS + timestamp.'),
+      ('What if the item is damaged?',
+       'Damage flagged reports are reviewed by admin. A support ticket is auto-created and both parties are notified.'),
+    ]),
+    ('Account', [
+      ('How do I delete my account?',
+       'Go to My Data → Request Deletion. There is a 30-day grace period during which you can cancel. After 30 days, data is anonymized per DPDP Act 2023.'),
+      ('Can I chat with vendors directly?',
+       'Yes. Customers and vendors can chat. Contact info sharing is filtered for safety — no phone numbers, emails, or UPI IDs in chat.'),
+    ]),
+    ('Trust & Safety', [
+      ('What does the verified badge mean?',
+       'Verified vendors/items have been reviewed by admin (paid verification, ₹999 for 90 days).'),
+      ('How is the leaderboard calculated?',
+       'Trust score = rating (40%) + bookings (30%) + earnings (20%) + verification (10%). Minimum 5 bookings required to qualify.'),
+    ]),
+  ] %}
+
+  <div class="space-y-8">
+    {% for category, questions in faqs %}
+    <div>
+      <h2 class="text-lg font-semibold text-plum-700 mb-3">{{ category }}</h2>
+      <div class="space-y-2">
+        {% for q, a in questions %}
+        <details class="bg-white rounded-lg border border-gray-200 group">
+          <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-900 flex items-center justify-between list-none">
+            <span>{{ q }}</span>
+            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform group-open:rotate-180"></i>
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-3">
+            {{ a }}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-10 bg-plum-50 rounded-xl p-6 text-center">
+    <p class="text-sm text-plum-800 font-medium">Still have questions?</p>
+    <p class="text-xs text-gray-600 mt-1 mb-4">Hamari team 24 hours me reply karti hai</p>
+    <div class="flex justify-center gap-3 flex-wrap">
+      <a href="{{ url_for('tickets_new') if 'tickets_new' in url_for.__globals__.get('app', type('x',(),{'view_functions':{}})()).view_functions else '#' }}"
+         class="bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+        <i class="fas fa-ticket-alt mr-1"></i> Raise a Ticket
+      </a>
+      <a href="{{ url_for('index') }}"
+         class="bg-white hover:bg-gray-50 text-plum-700 border border-plum-200 text-sm font-medium px-4 py-2 rounded-lg">
+        Back to Home
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
