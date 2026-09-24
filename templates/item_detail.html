@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+
+  <a href="{{ url_for('index') }}" class="text-sm text-plum-600 hover:text-plum-800 mb-4 inline-block">
+    <i class="fas fa-arrow-left mr-1"></i> Back to Marketplace
+  </a>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+
+    {# Image #}
+    <div class="bg-plum-50 rounded-xl overflow-hidden border border-gray-200 aspect-video lg:aspect-square">
+      <img src="{{ item.get_image() }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+    </div>
+
+    {# Info #}
+    <div>
+      <div class="flex items-start gap-3 mb-2 flex-wrap">
+        <h1 class="text-2xl md:text-3xl font-bold text-plum-700">{{ item.title }}</h1>
+        {% if item.is_currently_verified %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <i class="fas fa-check-circle mr-1"></i> Verified
+        </span>
+        {% endif %}
+      </div>
+
+      <p class="text-sm text-gray-500 capitalize mb-4">{{ item.category }}</p>
+
+      {% if avg_rating %}
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-amber-400">
+          {% for i in range(avg_rating|int) %}★{% endfor %}
+          {% for i in range(5 - avg_rating|int) %}<span class="text-gray-300">★</span>{% endfor %}
+        </span>
+        <span class="text-sm text-gray-600">{{ avg_rating }} ({{ all_review_count }} reviews)</span>
+      </div>
+      {% endif %}
+
+      <div class="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <div class="flex items-baseline justify-between mb-2">
+          <div>
+            <span class="text-3xl font-bold text-plum-700">₹{{ '%.0f'|format(item.rate_with_commission) }}</span>
+            <span class="text-sm text-gray-500">/day</span>
+          </div>
+          <div class="text-right text-sm text-gray-600">
+            <div>Deposit: ₹{{ '%.0f'|format(item.deposit_amount or 0) }}</div>
+            <div>Stock: {{ item.stock }}</div>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500">Rate includes 5% platform commission.</p>
+      </div>
+
+      {% if item.description %}
+      <div class="mb-5">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">Description</h2>
+        <p class="text-sm text-gray-700 leading-relaxed">{{ item.description }}</p>
+      </div>
+      {% endif %}
+
+      {# Vendor card #}
+      <div class="border border-gray-200 rounded-xl p-4 mb-5">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Vendor</p>
+            <p class="font-medium text-gray-900">{{ vendor.company_name or vendor.name }}</p>
+            {% if vendor.is_verified %}
+            <span class="inline-flex items-center text-xs text-emerald-600 mt-1">
+              <i class="fas fa-check-circle mr-1"></i> Verified vendor
+            </span>
+            {% endif %}
+          </div>
+          <a href="/vendor/{{ vendor.id }}/public"
+             class="text-sm text-plum-600 hover:text-plum-800">
+            View profile →
+          </a>
+        </div>
+      </div>
+
+      {# Actions #}
+      <div class="flex flex-wrap gap-2 mb-3">
+        {% if item.is_available and item.stock > 0 %}
+        <a href="/book/{{ item.id }}"
+           class="flex-1 min-w-[140px] inline-flex items-center justify-center bg-plum-600 hover:bg-plum-700 text-white font-medium px-5 py-3 rounded-lg">
+          <i class="fas fa-calendar-check mr-2"></i> Book Now
+        </a>
+        {% else %}
+        <button disabled
+                class="flex-1 min-w-[140px] inline-flex items-center justify-center bg-gray-300 text-white font-medium px-5 py-3 rounded-lg cursor-not-allowed">
+          <i class="fas fa-ban mr-2"></i> Not Available
+        </button>
+        {% endif %}
+
+        {% if current_user.is_authenticated %}
+          {% if in_wishlist %}
+          <form action="/wishlist/remove/{{ item.id }}" method="POST" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center justify-center bg-blush-100 hover:bg-blush-200 text-plum-700 border border-blush-200 font-medium px-4 py-3 rounded-lg">
+              <i class="fas fa-heart mr-2"></i> In Wishlist
+            </button>
+          </form>
+          {% else %}
+          <form action="/wishlist/add/{{ item.id }}" method="POST" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center justify-center bg-white hover:bg-plum-50 text-plum-700 border border-plum-200 font-medium px-4 py-3 rounded-lg">
+              <i class="far fa-heart mr-2"></i> Wishlist
+            </button>
+          </form>
+          {% endif %}
+
+          <button type="button"
+                  data-compare-id="{{ item.id }}"
+                  class="compare-btn inline-flex items-center justify-center bg-white hover:bg-plum-50 text-plum-700 border border-plum-200 font-medium px-4 py-3 rounded-lg">
+            <i class="fas fa-balance-scale mr-2"></i> Compare
+          </button>
+        {% else %}
+          <a href="{{ url_for('login') }}"
+             class="inline-flex items-center justify-center bg-white hover:bg-plum-50 text-plum-700 border border-plum-200 font-medium px-4 py-3 rounded-lg">
+            <i class="far fa-heart mr-2"></i> Login to Save
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Reviews #}
+  <div class="border-t border-gray-200 pt-8">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Reviews</h2>
+      {% if all_review_count > 5 %}
+      <a href="/item/{{ item.id }}/reviews" class="text-sm text-plum-600 hover:text-plum-800">
+        View all {{ all_review_count }} →
+      </a>
+      {% endif %}
+    </div>
+
+    {% if reviews %}
+    <div class="space-y-3">
+      {% for review in reviews %}
+      <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-amber-400">
+              {% for i in range(review.rating) %}★{% endfor %}
+              {% for i in range(5 - review.rating) %}<span class="text-gray-300">★</span>{% endfor %}
+            </span>
+            <span class="text-xs text-gray-500">{{ review.customer.name }}</span>
+          </div>
+          <span class="text-xs text-gray-400">{{ review.created_at.strftime('%d %b %Y') }}</span>
+        </div>
+        {% if review.comment %}
+        <p class="text-sm text-gray-700">{{ review.comment }}</p>
+        {% endif %}
+        {% if review.vendor_response %}
+        <div class="mt-3 pl-3 border-l-2 border-plum-200">
+          <p class="text-xs text-gray-500 mb-1">Vendor response:</p>
+          <p class="text-sm text-gray-700">{{ review.vendor_response }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
+      No reviews yet.
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{# Compare floating bar #}
+<div id="compare-bar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-plum-700 text-white rounded-full shadow-lg px-5 py-3 z-50">
+  <span id="compare-count" class="text-sm font-medium mr-3">0 items</span>
+  <a id="compare-go" href="/compare" class="text-sm font-bold underline">Compare →</a>
+  <button id="compare-clear" class="text-xs ml-3 opacity-75 hover:opacity-100">Clear</button>
+</div>
+
+<script src="{{ url_for('static', filename='js/compare.js') }}"></script>
+{% endblock %}
