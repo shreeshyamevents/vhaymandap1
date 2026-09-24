@@ -77,7 +77,7 @@
     <p class="text-sm text-plum-800 font-medium">Still have questions?</p>
     <p class="text-xs text-gray-600 mt-1 mb-4">Hamari team 24 hours me reply karti hai</p>
     <div class="flex justify-center gap-3 flex-wrap">
-      <a href="{{ url_for('tickets_new') if 'tickets_new' in url_for.__globals__.get('app', type('x',(),{'view_functions':{}})()).view_functions else '#' }}"
+      <a href="{{ url_for('ticket_new') }}"
          class="bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
         <i class="fas fa-ticket-alt mr-1"></i> Raise a Ticket
       </a>
