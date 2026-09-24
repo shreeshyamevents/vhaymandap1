@@ -76,7 +76,7 @@
   {% if items %}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
     {% for item in items %}
-    <a href="{{ url_for('item_detail', item_id=item.id) if 'item_detail' in url_for.__globals__.get('app', type('x',(),{'view_functions':{}})()).view_functions else '#' }}"
+        <a href="{{ url_for('item_reviews', item_id=item.id) }}"
        class="block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       <div class="aspect-video bg-plum-50 overflow-hidden">
         <img src="{{ item.get_image() }}" alt="{{ item.title }}"
