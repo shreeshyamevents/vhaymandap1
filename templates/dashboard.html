@@ -124,8 +124,13 @@
                         </span>
                     {% endif %}
                 </div>
-                <div class="flex items-center gap-2 flex-wrap">
+                                <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-gray-500">Booked: {{ booking.created_at.strftime('%d/%m/%Y') }}</span>
+                    
+                    <a href="{{ url_for('my_booking_detail', booking_id=booking.id) }}"
+                       class="bg-plum-600 text-white font-bold px-3 py-1 rounded-lg hover:bg-plum-700 transition">
+                        <i class="fa-solid fa-circle-info mr-1"></i>Details
+                    </a>
                     
                     <!-- Condition Reports -->
                     {% if booking.dispatch_report_done or booking.return_report_done %}
