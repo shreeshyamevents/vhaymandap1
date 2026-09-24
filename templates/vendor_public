@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ vendor.company_name or vendor.name }} — Vendor Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+
+  {# Header card #}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-start justify-between flex-wrap gap-4">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <h1 class="text-2xl font-bold text-plum-700">{{ vendor.company_name or vendor.name }}</h1>
+          {% if vendor.is_verified %}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <i class="fas fa-check-circle mr-1"></i> Verified
+          </span>
+          {% endif %}
+        </div>
+        {% if vendor.company_name %}
+        <p class="text-sm text-gray-600">Contact: {{ vendor.name }}</p>
+        {% endif %}
+        <p class="text-sm text-gray-500 mt-1">
+          Member since {{ vendor.created_at.strftime('%b %Y') }}
+        </p>
+      </div>
+
+      <div class="flex flex-col items-end gap-2">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('chat_with', user_id=vendor.id) }}"
+           class="inline-flex items-center bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+          <i class="fas fa-comment mr-2"></i> Chat with Vendor
+        </a>
+        {% else %}
+        <a href="{{ url_for('login') }}"
+           class="inline-flex items-center bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+          <i class="fas fa-sign-in-alt mr-2"></i> Login to Chat
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Stats row #}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Rating</p>
+        <p class="text-lg font-bold text-gray-900">
+          {% if avg_rating %}
+            {{ avg_rating }} <span class="text-amber-400 text-base">★</span>
+          {% else %}
+            —
+          {% endif %}
+        </p>
+        <p class="text-xs text-gray-500">{{ total_reviews }} review{{ 's' if total_reviews != 1 }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Bookings</p>
+        <p class="text-lg font-bold text-gray-900">{{ total_bookings }}</p>
+        <p class="text-xs text-gray-500">total</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Items</p>
+        <p class="text-lg font-bold text-gray-900">{{ items|length }}</p>
+        <p class="text-xs text-gray-500">available</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Verified Items</p>
+        <p class="text-lg font-bold text-emerald-600">{{ verified_item_count }}</p>
+        <p class="text-xs text-gray-500">blue badge</p>
+      </div>
+    </div>
+  </div>
+
+  {# Items grid #}
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Available Items</h2>
+
+  {% if items %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {% for item in items %}
+    <a href="{{ url_for('item_detail', item_id=item.id) if 'item_detail' in url_for.__globals__.get('app', type('x',(),{'view_functions':{}})()).view_functions else '#' }}"
+       class="block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+      <div class="aspect-video bg-plum-50 overflow-hidden">
+        <img src="{{ item.get_image() }}" alt="{{ item.title }}"
+             class="w-full h-full object-cover">
+      </div>
+      <div class="p-4">
+        <div class="flex items-start justify-between gap-2">
+          <h3 class="font-medium text-gray-900 text-sm leading-snug">{{ item.title }}</h3>
+          {% if item.is_currently_verified %}
+          <i class="fas fa-check-circle text-emerald-500 text-sm flex-shrink-0" title="Verified"></i>
+          {% endif %}
+        </div>
+        <p class="text-xs text-gray-500 mt-1 capitalize">{{ item.category }}</p>
+        <div class="flex items-baseline gap-1 mt-2">
+          <span class="text-plum-700 font-bold">₹{{ '%.0f'|format(item.rate_with_commission) }}</span>
+          <span class="text-xs text-gray-500">/day</span>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">Stock: {{ item.stock }}</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm mb-8">
+    No items available right now.
+  </div>
+  {% endif %}
+
+  {# Recent reviews #}
+  {% if reviews %}
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Reviews</h2>
+  <div class="space-y-3">
+    {% for review in reviews[:5] %}
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-amber-400">
+            {% for i in range(review.rating) %}★{% endfor %}
+            {% for i in range(5 - review.rating) %}<span class="text-gray-300">★</span>{% endfor %}
+          </span>
+          <span class="text-xs text-gray-500">{{ review.customer.name }}</span>
+        </div>
+        <span class="text-xs text-gray-400">{{ review.created_at.strftime('%d %b %Y') }}</span>
+      </div>
+      {% if review.comment %}
+      <p class="text-sm text-gray-700">{{ review.comment }}</p>
+      {% endif %}
+      {% if review.vendor_response %}
+      <div class="mt-3 pl-3 border-l-2 border-plum-200">
+        <p class="text-xs text-gray-500 mb-1">Vendor response:</p>
+        <p class="text-sm text-gray-700">{{ review.vendor_response }}</p>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
