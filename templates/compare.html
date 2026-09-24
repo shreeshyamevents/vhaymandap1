@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Compare Items — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-plum-700">Compare Items</h1>
+    <p class="text-sm text-gray-500 mt-1">Up to 4 items side by side</p>
+  </div>
+
+  {% if items %}
+  <div class="overflow-x-auto">
+    <table class="w-full bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <thead>
+        <tr class="border-b border-gray-200 bg-plum-50">
+          <th class="text-left p-4 text-xs font-semibold text-gray-600 uppercase tracking-wide w-32">Field</th>
+          {% for item in items %}
+          <th class="p-4 text-left min-w-[200px]">
+            <a href="/item/{{ item.id }}" class="block">
+              <div class="aspect-video bg-plum-100 rounded-lg overflow-hidden mb-2">
+                <img src="{{ item.get_image() }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+              </div>
+              <p class="font-semibold text-sm text-gray-900 hover:text-plum-700">{{ item.title }}</p>
+            </a>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="text-sm">
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Category</td>
+          {% for item in items %}
+          <td class="p-4 capitalize text-gray-800">{{ item.category }}</td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Rate / day</td>
+          {% for item in items %}
+          <td class="p-4 font-bold text-plum-700">₹{{ '%.0f'|format(item.rate_with_commission) }}</td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Deposit</td>
+          {% for item in items %}
+          <td class="p-4 text-gray-800">₹{{ '%.0f'|format(item.deposit_amount or 0) }}</td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Stock</td>
+          {% for item in items %}
+          <td class="p-4 text-gray-800">{{ item.stock }}</td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Rating</td>
+          {% for item in items %}
+          <td class="p-4 text-gray-800">
+            {% set stats = item_stats.get(item.id, {}) %}
+            {% if stats.get('avg_rating') %}
+            <span class="text-amber-400">★</span> {{ stats.avg_rating }}
+            <span class="text-xs text-gray-500">({{ stats.review_count }})</span>
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Verified</td>
+          {% for item in items %}
+          <td class="p-4">
+            {% if item.is_currently_verified %}
+            <i class="fas fa-check-circle text-emerald-500 mr-1"></i> Yes
+            {% else %}
+            <span class="text-gray-400">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr class="border-b border-gray-100">
+          <td class="p-4 font-medium text-gray-500">Vendor</td>
+          {% for item in items %}
+          <td class="p-4 text-gray-800">
+            <a href="/vendor/{{ item.vendor.id }}/public" class="text-plum-600 hover:text-plum-800">
+              {{ item.vendor.company_name or item.vendor.name }}
+            </a>
+          </td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td class="p-4"></td>
+          {% for item in items %}
+          <td class="p-4">
+            {% if item.is_available and item.stock > 0 %}
+            <a href="/book/{{ item.id }}"
+               class="inline-block w-full text-center bg-plum-600 hover:bg-plum-700 text-white text-xs font-medium px-3 py-2 rounded-lg">
+              Book Now
+            </a>
+            {% else %}
+            <span class="text-xs text-gray-400">Not available</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="fas fa-balance-scale text-4xl text-plum-200 mb-3"></i>
+    <p class="text-gray-500 mb-4">No items selected to compare.</p>
+    <p class="text-xs text-gray-400 mb-4">Open any item and click "Compare" to add it here.</p>
+    <a href="{{ url_for('index') }}"
+       class="inline-block bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-5 py-2 rounded-lg">
+      Browse Marketplace
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
