@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}My Wishlist — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-plum-700">My Wishlist</h1>
+    <p class="text-sm text-gray-500 mt-1">Items you have saved for later</p>
+  </div>
+
+  {% if items %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for item in items %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <a href="/item/{{ item.id }}" class="block aspect-video bg-plum-50 overflow-hidden">
+        <img src="{{ item.get_image() }}" alt="{{ item.title }}"
+             class="w-full h-full object-cover">
+      </a>
+      <div class="p-4">
+        <div class="flex items-start justify-between gap-2">
+          <a href="/item/{{ item.id }}" class="font-medium text-gray-900 text-sm leading-snug hover:text-plum-700">
+            {{ item.title }}
+          </a>
+          {% if item.is_currently_verified %}
+          <i class="fas fa-check-circle text-emerald-500 text-sm flex-shrink-0" title="Verified"></i>
+          {% endif %}
+        </div>
+        <p class="text-xs text-gray-500 mt-1 capitalize">{{ item.category }}</p>
+        <div class="flex items-baseline gap-1 mt-2">
+          <span class="text-plum-700 font-bold">₹{{ '%.0f'|format(item.rate_with_commission) }}</span>
+          <span class="text-xs text-gray-500">/day</span>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <a href="/book/{{ item.id }}"
+             class="flex-1 text-center bg-plum-600 hover:bg-plum-700 text-white text-xs font-medium px-3 py-2 rounded-lg">
+            Book Now
+          </a>
+          <form action="/wishlist/remove/{{ item.id }}" method="POST" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center justify-center bg-white hover:bg-red-50 text-red-500 border border-red-200 px-3 py-2 rounded-lg"
+                    title="Remove">
+              <i class="fas fa-trash text-xs"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="far fa-heart text-4xl text-plum-200 mb-3"></i>
+    <p class="text-gray-500 mb-4">Your wishlist is empty.</p>
+    <a href="{{ url_for('index') }}"
+       class="inline-block bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-5 py-2 rounded-lg">
+      Browse Marketplace
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
