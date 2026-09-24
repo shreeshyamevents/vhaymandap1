@@ -317,5 +317,52 @@
         document.getElementById('marketplace').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function clearFilters() {
-        document.g
+        function clearFilters() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('minPrice').value = '';
+        document.getElementById('maxPrice').value = '';
+        document.getElementById('sortSelect').value = 'newest';
+        document.getElementById('verifiedOnly').checked = false;
+        const hs = document.getElementById('heroSearch');
+        if (hs) hs.value = '';
+        Object.assign(currentFilters, { category: 'all', search: '', min_price: null, max_price: null, sort: 'newest', verified_only: false });
+        document.querySelectorAll('.cat-tab').forEach(t => {
+            t.className = `cat-tab whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition ${t.dataset.cat === 'all' ? 'bg-plum-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:border-plum-300'}`;
+        });
+        loadItems();
+    }
+
+    function scrollToMarketplace() {
+        const heroSearch = document.getElementById('heroSearch');
+        const searchInput = document.getElementById('searchInput');
+        searchInput.value = heroSearch.value;
+        currentFilters.search = heroSearch.value.trim();
+        loadItems();
+        document.getElementById('marketplace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadItems();
+
+        const searchInput = document.getElementById('searchInput');
+        const minPrice = document.getElementById('minPrice');
+        const maxPrice = document.getElementById('maxPrice');
+        const sortSelect = document.getElementById('sortSelect');
+        const verifiedOnly = document.getElementById('verifiedOnly');
+        const heroSearch = document.getElementById('heroSearch');
+
+        let debounceTimer;
+        function debouncedLoad() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadItems, 350);
+        }
+
+        if (searchInput) searchInput.addEventListener('input', e => { currentFilters.search = e.target.value.trim(); debouncedLoad(); });
+        if (minPrice) minPrice.addEventListener('input', e => { currentFilters.min_price = e.target.value ? parseFloat(e.target.value) : null; debouncedLoad(); });
+        if (maxPrice) maxPrice.addEventListener('input', e => { currentFilters.max_price = e.target.value ? parseFloat(e.target.value) : null; debouncedLoad(); });
+        if (sortSelect) sortSelect.addEventListener('change', e => { currentFilters.sort = e.target.value; loadItems(); });
+        if (verifiedOnly) verifiedOnly.addEventListener('change', e => { currentFilters.verified_only = e.target.checked; loadItems(); });
+        if (heroSearch) heroSearch.addEventListener('keydown', e => { if (e.key === 'Enter') scrollToMarketplace(); });
+    });
+</script>
+{% endblock %}
