@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Notifications — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-plum-700">Notifications</h1>
+            <p class="text-sm text-gray-500 mt-1">All your recent activity</p>
+        </div>
+        {% if notifications %}
+        <form method="POST" action="{{ url_for('notifications_clear_all') }}">
+            <button type="submit" class="text-sm text-red-600 hover:text-red-800 font-medium"
+                    onclick="return confirm('Clear all notifications?')">
+                <i class="fas fa-trash mr-1"></i>Clear all
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if notifications %}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+        {% for n in notifications %}
+        <a href="{{ url_for('notification_open', nid=n.id) }}"
+           class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition {% if not n.is_read %}bg-plum-50/30{% endif %}">
+            <div class="w-9 h-9 rounded-full bg-plum-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                {% if n.type == 'booking' %}<i class="fa-solid fa-calendar-check text-plum-600 text-sm"></i>
+                {% elif n.type == 'cancel' %}<i class="fa-solid fa-ban text-red-500 text-sm"></i>
+                {% elif n.type == 'payment' %}<i class="fa-solid fa-indian-rupee-sign text-emerald-600 text-sm"></i>
+                {% elif n.type == 'chat' %}<i class="fa-regular fa-comment text-blue-500 text-sm"></i>
+                {% elif n.type == 'review' %}<i class="fa-solid fa-star text-amber-500 text-sm"></i>
+                {% elif n.type == 'ticket' %}<i class="fa-regular fa-ticket text-gray-600 text-sm"></i>
+                {% else %}<i class="fa-regular fa-bell text-plum-600 text-sm"></i>
+                {% endif %}
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-900">{{ n.title }}</p>
+                <p class="text-sm text-gray-600 mt-0.5">{{ n.message }}</p>
+                <p class="text-xs text-gray-400 mt-1.5">{{ n.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+            </div>
+            {% if not n.is_read %}
+            <span class="w-2 h-2 rounded-full bg-plum-600 flex-shrink-0 mt-2"></span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <i class="fa-regular fa-bell-slash text-4xl text-plum-200 mb-3"></i>
+        <p class="text-gray-500">No notifications yet.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
