@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Announcements — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">Announcements</h1>
+      <p class="text-sm text-gray-500 mt-1">Broadcast messages to all users</p>
+    </div>
+    <a href="{{ url_for('admin_announcement_new') }}"
+       class="bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
+      <i class="fas fa-plus mr-1"></i> New
+    </a>
+  </div>
+
+  {% if show_form %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <h2 class="font-semibold text-gray-900 mb-4">Create Announcement</h2>
+    <form method="POST" action="{{ url_for('admin_announcement_new') }}">
+      <div class="mb-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">Message</label>
+        <textarea name="message" rows="3" required maxlength="300"
+                  placeholder="e.g. Diwali offer — 10% off on mandap bookings!"
+                  class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-plum-500 focus:ring-2 focus:ring-plum-100 outline-none"></textarea>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">
+          Expires on <span class="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <input type="date" name="expires_at"
+               class="border border-gray-200 rounded-lg p-3 text-sm focus:border-plum-500 focus:ring-2 focus:ring-plum-100 outline-none">
+      </div>
+      <button type="submit"
+              class="bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-5 py-2.5 rounded-lg">
+        Create
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if announcements %}
+  <div class="space-y-3">
+    {% for ann in announcements %}
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <p class="text-sm text-gray-900">{{ ann.message }}</p>
+          <p class="text-xs text-gray-500 mt-2">
+            Created: {{ ann.created_at.strftime('%d %b %Y, %I:%M %p') }}
+            {% if ann.expires_at %} · Expires: {{ ann.expires_at.strftime('%d %b %Y') }}{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          {% if ann.is_active %}
+          <span class="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded">
+            <i class="fas fa-circle text-[8px] mr-1"></i>Active
+          </span>
+          {% else %}
+          <span class="text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 px-2 py-1 rounded">
+            Inactive
+          </span>
+          {% endif %}
+          <form method="POST" action="{{ url_for('admin_announcement_toggle', ann_id=ann.id) }}" class="inline">
+            <button type="submit" class="text-xs text-plum-600 hover:text-plum-800 px-2 py-1">
+              {% if ann.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </form>
+          <form method="POST" action="{{ url_for('admin_announcement_delete', ann_id=ann.id) }}" class="inline"
+                onsubmit="return confirm('Delete this announcement?')">
+            <button type="submit" class="text-xs text-red-600 hover:text-red-800 px-2 py-1">
+              Delete
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif not show_form %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="fas fa-bullhorn text-4xl text-plum-200 mb-3"></i>
+    <p class="text-gray-500 mb-4">No announcements yet.</p>
+    <a href="{{ url_for('admin_announcement_new') }}"
+       class="inline-block bg-plum-600 hover:bg-plum-700 text-white text-sm font-medium px-5 py-2 rounded-lg">
+      Create First Announcement
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
