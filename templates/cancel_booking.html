@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Cancel Booking — {{ booking.booking_reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <a href="{{ url_for('my_booking_detail', booking_id=booking.id) }}"
+       class="text-sm text-plum-600 hover:text-plum-800">
+      <i class="fas fa-arrow-left mr-1"></i> Back
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+        <i class="fas fa-exclamation-triangle text-red-500"></i>
+      </div>
+      <h1 class="text-xl font-bold text-gray-900">Cancel Booking?</h1>
+    </div>
+    <p class="text-sm text-gray-600 mt-2">
+      You are about to cancel <strong>{{ booking.booking_reference }}</strong>
+      for <strong>{{ booking.item.title }}</strong>.
+    </p>
+  </div>
+
+  {# Booking summary #}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Start Date</p>
+        <p class="font-medium text-gray-900">{{ booking.start_date.strftime('%d %b %Y') }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">End Date</p>
+        <p class="font-medium text-gray-900">{{ booking.end_date.strftime('%d %b %Y') }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Paid</p>
+        <p class="font-medium text-gray-900">₹{{ '%.2f'|format(booking.total_amount) }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Days Until Start</p>
+        <p class="font-medium text-gray-900">{{ days_until }} day{{ 's' if days_until != 1 }}</p>
+      </div>
+    </div>
+  </div>
+
+  {# Refund breakdown #}
+  <div class="bg-plum-50 border border-plum-200 rounded-xl p-5 mb-6">
+    <h2 class="text-sm font-semibold text-plum-800 mb-3">Refund Breakdown</h2>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between">
+        <span class="text-gray-700">Refund percentage on base rent</span>
+        <span class="font-semibold text-plum-700">{{ (refund_pct * 100)|int }}%</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-700">Base rent refund</span>
+        <span class="text-gray-900">₹{{ '%.2f'|format(booking.base_rent * refund_pct) }}</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-gray-700">Security deposit (refundable)</span>
+        <span class="text-gray-900">₹{{ '%.2f'|format(booking.deposit or 0) }}</span>
+      </div>
+      <div class="flex justify-between border-t border-plum-300 pt-2 mt-2">
+        <span class="font-semibold text-plum-800">Total eligible refund</span>
+        <span class="font-bold text-plum-800 text-base">₹{{ '%.2f'|format(refund_amount) }}</span>
+      </div>
+    </div>
+    <p class="text-xs text-gray-600 mt-3 leading-relaxed">
+      Commission and transport fee are non-refundable. Actual refund is processed manually
+      by admin within 3-5 business days.
+    </p>
+  </div>
+
+  {# Form #}
+  <form method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+    <div class="mb-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-1">
+        Reason for cancellation <span class="text-gray-400 font-normal">(optional)</span>
+      </label>
+      <textarea name="reason" rows="3" maxlength="500"
+                placeholder="Let us know why you're cancelling..."
+                class="w-full border border-gray-200 rounded-lg p-3 text-sm focus:border-plum-500 focus:ring-2 focus:ring-plum-100 outline-none"></textarea>
+    </div>
+
+    <div class="flex gap-3">
+      <a href="{{ url_for('my_booking_detail', booking_id=booking.id) }}"
+         class="flex-1 text-center bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-5 py-3 rounded-lg">
+        Keep Booking
+      </a>
+      <button type="submit"
+              class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium px-5 py-3 rounded-lg">
+        Confirm Cancellation
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}
