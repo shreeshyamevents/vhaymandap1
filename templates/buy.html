@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Buy {{ item.title }} — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+
+  <a href="/item/{{ item.id }}" class="text-sm text-plum-600 hover:text-plum-800 mb-4 inline-block">
+    <i class="fas fa-arrow-left mr-1"></i> Back to item
+  </a>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex gap-4 mb-4">
+      <div class="w-20 h-20 rounded-lg overflow-hidden bg-plum-50 flex-shrink-0">
+        <img src="{{ item.get_image() }}" alt="{{ item.title }}" class="w-full h-full object-cover">
+      </div>
+      <div class="flex-1">
+        <h1 class="font-bold text-lg text-gray-900">{{ item.title }}</h1>
+        <p class="text-xs text-gray-500 capitalize mt-1">{{ item.category }}</p>
+        <p class="text-sm font-bold text-emerald-700 mt-2">₹{{ '%.0f'|format(item.sale_price) }} <span class="text-xs text-gray-500 font-normal">per unit</span></p>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500">In stock: {{ item.stock }} · Vendor: {{ item.vendor.company_name or item.vendor.name }}</p>
+  </div>
+
+  <form method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block font-semibold text-sm mb-1">Quantity *</label>
+        <input type="number" name="quantity" required min="1" max="{{ item.stock }}" value="1"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">UTR / Reference *</label>
+        <input type="text" name="utr_number" required placeholder="Payment reference"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
+      </div>
+    </div>
+
+    <div>
+      <label class="block font-semibold text-sm mb-1">Delivery address *</label>
+      <textarea name="venue_address" required rows="2" placeholder="Full delivery address"
+                class="w-full border border-gray-200 rounded-lg p-3 text-sm"></textarea>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block font-semibold text-sm mb-1">Delivery area *</label>
+        <select name="delivery_area" class="w-full border border-gray-200 rounded-lg p-3 text-sm bg-white">
+          <option value="city">Within city (₹600 / ₹1100)</option>
+          <option value="outskirts">Outskirts (₹1500 / ₹2000)</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Weight *</label>
+        <select name="weight_category" class="w-full border border-gray-200 rounded-lg p-3 text-sm bg-white">
+          <option value="till_20">Till 20 kg</option>
+          <option value="above_20">Above 20 kg</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="bg-plum-50 border border-plum-200 rounded-lg p-4 text-sm">
+      <p class="font-semibold text-plum-800 mb-2">Payment Summary</p>
+      <div class="space-y-1 text-gray-700">
+        <div class="flex justify-between"><span>Base price (× quantity)</span><span id="base">—</span></div>
+        <div class="flex justify-between"><span>Commission (5%)</span><span id="comm">—</span></div>
+        <div class="flex justify-between"><span>Transport</span><span id="trans">—</span></div>
+        <div class="flex justify-between border-t border-plum-300 pt-1.5 mt-1.5">
+          <span class="font-semibold text-plum-800">Total</span>
+          <span class="font-bold text-plum-800" id="total">—</span>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">No security deposit for purchases. KYC required for orders ≥ ₹30,000.</p>
+    </div>
+
+    <button type="submit"
+            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-3 rounded-lg">
+      <i class="fas fa-shopping-cart mr-1"></i> Confirm Purchase
+    </button>
+
+  </form>
+
+</div>
+
+<script>
+(function(){
+  var unitPrice = {{ item.sale_price or 0 }};
+  var qtyEl = document.querySelector('input[name="quantity"]');
+  var areaEl = document.querySelector('select[name="delivery_area"]');
+  var weightEl = document.querySelector('select[name="weight_category"]');
+  var transportMatrix = { city: { till_20: 600, above_20: 1100 }, outskirts: { till_20: 1500, above_20: 2000 } };
+
+  function fmt(n) { return '₹' + n.toFixed(2); }
+  function update() {
+    var q = parseInt(qtyEl.value) || 1;
+    var area = areaEl.value, w = weightEl.value;
+    var base = unitPrice * q;
+    var comm = Math.round(base * 0.05 * 100) / 100;
+    var trans = (transportMatrix[area] || {})[w] || 600;
+    var total = base + comm + trans;
+    document.getElementById('base').textContent = fmt(base);
+    document.getElementById('comm').textContent = fmt(comm);
+    document.getElementById('trans').textContent = fmt(trans);
+    document.getElementById('total').textContent = fmt(total);
+  }
+  [qtyEl, areaEl, weightEl].forEach(function(el){ el.addEventListener('input', update); el.addEventListener('change', update); });
+  update();
+})();
+</script>
+{% endblock %}
