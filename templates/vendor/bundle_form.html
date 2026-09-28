@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if bundle else 'New' }} Bundle — Vendor{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <a href="{{ url_for('vendor_bundles') }}" class="text-sm text-plum-600 hover:text-plum-800">
+      <i class="fas fa-arrow-left mr-1"></i> Back to Bundles
+    </a>
+  </div>
+
+  <h1 class="text-2xl font-bold text-plum-700 mb-6">{{ 'Edit' if bundle else 'New' }} Bundle</h1>
+
+  <form method="POST" enctype="multipart/form-data" class="space-y-6"
+        id="bundle-form" onsubmit="return prepareItemsForSubmit()">
+
+    {# Basic info #}
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h2 class="font-semibold text-gray-900 text-sm uppercase tracking-wide">Basic Info</h2>
+
+      <div>
+        <label class="block font-semibold text-sm mb-1">Bundle name *</label>
+        <input type="text" name="name" required maxlength="150"
+               value="{{ bundle.name if bundle else '' }}"
+               placeholder="e.g. Mehndi Bundle — Deluxe"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-sm mb-1">Tag</label>
+        <select name="tag" class="w-full border border-gray-200 rounded-lg p-3 text-sm bg-white">
+          {% set current_tag = bundle.tag if bundle else 'custom' %}
+          {% for t in ['mehndi', 'haldi', 'sangeet', 'wedding', 'reception', 'custom'] %}
+          <option value="{{ t }}" {% if current_tag == t %}selected{% endif %}>{{ t|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-sm mb-1">Description</label>
+        <textarea name="description" rows="3" maxlength="500"
+                  placeholder="Describe what's included..."
+                  class="w-full border border-gray-200 rounded-lg p-3 text-sm">{{ bundle.description if bundle else '' }}</textarea>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-sm mb-1">Image (optional)</label>
+        {% if bundle and bundle.image_url %}
+        <div class="mb-2">
+          <img src="{{ bundle.image_url }}" alt="Current" class="w-32 h-24 object-cover rounded-lg border border-gray-200">
+        </div>
+        {% endif %}
+        <input type="file" name="image_file" accept="image/*"
+               class="w-full border border-gray-200 rounded-lg p-2 text-sm">
+        <p class="text-xs text-gray-500 mt-1">Or paste URL:</p>
+        <input type="url" name="image_url" placeholder="https://..."
+               value="{{ bundle.image_url if bundle and bundle.image_url else '' }}"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm mt-1">
+      </div>
+    </div>
+
+    {# Pricing #}
+    <div class="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <h2 class="font-semibold text-gray-900 text-sm uppercase tracking-wide">Pricing</h2>
+
+      <div>
+        <label class="block font-semibold text-sm mb-2">Pricing type</label>
+        <div class="space-y-2">
+          {% set pt = bundle.pricing_type if bundle else 'discount' %}
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="pricing_type" value="discount" {% if pt == 'discount' %}checked{% endif %}
+                   onchange="togglePricing()" class="w-4 h-4 accent-plum-600">
+            <span class="text-sm"><strong>Discount</strong> — % off on individual item total</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="pricing_type" value="fixed" {% if pt == 'fixed' %}checked{% endif %}
+                   onchange="togglePricing()" class="w-4 h-4 accent-plum-600">
+            <span class="text-sm"><strong>Fixed price</strong> — flat rate for the whole bundle</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="discount-field" style="display: none;">
+        <label class="block font-semibold text-sm mb-1">Discount %</label>
+        <input type="number" name="discount_percent" min="0" max="90" step="1"
+               value="{{ bundle.discount_percent if bundle and bundle.discount_percent else 10 }}"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
+      </div>
+
+      <div id="fixed-field" style="display: none;">
+        <label class="block font-semibold text-sm mb-1">Fixed bundle price (₹)</label>
+        <input type="number" name="fixed_price" min="0" step="1"
+               value="{{ bundle.fixed_price if bundle and bundle.fixed_price else '' }}"
+               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
+      </div>
+    </div>
+
+    {# Items #}
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-900 text-sm uppercase tracking-wide">Items in bundle</h2>
+        <span class="text-xs text-gray-500" id="item-count">0 selected</span>
+      </div>
+
+      {% if vendor_items %}
+      <div class="space-y-2 max-h-96 overflow-y-auto border border-gray-100 rounded-lg p-2">
+        {% for item in vendor_items %}
+        {% set in_bundle = false %}
+        {% set existing_qty = 1 %}
+        {% if bundle %}
+          {% for bi in bundle.bundle_items %}
+            {% if bi.item_id == item.id %}
+              {% set in_bundle = true %}
+              {% set existing_qty = bi.quantity %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        <div class="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
+          <input type="checkbox" name="item_check" value="{{ item.id }}"
+                 data-item-id="{{ item.id }}"
+                 {% if in_bundle %}checked{% endif %}
+                 onchange="updateItemCount()"
+                 class="w-4 h-4 accent-plum-600 flex-shrink-0">
+          <div class="w-10 h-10 rounded bg-plum-50 flex-shrink-0 overflow-hidden">
+            <img src="{{ item.get_image() }}" class="w-full h-full object-cover" alt="">
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900 truncate">{{ item.title }}</p>
+            <p class="text-xs text-gray-500">₹{{ '%.0f'|format(item.rate_per_day) }}/day · Stock: {{ item.stock }}</p>
+          </div>
+          <input type="number" min="1" max="{{ item.stock }}"
+                 value="{{ existing_qty }}"
+                 data-qty-for="{{ item.id }}"
+                 class="w-16 border border-gray-200 rounded p-1.5 text-sm text-center">
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm text-gray-500">You have no items yet. Add items first.</p>
+      {% endif %}
+    </div>
+
+    {% if bundle %}
+    <div class="flex items-center gap-2">
+      <input type="checkbox" name="is_active" value="1" {% if bundle.is_active %}checked{% endif %}
+             class="w-4 h-4 accent-plum-600">
+      <label class="text-sm text-gray-700">Active (visible to customers)</label>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-3">
+      <a href="{{ url_for('vendor_bundles') }}"
+         class="flex-1 text-center bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold px-5 py-3 rounded-lg">
+        Cancel
+      </a>
+      <button type="submit"
+              class="flex-1 bg-plum-600 hover:bg-plum-700 text-white font-semibold px-5 py-3 rounded-lg">
+        {{ 'Save Changes' if bundle else 'Create Bundle' }}
+      </button>
+    </div>
+
+    {# Hidden inputs, filled by JS #}
+    <div id="hidden-items-container"></div>
+
+  </form>
+
+</div>
+
+<script>
+function togglePricing() {
+  var pt = document.querySelector('input[name="pricing_type"]:checked').value;
+  document.getElementById('discount-field').style.display = (pt === 'discount') ? 'block' : 'none';
+  document.getElementById('fixed-field').style.display = (pt === 'fixed') ? 'block' : 'none';
+}
+function updateItemCount() {
+  var n = document.querySelectorAll('input[name="item_check"]:checked').length;
+  document.getElementById('item-count').textContent = n + ' selected';
+}
+function prepareItemsForSubmit() {
+  var container = document.getElementById('hidden-items-container');
+  container.innerHTML = '';
+  document.querySelectorAll('input[name="item_check"]:checked').forEach(function(cb) {
+    var id = cb.value;
+    var qtyInput = document.querySelector('input[data-qty-for="' + id + '"]');
+    var qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+    var i1 = document.createElement('input');
+    i1.type = 'hidden'; i1.name = 'item_ids'; i1.value = id;
+    var i2 = document.createElement('input');
+    i2.type = 'hidden'; i2.name = 'item_qtys'; i2.value = qty;
+    container.appendChild(i1);
+    container.appendChild(i2);
+  });
+  if (container.children.length === 0) {
+    alert('Please select at least one item for the bundle.');
+    return false;
+  }
+  return true;
+}
+document.addEventListener('DOMContentLoaded', function() {
+  togglePricing();
+  updateItemCount();
+});
+</script>
+{% endblock %}
