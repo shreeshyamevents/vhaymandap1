@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ bundle.name }} — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+
+  <a href="{{ url_for('bundles_list') }}" class="text-sm text-plum-600 hover:text-plum-800 mb-4 inline-block">
+    <i class="fas fa-arrow-left mr-1"></i> All Bundles
+  </a>
+
+  {# Hero #}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2">
+      <div class="aspect-video md:aspect-auto bg-plum-50">
+        <img src="{{ bundle.get_image() }}" alt="{{ bundle.name }}" class="w-full h-full object-cover">
+      </div>
+      <div class="p-6">
+        {% if bundle.tag %}
+        <span class="inline-block bg-plum-100 text-plum-700 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full mb-3">
+          {{ bundle.tag }}
+        </span>
+        {% endif %}
+        <h1 class="text-2xl md:text-3xl font-bold text-plum-700 mb-2">{{ bundle.name }}</h1>
+        <p class="text-sm text-gray-500 mb-4">
+          by <a href="/vendor/{{ bundle.vendor.id }}/public" class="text-plum-600 hover:text-plum-800">{{ bundle.vendor.company_name or bundle.vendor.name }}</a>
+        </p>
+
+        {% if bundle.description %}
+        <p class="text-sm text-gray-700 leading-relaxed mb-4">{{ bundle.description }}</p>
+        {% endif %}
+
+        <div class="bg-plum-50 border border-plum-200 rounded-xl p-4 mb-4">
+          <p class="text-xs text-gray-600 uppercase tracking-wide mb-1">Pricing</p>
+          {% if bundle.pricing_type == 'fixed' and bundle.fixed_price %}
+          <p class="text-2xl font-bold text-plum-700">₹{{ '%.0f'|format(bundle.fixed_price) }}</p>
+          <p class="text-xs text-gray-500 mt-0.5">Fixed bundle price (per booking)</p>
+          {% elif bundle.pricing_type == 'discount' and bundle.discount_percent %}
+          <p class="text-2xl font-bold text-emerald-600">{{ bundle.discount_percent|int }}% OFF</p>
+          <p class="text-xs text-gray-500 mt-0.5">on total of individual item rates</p>
+          {% else %}
+          <p class="text-xl font-bold text-gray-700">Custom pricing</p>
+          {% endif %}
+        </div>
+
+        {% if available %}
+        <a href="/bundle/{{ bundle.id }}/book"
+           class="block w-full text-center bg-plum-600 hover:bg-plum-700 text-white font-semibold px-5 py-3 rounded-lg">
+          <i class="fas fa-calendar-check mr-2"></i> Book This Bundle
+        </a>
+        {% else %}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-sm text-red-700">
+          <i class="fas fa-exclamation-triangle mr-1"></i>
+          Not available: <strong>{{ blocking_item }}</strong> is out of stock.
+        </div>
+        <button disabled
+                class="w-full text-center bg-gray-300 text-white font-semibold px-5 py-3 rounded-lg cursor-not-allowed">
+          <i class="fas fa-ban mr-2"></i> Not Available
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Items in bundle #}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-lg font-bold text-gray-900 mb-4">
+      What's included
+      <span class="text-sm font-normal text-gray-500 ml-2">({{ bundle.items_count }} items)</span>
+    </h2>
+
+    <div class="divide-y divide-gray-100">
+      {% for bi in bundle.bundle_items %}
+      {% if bi.item %}
+      <div class="flex items-center gap-4 py-3">
+        <div class="w-16 h-16 rounded-lg overflow-hidden bg-plum-50 flex-shrink-0">
+          <img src="{{ bi.item.get_image() }}" alt="{{ bi.item.title }}" class="w-full h-full object-cover">
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm text-gray-900 truncate">{{ bi.item.title }}</p>
+          <p class="text-xs text-gray-500 capitalize mt-0.5">{{ bi.item.category }} · Qty: {{ bi.quantity }}</p>
+        </div>
+        <div class="text-right flex-shrink-0">
+          <p class="text-sm font-semibold text-gray-700">₹{{ '%.0f'|format(bi.item.rate_per_day) }}<span class="text-xs text-gray-500 font-normal">/day</span></p>
+          {% if not bi.item.is_available or (bi.item.stock or 0) < bi.quantity %}
+          <p class="text-[10px] text-red-500 font-bold mt-0.5">Out of stock</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if individual_sum %}
+    <div class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-600">
+      <div class="flex justify-between">
+        <span>Individual items total (per day)</span>
+        <span class="font-semibold">₹{{ '%.0f'|format(individual_sum) }}</span>
+      </div>
+      {% if bundle.pricing_type == 'discount' and bundle.discount_percent %}
+      <div class="flex justify-between mt-1 text-emerald-600">
+        <span>Bundle discount</span>
+        <span class="font-semibold">- {{ bundle.discount_percent|int }}%</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
