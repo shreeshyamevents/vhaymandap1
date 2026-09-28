@@ -310,8 +310,8 @@ class Booking(db.Model):
     cancellation_reason = db.Column(db.Text, nullable=True)
     refund_amount = db.Column(db.Float, nullable=True)
     cancelled_by = db.Column(db.String(20), nullable=True)
-    # Batch 8 — order type ('rent' | 'sale')
-    order_type = db.Column(db.String(10), default='rent')
+    # Batch 8 — order type ('rent' | 'sale' | 'bundle' | 'bundle_child')
+    order_type = db.Column(db.String(20), default='rent')
     # Batch 9 — bundle linkage
     bundle_id = db.Column(db.Integer, db.ForeignKey('bundles.id'), nullable=True)
     parent_booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True, index=True)
@@ -3692,6 +3692,7 @@ def init_database():
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS is_for_sale BOOLEAN DEFAULT FALSE",
                 "ALTER TABLE items ADD COLUMN IF NOT EXISTS sale_price FLOAT",
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_type VARCHAR(10) DEFAULT 'rent'",
+                "ALTER TABLE bookings ALTER COLUMN order_type TYPE VARCHAR(20)",
                 # Batch 9 — bundle linkage
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS bundle_id INTEGER",
                 "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS parent_booking_id INTEGER",
