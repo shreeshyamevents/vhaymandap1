@@ -10,6 +10,7 @@
     </div>
 
     <form method="POST" enctype="multipart/form-data" class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
             <label class="block font-semibold text-sm mb-1">Title *</label>
             <input type="text" name="title" required value="{{ item.title if item else '' }}" class="w-full border rounded-lg p-2.5 text-sm">
