@@ -2524,7 +2524,11 @@ def vendor_add_item():
         image_url = request.form.get('image_url', '').strip()
         image_filename = None
         if 'image_file' in request.files and request.files['image_file'].filename:
-            image_filename = save_uploaded_file(request.files['image_file'])
+            result = upload_file_to_cloudinary(request.files['image_file'], folder='vyahmandap/items')
+            if result and result.get('url'):
+                image_url = result['url']
+            else:
+                flash('Image upload failed. Please try again or paste an image URL.', 'warning')
         if not title or rate <= 0:
             flash('Title and rate are required.', 'danger')
             return render_template('vendor/item_form.html')
