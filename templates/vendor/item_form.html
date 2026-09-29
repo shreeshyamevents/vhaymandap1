@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+% extends "base.html" %}
 
 {% block title %}{{ 'Edit' if item else 'Add' }} Item - Vendor{% endblock %}
 
@@ -61,12 +61,22 @@
             </div>
         </div>
         <div>
-            <label class="block font-semibold text-sm mb-1">Image URL</label>
-            <input type="url" name="image_url" value="{{ item.image_url if item else '' }}" placeholder="https://example.com/image.jpg" class="w-full border rounded-lg p-2.5 text-sm">
-        </div>
-        <div>
-            <label class="block font-semibold text-sm mb-1">OR Upload Image</label>
-            <input type="file" name="image_file" accept="image/*" class="w-full border rounded-lg p-2.5 text-sm">
+             <div>
+            <label class="block font-semibold text-sm mb-1">Item Photo</label>
+            {% if item and item.image_url %}
+            <div class="mb-2">
+                <img src="{{ item.image_url }}" alt="Current" class="w-32 h-32 object-cover rounded-lg border">
+                <p class="text-xs text-gray-500 mt-1">Current photo — naya lene ke liye niche button dabao</p>
+            </div>
+            {% endif %}
+            <button type="button" onclick="takeItemPhoto()"
+                    class="w-full bg-plum-600 text-white font-semibold py-3 rounded-lg text-sm flex items-center justify-center gap-2">
+                📷 Take Photo
+            </button>
+            <input type="file" id="itemImageInput" name="image_file" accept="image/*"
+                   capture="environment" class="hidden" onchange="showItemFileName(this)">
+            <p id="itemFileName" class="text-xs text-gray-500 mt-2 text-center"></p>
+            <p class="text-xs text-gray-400 mt-1 text-center">Camera se live photo lo</p>
         </div>
         {% if item %}
         <div class="flex items-center gap-3">
@@ -79,4 +89,17 @@
         </button>
     </form>
 </div>
+<script>
+function takeItemPhoto() {
+    document.getElementById('itemImageInput').click();
+}
+function showItemFileName(input) {
+    const disp = document.getElementById('itemFileName');
+    if (input.files && input.files[0]) {
+        disp.textContent = '✓ ' + input.files[0].name;
+        disp.classList.remove('text-gray-500');
+        disp.classList.add('text-green-600', 'font-semibold');
+    }
+}
+</script>
 {% endblock %}
