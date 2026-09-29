@@ -2564,10 +2564,12 @@ def vendor_edit_item(item_id):
         item.is_available = 'is_available' in request.form
         _apply_sale_fields(item)
         if 'image_file' in request.files and request.files['image_file'].filename:
-            image_filename = save_uploaded_file(request.files['image_file'])
-            if image_filename:
-                item.image_filename = image_filename
-                item.image_url = None
+            result = upload_file_to_cloudinary(request.files['image_file'], folder='vyahmandap/items')
+            if result and result.get('url'):
+                item.image_url = result['url']
+                item.image_filename = None
+            else:
+                flash('Image upload failed. Please try again or paste an image URL.', 'warning')
         image_url = request.form.get('image_url', '').strip()
         if image_url:
             item.image_url = image_url
