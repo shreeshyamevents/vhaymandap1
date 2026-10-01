@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Earnings — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-plum-700">Earnings Summary</h1>
+    <p class="text-sm text-gray-500 mt-1">Based on completed bookings only</p>
+  </div>
+
+  {# Stat cards #}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Earnings</p>
+      <p class="text-3xl font-bold text-plum-700">₹{{ '%.0f'|format(total_earnings) }}</p>
+      <p class="text-xs text-gray-500 mt-1">from base rent (before commission)</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Completed Bookings</p>
+      <p class="text-3xl font-bold text-gray-900">{{ total_bookings }}</p>
+      <p class="text-xs text-gray-500 mt-1">all-time</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Deposits Collected</p>
+      <p class="text-3xl font-bold text-gray-900">₹{{ '%.0f'|format(total_deposits) }}</p>
+      <p class="text-xs text-gray-500 mt-1">refundable, held separately</p>
+    </div>
+  </div>
+
+  {# Monthly chart #}
+  <div class="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+    <h2 class="font-semibold text-gray-900 mb-5">Last 6 Months</h2>
+    <div class="flex items-end justify-between gap-3 h-40">
+      {% for m in monthly %}
+      <div class="flex-1 flex flex-col items-center">
+        <div class="text-xs font-semibold text-gray-700 mb-1">
+          {% if m.amount > 0 %}₹{{ '%.0f'|format(m.amount) }}{% endif %}
+        </div>
+        <div class="w-full bg-plum-100 rounded-t-md relative flex-1 flex items-end">
+          <div class="w-full bg-plum-600 rounded-t-md transition-all"
+               style="height: {{ ((m.amount / max_amount) * 100)|round(1) }}%; min-height: {{ 4 if m.amount > 0 else 0 }}px;"></div>
+        </div>
+        <div class="text-[10px] text-gray-500 mt-1.5 font-medium">{{ m.label }}</div>
+        <div class="text-[10px] text-gray-400">{{ m.count }} booking{{ 's' if m.count != 1 }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Completed bookings list #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+      <h2 class="font-semibold text-gray-900">Completed Bookings</h2>
+    </div>
+    {% if completed %}
+    <div class="divide-y divide-gray-100">
+      {% for b in completed %}
+      <a href="{{ url_for('my_booking_detail', booking_id=b.id) }}"
+         class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition">
+        <div class="min-w-0 flex-1">
+          <p class="font-medium text-sm text-gray-900 truncate">{{ b.item.title }}</p>
+          <p class="text-xs text-gray-500 mt-0.5">
+            {{ b.booking_reference }} · {{ b.start_date.strftime('%d %b %Y') }} · {{ b.customer.name }}
+          </p>
+        </div>
+        <div class="text-right ml-3">
+          <p class="font-bold text-plum-700">₹{{ '%.0f'|format(b.base_rent) }}</p>
+          <p class="text-xs text-gray-500">base rent</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-12 text-center text-sm text-gray-500">
+      <i class="fas fa-chart-line text-3xl text-plum-200 mb-3"></i>
+      <p>No completed bookings yet.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
