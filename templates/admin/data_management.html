@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Data Management — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+
+    <div class="mb-6 flex justify-between items-center flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-plum-700">🗄️ Data Management</h1>
+            <p class="text-sm text-gray-500 mt-1">View and selectively clear application data</p>
+        </div>
+        <a href="{{ url_for('admin_dashboard') }}" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">← Admin Dashboard</a>
+    </div>
+
+    <!-- Statistics -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <h2 class="font-bold text-lg mb-4">📊 Current Data</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-plum-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Users</div>
+                <div class="text-2xl font-bold text-plum-700">{{ counts.users }}</div>
+                <div class="text-[10px] text-gray-500">{{ counts.customers }} cust · {{ counts.vendors }} vend</div>
+            </div>
+            <div class="bg-plum-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Items</div>
+                <div class="text-2xl font-bold text-plum-700">{{ counts.items }}</div>
+                <div class="text-[10px] text-gray-500">{{ counts.bundles }} bundles</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Bookings</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.bookings }}</div>
+                <div class="text-[10px] text-gray-500">{{ counts.payment_proofs }} proofs</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Reports</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.reports }}</div>
+                <div class="text-[10px] text-gray-500">{{ counts.reviews }} reviews</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Messages</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.messages }}</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Notifications</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.notifications }}</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Tickets</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.tickets }}</div>
+                <div class="text-[10px] text-gray-500">{{ counts.tickets_closed }} closed</div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+                <div class="text-xs text-gray-500 uppercase tracking-wide">Wishlist</div>
+                <div class="text-2xl font-bold text-gray-700">{{ counts.wishlist }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="bg-red-50 border-2 border-red-300 rounded-xl p-6 mb-6">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-2xl">⚠️</span>
+            <h2 class="font-bold text-lg text-red-900">Danger Zone</h2>
+        </div>
+        <p class="text-xs text-red-700 mb-6">These actions are <strong>irreversible</strong>. Each requires typing a confirmation word.</p>
+
+        <!-- 1. Clear Bookings -->
+        <div class="bg-white rounded-lg p-4 mb-4 border border-red-200">
+            <h3 class="font-bold text-red-900 mb-1">Clear All Booking Data</h3>
+            <p class="text-xs text-gray-600 mb-3">
+                Deletes: {{ counts.bookings }} bookings, {{ counts.payment_proofs }} payment proofs, {{ counts.reports }} reports, {{ counts.reviews }} reviews, and booking-related notifications.
+                <br><strong class="text-green-700">Preserved:</strong> users, items, bundles, tickets, wishlist.
+            </p>
+            <form method="POST" onsubmit="return confirm('Are you SURE? This cannot be undone.')" class="flex gap-2 flex-wrap">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="clear_bookings">
+                <input type="text" name="confirm" required placeholder="Type DELETE_BOOKINGS" class="border border-red-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+                <button type="submit" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+                    🗑️ Clear Bookings
+                </button>
+            </form>
+        </div>
+
+        <!-- 2. Clear Notifications -->
+        <div class="bg-white rounded-lg p-4 mb-4 border border-red-200">
+            <h3 class="font-bold text-red-900 mb-1">Clear All Notifications</h3>
+            <p class="text-xs text-gray-600 mb-3">Deletes all {{ counts.notifications }} notifications for every user.</p>
+            <form method="POST" onsubmit="return confirm('Are you SURE? This cannot be undone.')" class="flex gap-2 flex-wrap">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="clear_notifications">
+                <input type="text" name="confirm" required placeholder="Type DELETE_NOTIFICATIONS" class="border border-red-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+                <button type="submit" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+                    🗑️ Clear Notifications
+                </button>
+            </form>
+        </div>
+
+        <!-- 3. Clear Messages -->
+        <div class="bg-white rounded-lg p-4 mb-4 border border-red-200">
+            <h3 class="font-bold text-red-900 mb-1">Clear All Messages</h3>
+            <p class="text-xs text-gray-600 mb-3">Deletes all {{ counts.messages }} chat messages between users.</p>
+            <form method="POST" onsubmit="return confirm('Are you SURE? This cannot be undone.')" class="flex gap-2 flex-wrap">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="clear_messages">
+                <input type="text" name="confirm" required placeholder="Type DELETE_MESSAGES" class="border border-red-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+                <button type="submit" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+                    🗑️ Clear Messages
+                </button>
+            </form>
+        </div>
+
+        <!-- 4. Clear Closed Tickets -->
+        <div class="bg-white rounded-lg p-4 border border-red-200">
+            <h3 class="font-bold text-red-900 mb-1">Clear Closed Tickets</h3>
+            <p class="text-xs text-gray-600 mb-3">Deletes {{ counts.tickets_closed }} closed/resolved tickets and their replies. Open tickets are preserved.</p>
+            <form method="POST" onsubmit="return confirm('Are you SURE? This cannot be undone.')" class="flex gap-2 flex-wrap">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="clear_closed_tickets">
+                <input type="text" name="confirm" required placeholder="Type DELETE_TICKETS" class="border border-red-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+                <button type="submit" class="bg-red-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-red-700 text-sm">
+                    🗑️ Clear Closed Tickets
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="text-xs text-gray-400 text-center">
+        💡 Tip: Use "Clear Bookings" to make app look fresh while keeping users, listings, and bundles intact.
+    </div>
+</div>
+{% endblock %}
