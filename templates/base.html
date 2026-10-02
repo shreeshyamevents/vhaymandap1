@@ -146,6 +146,14 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col antialiased">
 
+    <!-- PWA Splash Overlay -->
+    <div id="splash-overlay" style="display:none; position:fixed; inset:0; z-index:99999; background:#7b1f4f; align-items:center; justify-content:center;">
+        <video id="splash-video"
+               src="{{ url_for('static', filename='videos/splash.mp4') }}"
+               autoplay muted playsinline preload="auto"
+               style="width:100%; height:100%; object-fit:cover;"></video>
+    </div>
+
     <!-- Top Bar -->
     <div class="bg-plum-900 text-white text-xs py-2 px-4">
         <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
@@ -724,7 +732,7 @@
             }, true);
         })();
 
-        document.querySelectorAll('.flash-message').forEach(msg => {
+                document.querySelectorAll('.flash-message').forEach(msg => {
             setTimeout(() => {
                 msg.style.transition = 'opacity 0.5s, transform 0.5s';
                 msg.style.opacity = '0';
@@ -732,6 +740,41 @@
                 setTimeout(() => msg.remove(), 500);
             }, 4500);
         });
+
+        // PWA Splash Screen
+        (function() {
+            var isPWA = window.matchMedia('(display-mode: standalone)').matches
+                     || window.navigator.standalone === true;
+            var seen = sessionStorage.getItem('vm_splash_seen');
+            if (!isPWA || seen) return;
+
+            sessionStorage.setItem('vm_splash_seen', '1');
+
+            var overlay = document.getElementById('splash-overlay');
+            var video = document.getElementById('splash-video');
+            if (!overlay || !video) return;
+
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+
+            function hideSplash() {
+                overlay.style.transition = 'opacity 0.4s ease-out';
+                overlay.style.opacity = '0';
+                document.body.style.overflow = '';
+                setTimeout(function() {
+                    overlay.style.display = 'none';
+                }, 400);
+            }
+
+            video.play().catch(function() {
+                // Autoplay blocked — hide splash immediately
+                hideSplash();
+            });
+
+            // Hide after video ends OR 2.5 sec (whichever first)
+            video.addEventListener('ended', hideSplash);
+            setTimeout(hideSplash, 2500);
+        })();
     </script>
     {% block extra_scripts %}{% endblock %}
 </body>
