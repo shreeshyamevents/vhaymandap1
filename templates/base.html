@@ -136,7 +136,11 @@
         .mobile-link:hover { background: #faf5f8; border-left-color: #7b1f4f; color: #7b1f4f; }
         .mobile-link.danger { color: #dc2626; }
         
-        .flash-message { animation: slideDown 0.3s ease-out; }
+                .flash-message { animation: slideDown 0.3s ease-out; }
+
+        /* Force mobile nav on narrow viewports (PWA standalone fix) */
+        body.force-mobile-nav nav.hidden.md\:flex { display: none !important; }
+        body.force-mobile-nav button.md\:hidden { display: flex !important; }
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -724,7 +728,23 @@
             }, true);
         })();
 
-                document.querySelectorAll('.flash-message').forEach(msg => {
+                        // Force mobile nav if viewport is narrow (PWA viewport fix)
+        (function() {
+            function checkViewport() {
+                var isNarrow = window.innerWidth < 768
+                            || window.matchMedia('(max-width: 767px)').matches;
+                if (isNarrow) {
+                    document.body.classList.add('force-mobile-nav');
+                } else {
+                    document.body.classList.remove('force-mobile-nav');
+                }
+            }
+            checkViewport();
+            window.addEventListener('resize', checkViewport);
+            window.addEventListener('orientationchange', checkViewport);
+        })();
+
+        document.querySelectorAll('.flash-message').forEach(msg => {
             setTimeout(() => {
                 msg.style.transition = 'opacity 0.5s, transform 0.5s';
                 msg.style.opacity = '0';
