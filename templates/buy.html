@@ -22,7 +22,8 @@
     <p class="text-xs text-gray-500">In stock: {{ item.stock }} · Vendor: {{ item.vendor.company_name or item.vendor.name }}</p>
   </div>
 
-  <form method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+  <form method="POST" enctype="multipart/form-data" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
@@ -75,6 +76,94 @@
       <p class="text-xs text-gray-500 mt-2">No security deposit for purchases. KYC required for orders ≥ ₹30,000.</p>
     </div>
 
+    {% if payment_config and (payment_config.upi_id or payment_config.account_number or payment_config.custom_qr_url) %}
+    <div class="bg-white p-5 rounded-xl border-2 border-gray-200 space-y-4">
+      <h4 class="font-bold text-emerald-700">💳 Payment Details</h4>
+      <div class="flex flex-col md:flex-row gap-5">
+        {% if qr_base64 %}
+        <div class="flex-shrink-0 text-center">
+          <div class="bg-white border-2 border-gray-200 rounded-xl p-2 inline-block">
+            <img src="data:image/png;base64,{{ qr_base64 }}" alt="UPI QR" class="w-44 h-44">
+          </div>
+          <p class="text-xs text-gray-500 mt-2">Scan with any UPI app</p>
+        </div>
+        {% elif payment_config.custom_qr_url %}
+        <div class="flex-shrink-0 text-center">
+          <div class="bg-white border-2 border-gray-200 rounded-xl p-2 inline-block">
+            <img src="{{ payment_config.custom_qr_url }}" alt="QR" class="w-44 h-44 object-contain">
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="flex-1 space-y-3 text-sm">
+          {% if payment_config.upi_id %}
+          <div>
+            <div class="text-xs text-gray-500 font-semibold">UPI ID</div>
+            <div class="mt-1"><code class="bg-gray-100 px-3 py-1.5 rounded text-sm font-bold">{{ payment_config.upi_id }}</code></div>
+            {% if payment_config.upi_name %}<div class="text-xs text-gray-500 mt-1">Name: {{ payment_config.upi_name }}</div>{% endif %}
+          </div>
+          {% endif %}
+
+          {% if payment_config.account_number %}
+          <div class="pt-2 border-t">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Bank Transfer</div>
+            <div class="space-y-1">
+              {% if payment_config.account_name %}<div><span class="text-gray-500">Name:</span> <strong>{{ payment_config.account_name }}</strong></div>{% endif %}
+              <div><span class="text-gray-500">A/C:</span> <strong>{{ payment_config.account_number }}</strong></div>
+              {% if payment_config.ifsc_code %}<div><span class="text-gray-500">IFSC:</span> <strong>{{ payment_config.ifsc_code }}</strong></div>{% endif %}
+              {% if payment_config.bank_name %}<div><span class="text-gray-500">Bank:</span> {{ payment_config.bank_name }}</div>{% endif %}
+              {% if payment_config.branch %}<div><span class="text-gray-500">Branch:</span> {{ payment_config.branch }}</div>{% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-gray-50 p-5 rounded-xl border-2 border-gray-200 space-y-4">
+      <h4 class="font-bold text-emerald-700">📤 Upload Payment Proof</h4>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payment Method *</label>
+          <select name="method" required class="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option value="upi">UPI</option>
+            <option value="rtgs">RTGS</option>
+            <option value="neft">NEFT</option>
+            <option value="imps">IMPS</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-sm mb-1">Amount Paid (₹) *</label>
+          <input type="number" name="amount_paid" required min="1" step="0.01" value="{{ '%.0f'|format(item.sale_price) }}" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payment Date</label>
+          <input type="date" name="payment_date" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payer Name</label>
+          <input type="text" name="payer_name" value="{{ current_user.name }}" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Payer Bank (optional)</label>
+        <input type="text" name="payer_bank" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Notes (optional)</label>
+        <textarea name="notes" rows="2" class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Payment Screenshot * <span class="text-red-600 text-xs">(mandatory)</span></label>
+        <input type="file" name="screenshot" required accept="image/*" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+        <p class="text-xs text-gray-500 mt-1">PhonePe / GPay / bank screenshot upload karo</p>
+      </div>
+    </div>
+
     <button type="submit"
             class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-3 rounded-lg">
       <i class="fas fa-shopping-cart mr-1"></i> Confirm Purchase
@@ -106,6 +195,8 @@
     document.getElementById('trans').textContent = fmt(trans);
     document.getElementById('gateway').textContent = fmt(gateway);
     document.getElementById('total').textContent = fmt(total);
+    var amtInput = document.querySelector('input[name="amount_paid"]');
+    if (amtInput) amtInput.value = total;
   }
   [qtyEl, areaEl, weightEl].forEach(function(el){ el.addEventListener('input', update); el.addEventListener('change', update); });
   update();
