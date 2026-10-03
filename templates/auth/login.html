@@ -20,9 +20,19 @@
                 <label class="block font-semibold text-sm mb-1">Password</label>
                 <input type="password" name="password" required placeholder="Your password" class="w-full border rounded-lg p-3 text-sm">
             </div>
+                        <div class="text-right -mt-2">
+                <a href="{{ url_for('forgot_password') }}" class="text-xs text-plum-600 hover:underline font-medium">
+                    Forgot password?
+                </a>
+            </div>
             <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700 transition">
                 Sign In
             </button>
+        </form>
+
+        <p class="text-center text-sm text-gray-500 mt-4">
+            Don't have an account? <a href="{{ url_for('register') }}" class="text-plum-600 font-bold hover:underline">Register</a>
+        </p>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-4">
