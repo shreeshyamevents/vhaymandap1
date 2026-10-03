@@ -99,6 +99,15 @@
         </button>
         {% endif %}
 
+                <form action="{{ url_for('cart_add', item_id=item.id) }}" method="POST" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit"
+                  class="inline-flex items-center justify-center bg-plum-100 hover:bg-plum-200 text-plum-700 border border-plum-200 font-medium px-4 py-3 rounded-lg">
+            <i class="fas fa-cart-plus mr-2"></i> Add to Cart
+          </button>
+        </form>
+
         <button type="button" onclick="shareWhatsApp()"
                 class="inline-flex items-center justify-center bg-green-500 hover:bg-green-600 text-white font-medium px-4 py-3 rounded-lg">
           <i class="fa-brands fa-whatsapp mr-2 text-lg"></i> Share
