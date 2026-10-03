@@ -733,40 +733,7 @@
             }, 4500);
         });
 
-        // PWA Splash Screen
-        (function() {
-            var isPWA = window.matchMedia('(display-mode: standalone)').matches
-                     || window.navigator.standalone === true;
-            var seen = sessionStorage.getItem('vm_splash_seen');
-            if (!isPWA || seen) return;
-
-            sessionStorage.setItem('vm_splash_seen', '1');
-
-            var overlay = document.getElementById('splash-overlay');
-            var video = document.getElementById('splash-video');
-            if (!overlay || !video) return;
-
-            overlay.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-
-            function hideSplash() {
-                overlay.style.transition = 'opacity 0.4s ease-out';
-                overlay.style.opacity = '0';
-                document.body.style.overflow = '';
-                setTimeout(function() {
-                    overlay.style.display = 'none';
-                }, 400);
-            }
-
-            video.play().catch(function() {
-                // Autoplay blocked — hide splash immediately
-                hideSplash();
-            });
-
-            // Hide after video ends OR 2.5 sec (whichever first)
-            video.addEventListener('ended', hideSplash);
-            setTimeout(hideSplash, 2500);
-        })();
+        
     </script>
     {% block extra_scripts %}{% endblock %}
 </body>
