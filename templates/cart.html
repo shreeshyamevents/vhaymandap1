@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Cart — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">🛒 Your Cart</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ cart_items|length }} item(s)</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="text-sm text-plum-600 hover:text-plum-800">← Continue Shopping</a>
+  </div>
+
+  {% if cart_items %}
+  <form action="{{ url_for('cart_update') }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 mb-4">
+      {% for c in cart_items %}
+      <div class="p-4 flex items-center gap-4 flex-wrap">
+        <div class="w-20 h-20 rounded-lg overflow-hidden bg-plum-50 flex-shrink-0">
+          <img src="{{ c.item.get_image() }}" alt="{{ c.item.title }}" class="w-full h-full object-cover">
+        </div>
+        <div class="flex-1 min-w-[180px]">
+          <h3 class="font-semibold text-gray-900 text-sm">{{ c.item.title }}</h3>
+          <p class="text-xs text-gray-500 mt-0.5">{{ c.item.vendor.company_name or c.item.vendor.name }}</p>
+          <div class="mt-1">
+            {% if c.type == 'sale' %}
+              <span class="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded">BUY</span>
+              <span class="text-sm font-bold text-emerald-700 ml-2">₹{{ '%.0f'|format(c.item.sale_price or 0) }}</span>
+            {% else %}
+              <span class="inline-block bg-plum-50 text-plum-700 text-[10px] font-bold px-2 py-0.5 rounded">RENT</span>
+              <span class="text-sm font-bold text-plum-700 ml-2">₹{{ '%.0f'|format(c.item.rate_per_day) }}/day</span>
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] text-gray-500 uppercase tracking-wide font-semibold mb-1">Qty</label>
+          <input type="number" name="qty_{{ c.item.id }}" value="{{ c.quantity }}" min="1" max="{{ c.item.stock }}"
+                 class="w-20 border rounded-lg p-2 text-sm text-center">
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Stock</div>
+          <div class="text-sm font-semibold">{{ c.item.stock }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="flex flex-wrap gap-2 justify-between mb-6">
+      <button type="submit" class="bg-gray-700 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-600">
+        <i class="fas fa-sync mr-1"></i> Update Cart
+      </button>
+    </div>
+  </form>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4 flex flex-wrap gap-3 justify-between items-center">
+    <div class="flex flex-wrap gap-2">
+      {% for c in cart_items %}
+      <form action="{{ url_for('cart_remove', item_id=c.item.id) }}" method="POST" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="text-xs text-red-600 hover:text-red-800 underline">
+          Remove {{ c.item.title[:20] }}{% if c.item.title|length > 20 %}...{% endif %}
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    <form action="{{ url_for('cart_clear') }}" method="POST" onsubmit="return confirm('Clear entire cart?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="text-xs text-red-600 hover:text-red-800 font-bold">
+        <i class="fas fa-trash mr-1"></i> Clear Cart
+      </button>
+    </form>
+  </div>
+
+  <a href="{{ url_for('cart_checkout') }}"
+     class="block w-full text-center bg-plum-600 hover:bg-plum-700 text-white font-semibold px-5 py-4 rounded-xl">
+    <i class="fas fa-arrow-right mr-2"></i> Proceed to Checkout
+  </a>
+
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="fas fa-cart-shopping text-5xl text-gray-300 mb-4"></i>
+    <h2 class="text-lg font-bold text-gray-900 mb-1">Your cart is empty</h2>
+    <p class="text-sm text-gray-500 mb-4">Add items from the marketplace to get started.</p>
+    <a href="{{ url_for('index') }}" class="inline-block bg-plum-600 hover:bg-plum-700 text-white font-semibold px-5 py-3 rounded-lg">
+      Browse Items
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
