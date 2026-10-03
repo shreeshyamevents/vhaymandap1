@@ -138,13 +138,14 @@
         
                 .flash-message { animation: slideDown 0.3s ease-out; }
 
-        /* Force mobile nav on narrow viewports (PWA standalone fix) */
-        body.force-mobile-nav nav.hidden.md\:flex { display: none !important; }
-        body.force-mobile-nav button.md\:hidden { display: flex !important; }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+                /* Force mobile nav in PWA standalone mode */
+        @media (display-mode: standalone) {
+            nav.md\:flex { display: none !important; }
+            button.md\:hidden { display: inline-flex !important; }
+            .md\:hidden { display: inline-flex !important; }
         }
+        body.force-mobile-nav nav.md\:flex { display: none !important; }
+        body.force-mobile-nav button.md\:hidden { display: inline-flex !important; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -728,20 +729,21 @@
             }, true);
         })();
 
-                        // Force mobile nav if viewport is narrow (PWA viewport fix)
+                                // Force mobile nav in PWA standalone mode (regardless of viewport width)
         (function() {
-            function checkViewport() {
-                var isNarrow = window.innerWidth < 768
-                            || window.matchMedia('(max-width: 767px)').matches;
-                if (isNarrow) {
+            function checkPWA() {
+                var isPWA = window.matchMedia('(display-mode: standalone)').matches
+                         || window.navigator.standalone === true;
+                var isNarrow = window.innerWidth < 768;
+                if (isPWA || isNarrow) {
                     document.body.classList.add('force-mobile-nav');
                 } else {
                     document.body.classList.remove('force-mobile-nav');
                 }
             }
-            checkViewport();
-            window.addEventListener('resize', checkViewport);
-            window.addEventListener('orientationchange', checkViewport);
+            checkPWA();
+            window.addEventListener('resize', checkPWA);
+            window.addEventListener('orientationchange', checkPWA);
         })();
 
         document.querySelectorAll('.flash-message').forEach(msg => {
