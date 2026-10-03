@@ -146,38 +146,6 @@
 </head>
 <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col antialiased">
 
-    <!-- PWA Splash Overlay -->
-        <div id="splash-overlay" style="position:fixed; inset:0; z-index:99999; background:#7b1f4f; align-items:center; justify-content:center; display:flex;">
-        <video id="splash-video"
-               src="{{ url_for('static', filename='videos/splash.mp4') }}"
-               muted playsinline preload="auto"
-               style="width:100%; height:100%; object-fit:cover;"></video>
-    </div>
-    <script>
-    (function() {
-        var isPWA = window.matchMedia('(display-mode: standalone)').matches
-                 || window.navigator.standalone === true;
-        var seen = sessionStorage.getItem('vm_splash_seen');
-        var overlay = document.getElementById('splash-overlay');
-        var video = document.getElementById('splash-video');
-        if (!isPWA || seen) {
-            overlay.style.display = 'none';
-            return;
-        }
-        document.documentElement.style.overflow = 'hidden';
-        sessionStorage.setItem('vm_splash_seen', '1');
-        function hideSplash() {
-            overlay.style.transition = 'opacity 0.4s ease-out';
-            overlay.style.opacity = '0';
-            document.documentElement.style.overflow = '';
-            setTimeout(function() { overlay.style.display = 'none'; }, 400);
-        }
-        video.play().catch(function() { hideSplash(); });
-        video.addEventListener('ended', hideSplash);
-        setTimeout(hideSplash, 2500);
-    })();
-    </script>
-
     <!-- Top Bar -->
     <div class="bg-plum-900 text-white text-xs py-2 px-4">
         <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
