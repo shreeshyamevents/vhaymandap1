@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}My SOS Requests — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-red-700">🚨 My SOS Requests</h1>
+      <p class="text-sm text-gray-500 mt-1">Emergency booking alerts</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="text-sm text-plum-600">← Marketplace</a>
+  </div>
+
+  {% if not requests %}
+  <div class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+    <i class="fas fa-bolt text-5xl text-gray-300 mb-4"></i>
+    <p class="text-gray-500">No SOS requests yet.</p>
+    <p class="text-xs text-gray-400 mt-2">From item page, click SOS for emergency booking.</p>
+  </div>
+  {% else %}
+  <div class="space-y-3">
+    {% for r in requests %}
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <div class="flex justify-between items-start flex-wrap gap-3 mb-3">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="font-mono text-xs text-gray-500">{{ r.reference }}</span>
+            {% if r.status == 'active' %}
+              <span class="bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded">ACTIVE</span>
+            {% elif r.status == 'accepted' %}
+              <span class="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded">ACCEPTED</span>
+            {% elif r.status == 'expired' %}
+              <span class="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded">EXPIRED</span>
+            {% else %}
+              <span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded">CANCELLED</span>
+            {% endif %}
+          </div>
+          <h3 class="font-bold text-gray-900">{{ r.item.title if r.item else '(item deleted)' }}</h3>
+          <p class="text-xs text-gray-500 mt-1">{{ r.quantity }}× for {{ r.venue_address[:60] }}</p>
+          <p class="text-xs text-gray-500">Created {{ r.created_at.strftime('%d %b, %H:%M') }}</p>
+          {% if r.status == 'active' %}
+          <p class="text-xs text-red-700 font-semibold mt-1">Expires {{ r.expires_at.strftime('%H:%M') }}</p>
+          {% endif %}
+          {% if r.status == 'accepted' and r.vendor %}
+          <p class="text-xs text-green-700 font-semibold mt-1">✓ Accepted by {{ r.vendor.name }} at {{ r.accepted_at.strftime('%H:%M') }}</p>
+          {% endif %}
+        </div>
+        {% if r.status == 'active' %}
+        <form method="POST" action="{{ url_for('sos_cancel', sos_id=r.id) }}" onsubmit="return confirm('Cancel this SOS?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="text-xs bg-red-100 text-red-700 font-bold px-3 py-1.5 rounded hover:bg-red-200">Cancel</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
