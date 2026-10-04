@@ -4869,14 +4869,8 @@ def sos_create(item_id):
         return redirect(url_for('item_detail', item_id=item_id))
 
     if request.method == 'POST':
-        try:
-            start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d').date()
-        except (ValueError, TypeError):
-            flash('Invalid date.', 'danger')
-            return redirect(url_for('sos_create', item_id=item_id))
-        if start_date != ist_today():
-            flash('SOS is for today only.', 'danger')
-            return redirect(url_for('sos_create', item_id=item_id))
+                # SOS is always today — server-set
+        start_date = ist_today()
 
         try:
             quantity = int(request.form.get('quantity', 1))
@@ -4941,7 +4935,7 @@ def sos_create(item_id):
         flash(f'🚨 SOS sent to {len(vendors)} vendor(s) in {req.city}.', 'success')
         return redirect(url_for('sos_list'))
 
-    return render_template('sos_create.html', item=item)
+        return render_template('sos_create.html', item=item, today=ist_today())
 
 
 @app.route('/sos')
