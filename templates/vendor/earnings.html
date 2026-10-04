@@ -10,11 +10,16 @@
   </div>
 
   {# Stat cards #}
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Earnings</p>
       <p class="text-3xl font-bold text-plum-700">₹{{ '%.0f'|format(total_earnings) }}</p>
-      <p class="text-xs text-gray-500 mt-1">from base rent (before commission)</p>
+      <p class="text-xs text-gray-500 mt-1">base rent + SOS bonus</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">SOS Bonus</p>
+      <p class="text-3xl font-bold text-red-600">₹{{ '%.0f'|format(total_sos_bonus or 0) }}</p>
+      <p class="text-xs text-gray-500 mt-1">10% extra from SOS bookings</p>
     </div>
     <div class="bg-white rounded-xl border border-gray-200 p-5">
       <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Completed Bookings</p>
@@ -59,14 +64,25 @@
       <a href="{{ url_for('my_booking_detail', booking_id=b.id) }}"
          class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition">
         <div class="min-w-0 flex-1">
-          <p class="font-medium text-sm text-gray-900 truncate">{{ b.item.title }}</p>
+          <p class="font-medium text-sm text-gray-900 truncate">
+            {{ b.item.title }}
+            {% if b.sos_bonus and b.sos_bonus > 0 %}
+            <span class="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded ml-1">⚡SOS</span>
+            {% endif %}
+          </p>
           <p class="text-xs text-gray-500 mt-0.5">
             {{ b.booking_reference }} · {{ b.start_date.strftime('%d %b %Y') }} · {{ b.customer.name }}
           </p>
         </div>
         <div class="text-right ml-3">
-          <p class="font-bold text-plum-700">₹{{ '%.0f'|format(b.base_rent) }}</p>
-          <p class="text-xs text-gray-500">base rent</p>
+          <p class="font-bold text-plum-700">₹{{ '%.0f'|format((b.base_rent or 0) + (b.sos_bonus or 0)) }}</p>
+          <p class="text-xs text-gray-500">
+            {% if b.sos_bonus and b.sos_bonus > 0 %}
+            <span class="text-red-600">⚡ incl. ₹{{ '%.0f'|format(b.sos_bonus) }} SOS</span>
+            {% else %}
+            base rent
+            {% endif %}
+          </p>
         </div>
       </a>
       {% endfor %}
