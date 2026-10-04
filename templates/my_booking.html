@@ -83,9 +83,11 @@
             <div class="flex justify-between"><span class="text-gray-500">Base Rent</span><strong>₹{{ '%.2f'|format(booking.base_rent) }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Platform Commission (5%)</span><strong class="text-green-700">₹{{ '%.2f'|format(booking.commission) }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Security Deposit (refundable)</span><strong>₹{{ '%.2f'|format(booking.deposit or 0) }}</strong></div>
+            {% if booking.transport_fee and booking.transport_fee > 0 %}
             <div class="flex justify-between"><span class="text-gray-500">Transport Fee</span><strong>₹{{ '%.2f'|format(booking.transport_fee) }}</strong></div>
+            {% endif %}
             {% if booking.sos_fee and booking.sos_fee > 0 %}
-            <div class="flex justify-between text-red-700"><span>🚨 SOS Emergency Fee (20%)</span><strong>₹{{ '%.2f'|format(booking.sos_fee) }}</strong></div>
+            <div class="flex justify-between text-red-700"><span>🚨 SOS Emergency Fee (25%)</span><strong>₹{{ '%.2f'|format(booking.sos_fee) }}</strong></div>
             {% endif %}
             {% if booking.installation_fee and booking.installation_fee > 0 %}
             <div class="flex justify-between"><span class="text-gray-500">Installation Fee</span><strong>₹{{ '%.2f'|format(booking.installation_fee) }}</strong></div>
@@ -95,6 +97,9 @@
             {% endif %}
             <hr class="my-2">
             <div class="flex justify-between text-base"><span class="font-bold">Total</span><strong class="text-green-700">₹{{ '%.2f'|format(booking.total_amount) }}</strong></div>
+            {% if not booking.transport_fee or booking.transport_fee == 0 %}
+            <p class="text-[11px] text-gray-500 mt-2 italic">📦 Transport excluded — vendor se alag settle karein.</p>
+            {% endif %}
         </div>
     </div>
 
