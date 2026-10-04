@@ -562,11 +562,15 @@ function closeDateModal() {
 document.addEventListener('DOMContentLoaded', function() {
     // Local-date formatter (toISOString uses UTC and can give yesterday's date in India)
     const fmt = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    const todayD = new Date();
-    const tomorrowD = new Date(todayD.getFullYear(), todayD.getMonth(), todayD.getDate() + 1);
-    document.getElementById('startDate').value = fmt(todayD);
-    // End date = tomorrow to avoid same-day validation edge case
-    document.getElementById('endDate').value = fmt(tomorrowD);
+    const tomorrowD = new Date();
+    tomorrowD.setDate(tomorrowD.getDate() + 1);
+    const minDate = fmt(tomorrowD);
+    var sEl = document.getElementById('startDate');
+    var eEl = document.getElementById('endDate');
+    sEl.value = minDate;
+    sEl.min = minDate;
+    eEl.value = minDate;
+    eEl.min = minDate;
     calculateTotal();
     
     ['startDate', 'endDate', 'qty', 'area', 'weight'].forEach(id => {
