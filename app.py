@@ -4025,6 +4025,10 @@ def utility_processor():
 # ============================================
 # INIT DATABASE
 # ============================================
+# Register helpers as Jinja globals
+app.jinja_env.globals['_time_ago'] = _time_ago
+
+
 def init_database():
     try:
         try:
