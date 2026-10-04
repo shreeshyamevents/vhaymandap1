@@ -106,6 +106,12 @@
           <td class="py-2">Transport Fee</td>
           <td class="text-right py-2">{{ '%.2f'|format(booking.transport_fee) }}</td>
         </tr>
+                {% if booking.installation_fee and booking.installation_fee > 0 %}
+        <tr class="border-b border-gray-100">
+          <td class="py-2">Installation Fee</td>
+          <td class="text-right py-2">{{ '%.2f'|format(booking.installation_fee) }}</td>
+        </tr>
+        {% endif %}
         {% if booking.gateway_charge and booking.gateway_charge > 0 %}
         <tr class="border-b border-gray-100">
           <td class="py-2">Payment Processing (2%)</td>
