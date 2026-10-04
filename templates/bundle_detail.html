@@ -29,7 +29,7 @@
         <p class="text-sm text-gray-700 leading-relaxed mb-4">{{ bundle.description }}</p>
         {% endif %}
 
-        <div class="bg-plum-50 border border-plum-200 rounded-xl p-4 mb-4">
+                <div class="bg-plum-50 border border-plum-200 rounded-xl p-4 mb-4">
           <p class="text-xs text-gray-600 uppercase tracking-wide mb-1">Pricing</p>
           {% if bundle.pricing_type == 'fixed' and bundle.fixed_price %}
           <p class="text-2xl font-bold text-plum-700">₹{{ '%.0f'|format(bundle.fixed_price) }}</p>
@@ -39,6 +39,12 @@
           <p class="text-xs text-gray-500 mt-0.5">on total of individual item rates</p>
           {% else %}
           <p class="text-xl font-bold text-gray-700">Custom pricing</p>
+          {% endif %}
+          {% if bundle.installation_fee and bundle.installation_fee > 0 %}
+          <p class="text-sm text-gray-700 mt-2 pt-2 border-t border-plum-200">
+            <i class="fas fa-tools text-plum-600 mr-1"></i>
+            <strong>Installation:</strong> ₹{{ '%.0f'|format(bundle.installation_fee) }} extra
+          </p>
           {% endif %}
         </div>
 
