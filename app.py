@@ -2632,7 +2632,7 @@ def vendor_sales():
     items = Item.query.filter_by(vendor_id=current_user.id).order_by(Item.created_at.desc()).all()
     item_ids = [i.id for i in items]
     bookings = Booking.query.filter(Booking.item_id.in_(item_ids), Booking.parent_booking_id.is_(None)).order_by(Booking.created_at.desc()).all() if item_ids else []
-    total_earnings = sum(b.base_rent for b in bookings)
+    total_earnings = sum((b.base_rent or 0) + (b.sos_bonus or 0) for b in bookings)
     return render_template('vendor/dashboard.html',
                          items=items, bookings=bookings,
                          total_earnings=total_earnings,
