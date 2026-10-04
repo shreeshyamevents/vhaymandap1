@@ -225,10 +225,13 @@
   }
 
   // Init dates
-  if (hasRentals && startEl && endEl) {
-    var today = new Date().toISOString().split('T')[0];
-    startEl.value = today;
-    endEl.value = today;
+    if (hasRentals && startEl && endEl) {
+    var t = new Date(); t.setDate(t.getDate() + 1);
+    var minDate = t.toISOString().split('T')[0];
+    startEl.value = minDate;
+    startEl.min = minDate;
+    endEl.value = minDate;
+    endEl.min = minDate;
     [startEl, endEl].forEach(function(el) {
       el.addEventListener('change', update);
       el.addEventListener('input', update);
