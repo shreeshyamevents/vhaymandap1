@@ -79,6 +79,9 @@
             <div class="flex justify-between"><span class="text-gray-500">Platform Commission (5%)</span><strong class="text-green-700">₹{{ '%.2f'|format(booking.commission) }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Security Deposit (refundable)</span><strong>₹{{ '%.2f'|format(booking.deposit or 0) }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Transport Fee</span><strong>₹{{ '%.2f'|format(booking.transport_fee) }}</strong></div>
+                        {% if booking.installation_fee and booking.installation_fee > 0 %}
+            <div class="flex justify-between"><span class="text-gray-500">Installation Fee</span><strong>₹{{ '%.2f'|format(booking.installation_fee) }}</strong></div>
+            {% endif %}
             {% if booking.gateway_charge and booking.gateway_charge > 0 %}
             <div class="flex justify-between"><span class="text-gray-500">Payment Processing (2%)</span><strong>₹{{ '%.2f'|format(booking.gateway_charge) }}</strong></div>
             {% endif %}
