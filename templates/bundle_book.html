@@ -123,9 +123,16 @@
           <span id="sum-trans">—</span>
         </div>
         <div class="flex justify-between">
+                  <div class="flex justify-between">
           <span>Payment Processing (2%)</span>
           <span id="sum-gateway">—</span>
         </div>
+        {% if bundle.installation_fee and bundle.installation_fee > 0 %}
+        <div class="flex justify-between">
+          <span>Installation Fee</span>
+          <span id="sum-install">—</span>
+        </div>
+        {% endif %}
         <div class="flex justify-between border-t border-plum-300 pt-2 mt-2 text-base font-bold text-plum-800">
           <span>Total</span>
           <span id="sum-total">—</span>
