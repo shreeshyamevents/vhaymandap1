@@ -189,17 +189,20 @@
     } else {
       base = itemTotal;
     }
-    var comm = base * commissionRate;
+        var comm = base * commissionRate;
     var dep = base * depositRate;
     var trans = (transportMatrix[areaEl.value] || {})[weightEl.value] || 600;
     var gateway = base * gatewayRate;
-    var total = base + comm + dep + trans + gateway;
+    var install = {{ bundle.installation_fee or 0 }};
+    var total = base + comm + dep + trans + gateway + install;
 
     document.getElementById('sum-base').textContent = fmt(base);
     document.getElementById('sum-comm').textContent = fmt(comm);
     document.getElementById('sum-dep').textContent = fmt(dep);
     document.getElementById('sum-trans').textContent = fmt(trans);
     document.getElementById('sum-gateway').textContent = fmt(gateway);
+    var installEl = document.getElementById('sum-install');
+    if (installEl) installEl.textContent = fmt(install);
     document.getElementById('sum-total').textContent = fmt(total);
   }
   [startEl, endEl, areaEl, weightEl].forEach(function(el){
