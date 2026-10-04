@@ -67,7 +67,7 @@
 {% endif %}
 
 <!-- Stats Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
     <div class="bg-white p-4 rounded-xl border shadow-sm">
         <div class="flex items-center justify-between">
             <span class="text-xs text-gray-500">Total Items</span>
@@ -91,10 +91,19 @@
     </div>
     <div class="bg-white p-4 rounded-xl border shadow-sm">
         <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500">SOS Bonus</span>
+            <i class="fa-solid fa-bolt text-red-600"></i>
+        </div>
+        <h3 class="text-2xl font-bold mt-1 text-red-600">{{ format_currency(total_sos_bonus or 0) }}</h3>
+        <p class="text-[10px] text-gray-400">extra from SOS bookings</p>
+    </div>
+    <div class="bg-white p-4 rounded-xl border shadow-sm">
+        <div class="flex items-center justify-between">
             <span class="text-xs text-gray-500">Total Earnings</span>
             <i class="fa-solid fa-indian-rupee-sign text-green-700"></i>
         </div>
         <h3 class="text-2xl font-bold mt-1 text-green-700">{{ format_currency(total_earnings) }}</h3>
+        <p class="text-[10px] text-gray-400">base rent + SOS bonus</p>
     </div>
 </div>
 
@@ -109,7 +118,12 @@
         {% for booking in upcoming_bookings[:5] %}
         <div class="flex flex-wrap justify-between items-center p-3 bg-gray-50 rounded-lg gap-2">
             <div class="flex-1 min-w-[200px]">
-                <p class="font-bold text-sm">{{ booking.item.title }}</p>
+                <p class="font-bold text-sm">
+                    {{ booking.item.title }}
+                    {% if booking.sos_bonus and booking.sos_bonus > 0 %}
+                    <span class="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded ml-1">⚡SOS</span>
+                    {% endif %}
+                </p>
                 <p class="text-xs text-gray-500">
                     <i class="fa-regular fa-user mr-1"></i>{{ booking.customer.name }}
                     <span class="mx-2">•</span>
@@ -122,7 +136,7 @@
                 </span>
             </div>
             <div class="text-xs font-bold text-green-700">
-                {{ format_currency(booking.base_rent) }}
+                {{ format_currency((booking.base_rent or 0) + (booking.sos_bonus or 0)) }}
             </div>
         </div>
         {% endfor %}
@@ -193,7 +207,6 @@
                                 </span>
                             {% endif %}
                             
-                            <!-- Toggle Availability -->
                             <form method="POST" action="{{ url_for('vendor_toggle_availability', item_id=item.id) }}" class="inline">
                                 {% if item.is_available %}
                                     <button type="submit" 
@@ -257,10 +270,20 @@
                         {{ booking.customer.name }}
                         <div class="text-[10px] text-gray-500">{{ booking.customer.mobile }}</div>
                     </td>
-                    <td class="p-2">{{ booking.item.title[:20] }}{% if booking.item.title|length > 20 %}...{% endif %}</td>
+                    <td class="p-2">
+                        {{ booking.item.title[:20] }}{% if booking.item.title|length > 20 %}...{% endif %}
+                        {% if booking.sos_bonus and booking.sos_bonus > 0 %}
+                        <span class="text-[9px] bg-red-100 text-red-700 font-bold px-1 py-0.5 rounded ml-1">⚡SOS</span>
+                        {% endif %}
+                    </td>
                     <td class="p-2 text-xs">{{ booking.start_date }} → {{ booking.end_date }}</td>
                     <td class="p-2">{{ booking.quantity }}</td>
-                    <td class="p-2 font-bold text-green-700">₹{{ booking.base_rent }}</td>
+                    <td class="p-2 font-bold text-green-700">
+                        ₹{{ '%.0f'|format((booking.base_rent or 0) + (booking.sos_bonus or 0)) }}
+                        {% if booking.sos_bonus and booking.sos_bonus > 0 %}
+                        <div class="text-[9px] text-red-600 font-normal">incl. +₹{{ '%.0f'|format(booking.sos_bonus) }} SOS</div>
+                        {% endif %}
+                    </td>
                     <td class="p-2 text-xs">
                         {% if booking.dispatch_report_done %}
                             <span class="text-green-700" title="Dispatch done">✅📤</span>
