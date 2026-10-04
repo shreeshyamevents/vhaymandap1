@@ -4932,10 +4932,10 @@ def sos_create(item_id):
                                 url_for('vendor_sos'))
         db.session.commit()
 
-        flash(f'🚨 SOS sent to {len(vendors)} vendor(s) in {req.city}.', 'success')
+                flash(f'🚨 SOS sent to {len(vendors)} vendor(s) in {req.city}.', 'success')
         return redirect(url_for('sos_list'))
 
-        return render_template('sos_create.html', item=item, today=ist_today())
+    return render_template('sos_create.html', item=item, today=ist_today())
 
 
 @app.route('/sos')
