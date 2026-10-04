@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}SOS — {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+  <div class="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-6">
+    <h1 class="text-xl font-bold text-red-900 mb-1">🚨 SOS Emergency Booking</h1>
+    <p class="text-sm text-red-800">Vendors in {{ current_user.city or 'Harda' }} will be alerted immediately. SOS valid for 60 minutes.</p>
+    <p class="text-xs text-red-700 mt-2">⚡ <strong>20% SOS fee</strong> applies. Response time SLA: 15-30 min.</p>
+  </div>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div class="flex gap-4">
+      <div class="w-20 h-20 rounded-lg overflow-hidden bg-plum-50 flex-shrink-0">
+        <img src="{{ item.get_image() }}" class="w-full h-full object-cover">
+      </div>
+      <div class="flex-1">
+        <h3 class="font-bold">{{ item.title }}</h3>
+        <p class="text-xs text-gray-500">Vendor: {{ item.vendor.company_name or item.vendor.name }}</p>
+        <p class="text-sm font-bold text-plum-700 mt-1">₹{{ '%.0f'|format(item.rate_per_day) }}/day</p>
+        <p class="text-xs text-gray-500">Stock: {{ item.stock }}</p>
+      </div>
+    </div>
+  </div>
+
+  <form method="POST" class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block font-semibold text-sm mb-1">Date * <span class="text-xs text-red-600">(today only)</span></label>
+        <input type="date" name="start_date" required value="{{ ist_today }}"
+               class="w-full border rounded-lg p-2.5 text-sm" readonly>
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Start Time *</label>
+        <input type="time" name="start_time" required value="10:00" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+    </div>
+
+    <div>
+      <label class="block font-semibold text-sm mb-1">Quantity *</label>
+      <input type="number" name="quantity" required min="1" max="{{ item.stock }}" value="1" class="w-full border rounded-lg p-2.5 text-sm">
+    </div>
+
+    <div>
+      <label class="block font-semibold text-sm mb-1">Venue Address *</label>
+      <textarea name="venue_address" required rows="2" placeholder="Full venue address (must be in {{ current_user.city or 'Harda' }})" class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+    </div>
+
+    <div>
+      <label class="block font-semibold text-sm mb-1">Notes (optional)</label>
+      <textarea name="notes" rows="2" placeholder="Urgent details..." class="w-full border rounded-lg p-2.5 text-sm"></textarea>
+    </div>
+
+    <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">
+      <strong>⚠️ Note:</strong> Final payment happens after vendor accepts. You will receive a notification once a vendor accepts.
+    </div>
+
+    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-xl">
+      <i class="fas fa-bolt mr-2"></i> Send SOS to Nearby Vendors
+    </button>
+  </form>
+</div>
+{% endblock %}
