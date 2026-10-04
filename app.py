@@ -4869,7 +4869,7 @@ def sos_create(item_id):
         return redirect(url_for('item_detail', item_id=item_id))
 
     if request.method == 'POST':
-                # SOS is always today — server-set
+        # SOS is always today — server-set
         start_date = ist_today()
 
         try:
@@ -4887,7 +4887,6 @@ def sos_create(item_id):
             flash('Venue address required.', 'danger')
             return redirect(url_for('sos_create', item_id=item_id))
 
-        # Check if customer already has active SOS for same item
         existing = SOSRequest.query.filter_by(
             customer_id=current_user.id, item_id=item.id, status='active'
         ).first()
@@ -4895,7 +4894,6 @@ def sos_create(item_id):
             flash('You already have an active SOS for this item.', 'warning')
             return redirect(url_for('sos_list'))
 
-        # Auto-expire old requests
         now = datetime.utcnow()
         SOSRequest.query.filter(
             SOSRequest.status == 'active',
@@ -4920,7 +4918,6 @@ def sos_create(item_id):
         db.session.add(req)
         db.session.commit()
 
-        # Notify nearby available vendors
         vendors = User.query.filter(
             User.role == 'vendor',
             User.city == req.city,
@@ -4932,11 +4929,10 @@ def sos_create(item_id):
                                 url_for('vendor_sos'))
         db.session.commit()
 
-                flash(f'🚨 SOS sent to {len(vendors)} vendor(s) in {req.city}.', 'success')
+        flash(f'🚨 SOS sent to {len(vendors)} vendor(s) in {req.city}.', 'success')
         return redirect(url_for('sos_list'))
 
     return render_template('sos_create.html', item=item, today=ist_today())
-
 
 @app.route('/sos')
 @login_required
