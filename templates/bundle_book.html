@@ -166,7 +166,14 @@
     outskirts: { till_20: 1500, above_20: 2000 }
   };
 
-  var startEl = document.querySelector('input[name="start_date"]');
+    var startEl = document.querySelector('input[name="start_date"]');
+  (function() {
+    var t = new Date(); t.setDate(t.getDate() + 1);
+    var minD = t.toISOString().split('T')[0];
+    if (startEl) { startEl.min = minD; if (!startEl.value) startEl.value = minD; }
+    var e = document.querySelector('input[name="end_date"]');
+    if (e) { e.min = minD; if (!e.value) e.value = minD; }
+  })();
   var endEl = document.querySelector('input[name="end_date"]');
   var areaEl = document.querySelector('select[name="area"]');
   var weightEl = document.querySelector('select[name="weight"]');
