@@ -17,7 +17,7 @@
       </div>
       <div class="flex-1">
         <h3 class="font-bold">{{ item.title }}</h3>
-        <p class="text-xs text-gray-500">Vendor: {{ item.vendor.company_name or item.vendor.name }}</p>
+        <p class="text-xs text-gray-500">Vendor: {{ item.vendor.company_name or disp_name(item.vendor) }}</p>
         <p class="text-sm font-bold text-plum-700 mt-1">₹{{ '%.0f'|format(item.rate_per_day) }}/day</p>
         <p class="text-xs text-gray-500">Stock: {{ item.stock }}</p>
       </div>
