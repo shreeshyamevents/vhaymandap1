@@ -4276,6 +4276,54 @@ def utility_processor():
 app.jinja_env.globals['_time_ago'] = _time_ago
 
 
+@app.template_filter('ist_dt')
+def ist_dt_filter(dt):
+    """Full datetime in IST: 05 Oct 2026, 06:30 PM"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%d %b %Y, %I:%M %p')
+
+
+@app.template_filter('ist_date')
+def ist_date_filter(dt):
+    """Date in IST: 05 Oct 2026"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%d %b %Y')
+
+
+@app.template_filter('ist_time')
+def ist_time_filter(dt):
+    """Time in IST: 06:30 PM"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%I:%M %p')
+
+
+@app.template_filter('ist_hm')
+def ist_hm_filter(dt):
+    """24-hour HM: 18:30"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%H:%M')
+
+
+@app.template_filter('ist_short')
+def ist_short_filter(dt):
+    """Short: 05 Oct, 06:30 PM"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%d %b, %I:%M %p')
+
+
+@app.template_filter('ist_ym')
+def ist_ym_filter(dt):
+    """Year-Month: Oct 2026"""
+    if not dt:
+        return ''
+    return (dt + timedelta(hours=5, minutes=30)).strftime('%b %Y')
+
+
 def init_database():
     try:
         try:
@@ -4490,7 +4538,7 @@ def api_notifications_recent():
             'id': n.id, 'type': n.type, 'title': n.title,
             'message': n.message or '', 'link': n.link or '',
             'is_read': n.is_read, 'time_ago': _time_ago(n.created_at),
-            'created_at': n.created_at.strftime('%d %b %Y, %I:%M %p'),
+            'created_at': (n.created_at + timedelta(hours=5, minutes=30)).strftime('%d %b %Y, %I:%M %p'),
         } for n in notifs],
         'unread_count': unread,
     })
