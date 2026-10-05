@@ -9,7 +9,7 @@
     <div class="flex items-start justify-between flex-wrap gap-4">
       <div>
         <div class="flex items-center gap-3 mb-2">
-          <h1 class="text-2xl font-bold text-plum-700">{{ vendor.company_name or vendor.name }}</h1>
+          <h1 class="text-2xl font-bold text-plum-700">{{ vendor.company_name or disp_name(vendor) }}</h1>
           {% if vendor.is_verified %}
           <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
             <i class="fas fa-check-circle mr-1"></i> Verified
@@ -17,7 +17,7 @@
           {% endif %}
         </div>
         {% if vendor.company_name %}
-        <p class="text-sm text-gray-600">Contact: {{ vendor.name }}</p>
+        <p class="text-sm text-gray-600 font-mono text-xs">ID: {{ vendor.public_id or disp_name(vendor) }}</p>
         {% endif %}
         <p class="text-sm text-gray-500 mt-1">
           Member since {{ vendor.created_at.strftime('%b %Y') }}
