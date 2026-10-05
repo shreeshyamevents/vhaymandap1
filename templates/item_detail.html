@@ -174,7 +174,7 @@
               {% for i in range(review.rating) %}★{% endfor %}
               {% for i in range(5 - review.rating) %}<span class="text-gray-300">★</span>{% endfor %}
             </span>
-            <span class="text-xs text-gray-500">{{ review.customer.name }}</span>
+            <span class="text-xs text-gray-500">{{ disp_name(review.customer) }}</span>
           </div>
           <span class="text-xs text-gray-400">{{ review.created_at.strftime('%d %b %Y') }}</span>
         </div>
