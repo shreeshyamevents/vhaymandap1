@@ -22,7 +22,7 @@
         </div>
         <div class="flex-1 min-w-[180px]">
           <h3 class="font-semibold text-gray-900 text-sm">{{ c.item.title }}</h3>
-          <p class="text-xs text-gray-500 mt-0.5">{{ c.item.vendor.company_name or c.item.vendor.name }}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ c.item.vendor.company_name or disp_name(c.item.vendor) }}</p>
           <div class="mt-1">
             {% if c.type == 'sale' %}
               <span class="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded">BUY</span>
