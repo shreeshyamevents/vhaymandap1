@@ -19,13 +19,14 @@
           {{ bundle.tag }} bundle · {{ bundle.items_count }} items
         </p>
         <p class="text-sm text-gray-600 mt-2">
-          Vendor: <strong>{{ bundle.vendor.company_name or bundle.vendor.name }}</strong>
+          Vendor: <strong>{{ bundle.vendor.company_name or disp_name(bundle.vendor) }}</strong>
         </p>
       </div>
     </div>
   </div>
 
-  <form method="POST" class="space-y-5">
+  <form method="POST" enctype="multipart/form-data" class="space-y-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     {# Dates #}
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
@@ -33,8 +34,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold mb-1">Start date *</label>
-                    <input type="date" name="start_date" required
-                 id="bundleStartDate"
+          <input type="date" name="start_date" required id="bundleStartDate"
                  class="w-full border border-gray-200 rounded-lg p-3 text-sm">
         </div>
         <div>
@@ -83,16 +83,6 @@
       </div>
     </div>
 
-    {# Payment #}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-      <h2 class="font-semibold text-sm uppercase tracking-wide text-gray-700 mb-3">Payment</h2>
-      <div>
-        <label class="block text-sm font-semibold mb-1">UTR / Payment reference *</label>
-        <input type="text" name="utr" required placeholder="UPI / bank reference number"
-               class="w-full border border-gray-200 rounded-lg p-3 text-sm">
-      </div>
-    </div>
-
     {# Live summary #}
     <div class="bg-plum-50 border border-plum-200 rounded-xl p-5">
       <h2 class="font-semibold text-sm uppercase tracking-wide text-plum-800 mb-3">Cost Summary</h2>
@@ -119,9 +109,7 @@
           <span>Security deposit (35%)</span>
           <span id="sum-dep">—</span>
         </div>
-        
         <div class="flex justify-between">
-                  <div class="flex justify-between">
           <span>Payment Processing (2%)</span>
           <span id="sum-gateway">—</span>
         </div>
@@ -135,11 +123,112 @@
           <span>Total</span>
           <span id="sum-total">—</span>
         </div>
-        <p class="text-[11px] text-gray-500 mt-2 italic">📦 Please note: Transport charges are not included in this bill. Transport team will coordinate and settle these separately.</p>
+        <p class="text-[11px] text-gray-500 mt-2 italic">📦 Please note: Transport charges are not included in this bill. Our transport team will coordinate and settle these separately.</p>
       </div>
-      <p class="text-xs text-gray-500 mt-3">
-        Final amount calculated based on dates, area, and weight. KYC required if total ≥ ₹30,000.
+    </div>
+
+    {# KYC Section #}
+    <div id="kycSection" class="hidden bg-yellow-50 border-2 border-yellow-300 p-5 rounded-xl space-y-3">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-shield-halved text-yellow-700"></i>
+        <h4 class="font-bold text-yellow-900">🛡️ KYC Verification Required</h4>
+      </div>
+      <p class="text-xs text-yellow-800">
+        Total <strong>₹30,000 or above</strong>. Please provide Aadhaar and PAN details.
       </p>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Aadhaar (12 digits) *</label>
+        <input type="text" name="aadhaar" id="aadhaarInput" maxlength="12" pattern="\d{12}"
+               placeholder="123456789012" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">PAN *</label>
+        <input type="text" name="pan" id="panInput" maxlength="10"
+               placeholder="ABCDE1234F" style="text-transform: uppercase;"
+               class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+    </div>
+
+    {# Payment Details — QR + Bank #}
+    {% if payment_config and (payment_config.upi_id or payment_config.account_number or payment_config.custom_qr_url) %}
+    <div class="bg-white p-5 rounded-xl border-2 border-gray-200 space-y-4">
+      <h2 class="font-bold text-emerald-700">💳 Payment Details</h2>
+      <div class="flex flex-col md:flex-row gap-5">
+        {% if qr_base64 %}
+        <div class="flex-shrink-0 text-center">
+          <div class="bg-white border-2 border-gray-200 rounded-xl p-2 inline-block">
+            <img src="data:image/png;base64,{{ qr_base64 }}" alt="UPI QR" class="w-44 h-44">
+          </div>
+          <p class="text-xs text-gray-500 mt-2">Scan with any UPI app</p>
+        </div>
+        {% endif %}
+        <div class="flex-1 space-y-3 text-sm">
+          {% if payment_config.upi_id %}
+          <div>
+            <div class="text-xs text-gray-500 font-semibold">UPI ID</div>
+            <div class="mt-1"><code class="bg-gray-100 px-3 py-1.5 rounded text-sm font-bold">{{ payment_config.upi_id }}</code></div>
+            {% if payment_config.upi_name %}<div class="text-xs text-gray-500 mt-1">Name: {{ payment_config.upi_name }}</div>{% endif %}
+          </div>
+          {% endif %}
+          {% if payment_config.account_number %}
+          <div class="pt-2 border-t">
+            <div class="text-xs text-gray-500 font-semibold mb-1">Bank Transfer</div>
+            <div class="space-y-1">
+              {% if payment_config.account_name %}<div><span class="text-gray-500">Name:</span> <strong>{{ payment_config.account_name }}</strong></div>{% endif %}
+              <div><span class="text-gray-500">A/C:</span> <strong>{{ payment_config.account_number }}</strong></div>
+              {% if payment_config.ifsc_code %}<div><span class="text-gray-500">IFSC:</span> <strong>{{ payment_config.ifsc_code }}</strong></div>{% endif %}
+              {% if payment_config.bank_name %}<div><span class="text-gray-500">Bank:</span> {{ payment_config.bank_name }}</div>{% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Payment Proof Upload #}
+    <div class="bg-gray-50 p-5 rounded-xl border-2 border-gray-200 space-y-4">
+      <h2 class="font-bold text-emerald-700">📤 Upload Payment Proof</h2>
+      <div>
+        <label class="block font-semibold text-sm mb-1">UTR / Transaction ID *</label>
+        <input type="text" name="utr" required placeholder="UPI / bank reference number"
+               class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payment Method *</label>
+          <select name="method" required class="w-full border rounded-lg p-2.5 text-sm bg-white">
+            <option value="upi">UPI</option>
+            <option value="rtgs">RTGS</option>
+            <option value="neft">NEFT</option>
+            <option value="imps">IMPS</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-sm mb-1">Amount Paid (₹) *</label>
+          <input type="number" name="amount_paid" id="amountPaid" required min="1" step="0.01"
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payment Date</label>
+          <input type="date" name="payment_date" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block font-semibold text-sm mb-1">Payer Name</label>
+          <input type="text" name="payer_name" value="{{ current_user.name }}" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Payer Bank (optional)</label>
+        <input type="text" name="payer_bank" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block font-semibold text-sm mb-1">Payment Screenshot * <span class="text-red-600 text-xs">(mandatory)</span></label>
+        <input type="file" name="screenshot" required accept="image/*" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+      </div>
     </div>
 
     <button type="submit"
@@ -159,12 +248,8 @@
   var commissionRate = 0.05;
   var depositRate = 0.35;
   var gatewayRate = 0.02;
-  var transportMatrix = {
-    city: { till_20: 600, above_20: 1100 },
-    outskirts: { till_20: 1500, above_20: 2000 }
-  };
 
-    var startEl = document.querySelector('input[name="start_date"]');
+  var startEl = document.querySelector('input[name="start_date"]');
   (function() {
     var t = new Date(); t.setDate(t.getDate() + 1);
     var minD = t.toISOString().split('T')[0];
@@ -173,8 +258,6 @@
     if (e) { e.min = minD; if (!e.value) e.value = minD; }
   })();
   var endEl = document.querySelector('input[name="end_date"]');
-  var areaEl = document.querySelector('select[name="area"]');
-  var weightEl = document.querySelector('select[name="weight"]');
 
   function days() {
     if (!startEl.value || !endEl.value) return 1;
@@ -195,9 +278,8 @@
     } else {
       base = itemTotal;
     }
-        var comm = base * commissionRate;
+    var comm = base * commissionRate;
     var dep = base * depositRate;
-    var trans = 0; // Transport excluded
     var gateway = base * gatewayRate;
     var install = {{ bundle.installation_fee or 0 }};
     var total = base + comm + dep + gateway + install;
@@ -205,17 +287,31 @@
     document.getElementById('sum-base').textContent = fmt(base);
     document.getElementById('sum-comm').textContent = fmt(comm);
     document.getElementById('sum-dep').textContent = fmt(dep);
-    
     document.getElementById('sum-gateway').textContent = fmt(gateway);
     var installEl = document.getElementById('sum-install');
     if (installEl) installEl.textContent = fmt(install);
     document.getElementById('sum-total').textContent = fmt(total);
-  }
-  [startEl, endEl, areaEl, weightEl].forEach(function(el){
-    if (el) {
-      el.addEventListener('input', update);
-      el.addEventListener('change', update);
+
+    // Auto-fill amount paid
+    var amt = document.getElementById('amountPaid');
+    if (amt) amt.value = total.toFixed(2);
+
+    // KYC toggle
+    var kyc = document.getElementById('kycSection');
+    var aadhaar = document.getElementById('aadhaarInput');
+    var pan = document.getElementById('panInput');
+    if (total >= 30000) {
+      kyc.classList.remove('hidden');
+      aadhaar.required = true;
+      pan.required = true;
+    } else {
+      kyc.classList.add('hidden');
+      aadhaar.required = false;
+      pan.required = false;
     }
+  }
+  [startEl, endEl].forEach(function(el){
+    if (el) { el.addEventListener('input', update); el.addEventListener('change', update); }
   });
   update();
 })();
