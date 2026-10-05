@@ -1954,7 +1954,7 @@ def get_items():
             'category': item.category, 'rate': item.rate_per_day,
             'rate_with_commission': item.rate_with_commission,
             'deposit': item.deposit_amount, 'stock': item.stock,
-            'image': item.get_image(), 'vendor': item.vendor.name,
+            'image': item.get_image(), 'vendor': get_display_name(item.vendor),
             'vendor_id': item.vendor_id,
             'vendor_verified': item.vendor.is_verified,
             'item_verified': item.is_currently_verified,
