@@ -16,8 +16,9 @@
 
 <!-- User Info -->
 <div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
         <div><span class="text-gray-500">Name:</span> <strong>{{ user.name }}</strong></div>
+        <div><span class="text-gray-500">Public ID:</span> <code class="bg-gray-100 px-2 py-0.5 rounded font-mono text-xs">{{ user.public_id or '—' }}</code></div>
         <div><span class="text-gray-500">Mobile:</span> <strong>{{ user.mobile }}</strong></div>
         <div><span class="text-gray-500">Email:</span> <strong>{{ user.email or '-' }}</strong></div>
         <div><span class="text-gray-500">Role:</span> <strong>{{ user.role|title }}</strong></div>
