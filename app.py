@@ -4106,6 +4106,23 @@ def admin_users():
     if current_user.role != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('index'))
+
+    # One-time backfill: users without public_id
+    try:
+        missing = User.query.filter(
+            (User.public_id.is_(None)) | (User.public_id == '')
+        ).all()
+        for u in missing:
+            try:
+                u.public_id = generate_user_public_id(u.role)
+            except Exception:
+                pass
+        if missing:
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        app.logger.warning(f'public_id backfill failed: {e}')
+
     role_filter = request.args.get('role', 'all')
     search = request.args.get('search', '').strip()
     query = User.query
@@ -4115,8 +4132,9 @@ def admin_users():
         query = query.filter(db.or_(User.name.ilike(f'%{search}%'),
                                     User.mobile.ilike(f'%{search}%'),
                                     User.email.ilike(f'%{search}%')))
-    return render_template('admin/users.html', users=query.order_by(User.created_at.desc()).all(),
-                         role_filter=role_filter, search=search)
+    return render_template('admin/users.html',
+                           users=query.order_by(User.created_at.desc()).all(),
+                           role_filter=role_filter, search=search)
 
 
 @app.route('/admin/user/<int:user_id>/role', methods=['POST'])
