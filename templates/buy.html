@@ -19,7 +19,7 @@
         <p class="text-sm font-bold text-emerald-700 mt-2">₹{{ '%.0f'|format(item.sale_price) }} <span class="text-xs text-gray-500 font-normal">per unit</span></p>
       </div>
     </div>
-    <p class="text-xs text-gray-500">In stock: {{ item.stock }} · Vendor: {{ item.vendor.company_name or item.vendor.name }}</p>
+    <p class="text-xs text-gray-500">In stock: {{ item.stock }} · Vendor: {{ item.vendor.company_name or disp_name(item.vendor) }}</p>
   </div>
 
   <form method="POST" enctype="multipart/form-data" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
