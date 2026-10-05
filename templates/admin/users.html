@@ -38,6 +38,7 @@
             <thead class="bg-gray-50">
                 <tr>
                     <th class="p-3">Name</th>
+                    <th class="p-3">Public ID</th>
                     <th class="p-3">Mobile</th>
                     <th class="p-3">Email</th>
                     <th class="p-3">Role</th>
@@ -51,6 +52,9 @@
                 {% for user in users %}
                 <tr class="border-b hover:bg-gray-50">
                     <td class="p-3 font-medium">{{ user.name }}</td>
+                    <td class="p-3">
+                        <code class="text-xs bg-gray-100 px-2 py-0.5 rounded font-mono">{{ user.public_id or '—' }}</code>
+                    </td>
                     <td class="p-3 text-xs">{{ user.mobile }}</td>
                     <td class="p-3 text-xs">{{ user.email or '-' }}</td>
                     <td class="p-3">
