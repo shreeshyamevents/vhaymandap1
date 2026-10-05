@@ -838,6 +838,76 @@
             setTimeout(enforceMobileNav, 2000);
         })();
 
+                // PWA Push Notifications
+        (function() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+            {% if not current_user.is_authenticated %}return;{% endif %}
+
+            var VAPID_PUBLIC_KEY = null;
+
+            function urlBase64ToUint8Array(base64String) {
+                var padding = '='.repeat((4 - base64String.length % 4) % 4);
+                var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                var rawData = atob(base64);
+                var outputArray = new Uint8Array(rawData.length);
+                for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+                return outputArray;
+            }
+
+            function subscribe() {
+                if (!VAPID_PUBLIC_KEY) return;
+                navigator.serviceWorker.ready.then(function(reg) {
+                    return reg.pushManager.getSubscription().then(function(existing) {
+                        var subPromise = existing ? Promise.resolve(existing)
+                            : reg.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                            });
+                        return subPromise;
+                    });
+                }).then(function(sub) {
+                    if (!sub) return;
+                    var data = sub.toJSON();
+                    fetch('/api/push/subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            endpoint: data.endpoint,
+                            keys: data.keys
+                        })
+                    }).catch(function() {});
+                }).catch(function(err) {
+                    console.log('Push subscribe failed:', err);
+                });
+            }
+
+            function init() {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .then(function() {
+                        return fetch('/api/push/vapid-public-key').then(function(r) { return r.json(); });
+                    })
+                    .then(function(data) {
+                        VAPID_PUBLIC_KEY = (data && data.publicKey) || '';
+                        if (!VAPID_PUBLIC_KEY) return;
+                        if (Notification.permission === 'granted') {
+                            subscribe();
+                        } else if (Notification.permission === 'default') {
+                            // Only prompt after slight delay + user engagement
+                            setTimeout(function() {
+                                Notification.requestPermission().then(function(p) {
+                                    if (p === 'granted') subscribe();
+                                }).catch(function() {});
+                            }, 4000);
+                        }
+                    })
+                    .catch(function(err) {
+                        console.log('SW init failed:', err);
+                    });
+            }
+
+            window.addEventListener('load', init);
+        })();
+
         document.querySelectorAll('.flash-message').forEach(msg => {
             setTimeout(() => {
                 msg.style.transition = 'opacity 0.5s, transform 0.5s';
