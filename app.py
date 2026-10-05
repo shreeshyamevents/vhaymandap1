@@ -1347,6 +1347,19 @@ def unread_notification_count():
     return 0
 
 
+def get_display_name(user):
+    """Return public_id for others, real name for self/admin."""
+    if not user:
+        return '—'
+    try:
+        if current_user and current_user.is_authenticated:
+            if current_user.id == user.id or current_user.role == 'admin':
+                return user.name
+    except Exception:
+        pass
+    return user.public_id or user.name
+
+
 def _time_ago(dt):
     if not dt:
         return ''
