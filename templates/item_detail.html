@@ -65,6 +65,9 @@
           <div>
             <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Vendor</p>
             <p class="font-medium text-gray-900">{{ vendor.company_name or disp_name(vendor) }}</p>
+            {% if vendor.public_id %}
+            <p class="text-[10px] text-gray-400 font-mono">{{ vendor.public_id }}</p>
+            {% endif %}
             <p class="text-[10px] text-gray-400 font-mono">{{ vendor.public_id or '' }}</p>
             {% if vendor.is_verified %}
             <span class="inline-flex items-center text-xs text-emerald-600 mt-1">
