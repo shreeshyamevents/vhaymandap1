@@ -265,7 +265,11 @@
             <tbody>
                 {% for booking in bookings %}
                 <tr class="border-b hover:bg-gray-50 {% if not booking.dispatch_report_done and booking.booking_status == 'confirmed' %}bg-red-50{% endif %}">
-                    <td class="p-2 font-mono text-xs">{{ booking.booking_reference }}</td>
+                    <td class="p-2 font-mono text-xs">
+                      <a href="{{ url_for('vendor_booking_detail', booking_id=booking.id) }}" class="text-plum-600 hover:text-plum-800 font-bold">
+                       {{ booking.booking_reference }}
+                      </a>
+                    </td>
                     <td class="p-2">
                         {{ booking.customer.name }}
                         <div class="text-[10px] text-gray-500">{{ booking.customer.mobile }}</div>
