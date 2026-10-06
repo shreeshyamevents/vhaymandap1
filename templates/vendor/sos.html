@@ -77,10 +77,10 @@
         <p class="text-sm font-semibold">{{ r.reference }} — {{ r.item.title if r.item else '-' }}</p>
         <p class="text-xs text-gray-500">{{ disp_name(r.customer) if r.customer else '-' }} · {{ r.accepted_at|ist_short if r.accepted_at else '-' }}</p>
         {% if r.booking %}
-        <p class="text-xs text-gray-500 mt-1">
-          Booking: <strong class="font-mono">{{ r.booking.booking_reference }}</strong> ·
-          Status: <strong>{{ r.booking.payment_status|title }}</strong>
-        </p>
+        <a href="{{ url_for('vendor_booking_detail', booking_id=r.booking.id) }}"
+           class="text-xs text-plum-600 hover:text-plum-800 underline font-semibold">
+          View Booking →
+        </a>
         {% endif %}
       </div>
       <div class="flex flex-col gap-2 items-end">
