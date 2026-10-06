@@ -38,7 +38,7 @@
           <div class="flex items-center gap-2 mb-1">
             <span class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">🚨 SOS</span>
             <span class="font-mono text-xs text-gray-500">{{ r.reference }}</span>
-            <span class="text-xs text-red-700 font-bold">expires {{ r.expires_at.strftime('%H:%M') }}</span>
+            <span class="text-xs text-red-700 font-bold">expires {{ r.expires_at|ist_hm }}</span>
           </div>
           <h3 class="font-bold text-gray-900">{{ r.item.title if r.item else 'Item' }}</h3>
           <p class="text-xs text-gray-500 mt-1">
