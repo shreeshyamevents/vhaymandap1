@@ -152,7 +152,7 @@
     {% endif %}
 
     {% set pending_proof = proofs | selectattr('status', 'equalto', 'pending') | list %}
-    {% if booking.payment_status in ('pending', 'rejected') and not pending_proof %}
+    {% if current_user.id == booking.customer_id and booking.payment_status in ('pending', 'rejected') and not pending_proof %}
     <div class="bg-red-50 border-2 border-red-200 p-6 rounded-2xl mb-6">
         <h3 class="font-bold text-lg mb-2 text-red-800">💰 Payment Required</h3>
         <p class="text-sm text-red-700 mb-4">
