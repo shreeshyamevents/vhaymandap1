@@ -25,53 +25,65 @@
   </div>
 
   {# Booking summary #}
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+  <!-- Booking Details -->
+<div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
     <div class="grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Start Date</p>
-        <p class="font-medium text-gray-900">{{ booking.start_date.strftime('%d %b %Y') }}</p>
-      </div>
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">End Date</p>
-        <p class="font-medium text-gray-900">{{ booking.end_date.strftime('%d %b %Y') }}</p>
-      </div>
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Paid</p>
-        <p class="font-medium text-gray-900">₹{{ '%.2f'|format(booking.total_amount) }}</p>
-      </div>
-      <div>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Days Until Start</p>
-        <p class="font-medium text-gray-900">{{ days_until }} day{{ 's' if days_until != 1 }}</p>
-      </div>
+        <div>
+            <p class="text-xs text-gray-500">START DATE</p>
+            <p class="font-bold">{{ booking.start_date.strftime('%d %b %Y') }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500">END DATE</p>
+            <p class="font-bold">{{ booking.end_date.strftime('%d %b %Y') }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500">TOTAL PAID</p>
+            {% if booking.payment_status in ('paid', 'verified', 'partial') %}
+            <p class="font-bold">₹{{ '%.2f'|format(booking.total_amount) }}</p>
+            {% else %}
+            <p class="font-bold text-gray-400">₹0.00 <span class="text-[10px] font-normal">(not paid yet)</span></p>
+            {% endif %}
+        </div>
+        <div>
+            <p class="text-xs text-gray-500">DAYS UNTIL START</p>
+            <p class="font-bold">{{ days_until }} days</p>
+        </div>
     </div>
-  </div>
+</div>
 
   {# Refund breakdown #}
-  <div class="bg-plum-50 border border-plum-200 rounded-xl p-5 mb-6">
-    <h2 class="text-sm font-semibold text-plum-800 mb-3">Refund Breakdown</h2>
-    <div class="space-y-2 text-sm">
-      <div class="flex justify-between">
-        <span class="text-gray-700">Refund percentage on base rent</span>
-        <span class="font-semibold text-plum-700">{{ (refund_pct * 100)|int }}%</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-gray-700">Base rent refund</span>
-        <span class="text-gray-900">₹{{ '%.2f'|format(booking.base_rent * refund_pct) }}</span>
-      </div>
-      <div class="flex justify-between">
-        <span class="text-gray-700">Security deposit (refundable)</span>
-        <span class="text-gray-900">₹{{ '%.2f'|format(booking.deposit or 0) }}</span>
-      </div>
-      <div class="flex justify-between border-t border-plum-300 pt-2 mt-2">
-        <span class="font-semibold text-plum-800">Total eligible refund</span>
-        <span class="font-bold text-plum-800 text-base">₹{{ '%.2f'|format(refund_amount) }}</span>
-      </div>
+ <!-- Refund Breakdown -->
+<div class="bg-red-50 p-4 rounded-xl border border-red-200 mb-6">
+    <h3 class="font-bold mb-3 text-red-900">Refund Breakdown</h3>
+    {% if booking.payment_status not in ('paid', 'verified', 'partial') %}
+    <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-xs text-yellow-800">
+        ⚠️ <strong>No payment received.</strong> Since no payment has been made for this booking, there is nothing to refund.
     </div>
-    <p class="text-xs text-gray-600 mt-3 leading-relaxed">
-      Commission and transport fee are non-refundable. Actual refund is processed manually
-      by admin within 3-5 business days.
+    {% else %}
+    <div class="space-y-1 text-sm">
+        <div class="flex justify-between">
+            <span>Refund percentage on base rent</span>
+            <span class="font-semibold">{{ (refund_pct * 100)|int }}%</span>
+        </div>
+        <div class="flex justify-between">
+            <span>Base rent refund</span>
+            <span class="font-semibold">₹{{ '%.2f'|format(booking.base_rent * refund_pct) }}</span>
+        </div>
+        <div class="flex justify-between">
+            <span>Security deposit (refundable)</span>
+            <span class="font-semibold">₹{{ '%.2f'|format(booking.deposit or 0) }}</span>
+        </div>
+        <hr class="my-2 border-red-200">
+        <div class="flex justify-between font-bold text-base text-red-900">
+            <span>Total eligible refund</span>
+            <span>₹{{ '%.2f'|format(refund_amount) }}</span>
+        </div>
+    </div>
+    <p class="text-xs text-red-700 mt-3">
+        Commission and transport fee are non-refundable. Actual refund is processed manually by admin within 3-5 business days.
     </p>
-  </div>
+    {% endif %}
+</div>
 
   {# Form #}
   <form method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
