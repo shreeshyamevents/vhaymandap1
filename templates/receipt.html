@@ -36,7 +36,7 @@
       <div class="text-right">
         <p class="text-xs text-gray-500 uppercase tracking-wide">Receipt</p>
         <p class="text-lg font-mono font-bold text-plum-700">{{ booking.booking_reference }}</p>
-        <p class="text-xs text-gray-500 mt-1">{{ booking.created_at.strftime('%d %b %Y, %I:%M %p') }}</p>
+        <p class="text-xs text-gray-500 mt-1">{{ booking.created_at|ist_dt }}</p>
       </div>
     </div>
 
