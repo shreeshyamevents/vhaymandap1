@@ -2299,7 +2299,22 @@ def dashboard():
 @login_required
 def my_booking_detail(booking_id):
     booking = Booking.query.get_or_404(booking_id)
-    if booking.customer_id != current_user.id and current_user.role != 'admin':
+
+    is_customer = (booking.customer_id == current_user.id)
+    is_admin = (current_user.role == 'admin')
+    is_vendor_of_item = (
+        booking.item and booking.item.vendor_id == current_user.id
+    )
+    # Vendor who accepted SOS
+    is_sos_vendor = False
+    try:
+        sos = SOSRequest.query.filter_by(booking_id=booking.id).first()
+        if sos and sos.accepted_by == current_user.id:
+            is_sos_vendor = True
+    except Exception:
+        pass
+
+    if not (is_customer or is_admin or is_vendor_of_item or is_sos_vendor):
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
     
