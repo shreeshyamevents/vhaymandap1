@@ -63,7 +63,7 @@
     {% if completed %}
     <div class="divide-y divide-gray-100">
       {% for b in completed %}
-      <a href="{{ url_for('my_booking_detail', booking_id=b.id) }}"
+      <a href="{{ url_for('vendor_booking_detail', booking_id=b.id) }}"
          class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition">
         <div class="min-w-0 flex-1">
           <p class="font-medium text-sm text-gray-900 truncate">
