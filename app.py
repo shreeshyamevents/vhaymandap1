@@ -956,6 +956,11 @@ def ist_today():
     return (datetime.utcnow() + timedelta(hours=5, minutes=30)).date()
 
 
+def ist_now():
+    """Return current datetime in India Standard Time (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+
 def should_filter_contact_info(user_a, user_b):
     roles = {user_a.role, user_b.role}
     if 'admin' in roles:
