@@ -75,7 +75,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
       <div class="flex-1">
         <p class="text-sm font-semibold">{{ r.reference }} — {{ r.item.title if r.item else '-' }}</p>
-        <p class="text-xs text-gray-500">{{ disp_name(r.customer) if r.customer else '-' }} · {{ r.accepted_at.strftime('%d %b, %H:%M') if r.accepted_at else '-' }}</p>
+        <p class="text-xs text-gray-500">{{ disp_name(r.customer) if r.customer else '-' }} · {{ r.accepted_at|ist_short if r.accepted_at else '-' }}</p>
         {% if r.booking %}
         <p class="text-xs text-gray-500 mt-1">
           Booking: <strong class="font-mono">{{ r.booking.booking_reference }}</strong> ·
