@@ -64,7 +64,7 @@
         <h3 class="font-bold text-lg mb-4">📅 Booking Information</h3>
         <div class="space-y-2 text-sm">
             <div class="flex justify-between"><span class="text-gray-500">Reference:</span><strong class="font-mono">{{ booking.booking_reference }}</strong></div>
-            <div class="flex justify-between"><span class="text-gray-500">Booked On:</span><strong>{{ booking.created_at.strftime('%d %b %Y, %H:%M') }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Booked On:</span><strong>{{ booking.created_at|ist_dt }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Start Date:</span><strong>{{ booking.start_date }} @ {{ booking.start_time }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">End Date:</span><strong>{{ booking.end_date }} @ {{ booking.end_time }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Quantity:</span><strong>{{ booking.quantity }}</strong></div>
