@@ -37,9 +37,10 @@
         <input type="date" value="{{ today }}" readonly
                class="w-full border rounded-lg p-2.5 text-sm bg-gray-100 text-gray-600">
       </div>
-      <div>
-        <label class="block font-semibold text-sm mb-1">Start Time *</label>
-        <input type="time" name="start_time" required value="10:00" class="w-full border rounded-lg p-2.5 text-sm">
+          <div>
+        <label class="block font-semibold text-sm mb-1">Start Time * <span class="text-xs text-red-600">(must be future)</span></label>
+        <input type="time" name="start_time" id="sosTime" required value="" class="w-full border rounded-lg p-2.5 text-sm">
+        <p class="text-xs text-gray-500 mt-1">Current IST: <span id="istNow" class="font-mono">—</span></p>
       </div>
 
     <div>
@@ -66,4 +67,31 @@
     </button>
   </form>
 </div>
+<script>
+(function() {
+  function istNow() {
+    var now = new Date();
+    var utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    return new Date(utc + 5.5 * 3600000);
+  }
+  function fmt24(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function fmt12(d) {
+    var h = d.getHours();
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + String(d.getMinutes()).padStart(2, '0') + ' ' + ampm;
+  }
+  var ist = istNow();
+  ist.setMinutes(ist.getMinutes() + 5); // 5-min grace
+  var tEl = document.getElementById('sosTime');
+  var nEl = document.getElementById('istNow');
+  if (tEl) {
+    tEl.min = fmt24(ist);
+    tEl.value = fmt24(ist);
+  }
+  if (nEl) nEl.textContent = fmt12(istNow());
+})();
+</script>
 {% endblock %}
