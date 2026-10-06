@@ -4289,6 +4289,7 @@ def utility_processor():
 # ============================================
 # Register helpers as Jinja globals
 app.jinja_env.globals['_time_ago'] = _time_ago
+app.jinja_env.globals['disp_name'] = disp_name
 
 
 @app.template_filter('ist_dt')
