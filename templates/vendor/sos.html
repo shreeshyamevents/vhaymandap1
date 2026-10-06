@@ -72,22 +72,22 @@
   {% else %}
   <div class="space-y-2">
     {% for r in my_accepted %}
-    <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-      <div class="flex-1">
+    <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between flex-wrap gap-3">
+      <div class="flex-1 min-w-[200px]">
         <p class="text-sm font-semibold">{{ r.reference }} — {{ r.item.title if r.item else '-' }}</p>
         <p class="text-xs text-gray-500">{{ disp_name(r.customer) if r.customer else '-' }} · {{ r.accepted_at|ist_short if r.accepted_at else '-' }}</p>
         {% if r.booking %}
-        <a href="{{ url_for('vendor_booking_detail', booking_id=r.booking.id) }}"
-           class="text-xs text-plum-600 hover:text-plum-800 underline font-semibold">
-          View Booking →
-        </a>
+        <p class="text-xs text-gray-500 mt-1">
+          Booking: <strong class="font-mono">{{ r.booking.booking_reference }}</strong> ·
+          Status: <strong>{{ r.booking.payment_status|title }}</strong>
+        </p>
         {% endif %}
       </div>
       <div class="flex flex-col gap-2 items-end">
         <span class="text-xs bg-green-100 text-green-700 font-bold px-2 py-1 rounded">ACCEPTED</span>
         {% if r.booking %}
-        <a href="{{ url_for('my_booking_detail', booking_id=r.booking.id) }}"
-           class="text-xs text-plum-600 hover:text-plum-800 underline font-semibold">
+        <a href="{{ url_for('vendor_booking_detail', booking_id=r.booking.id) }}"
+           class="text-xs bg-plum-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-plum-700">
           View Booking →
         </a>
         {% endif %}
