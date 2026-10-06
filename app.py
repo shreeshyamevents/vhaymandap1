@@ -5364,6 +5364,36 @@ def sos_cancel(sos_id):
     return redirect(url_for('sos_list'))
 
 
+@app.route('/vendor/booking/<int:booking_id>')
+@login_required
+def vendor_booking_detail(booking_id):
+    if current_user.role not in ('vendor', 'admin'):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+
+    booking = Booking.query.get_or_404(booking_id)
+
+    # Only item owner or admin can view
+    if booking.item.vendor_id != current_user.id and current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('vendor_dashboard'))
+
+    # Dispatch/return reports for this booking
+    dispatch_report = EquipmentReport.query.filter_by(
+        booking_id=booking.id, report_type='dispatch'
+    ).first()
+    return_report = EquipmentReport.query.filter_by(
+        booking_id=booking.id, report_type='return'
+    ).first()
+
+    return render_template(
+        'vendor/booking_detail.html',
+        booking=booking,
+        dispatch_report=dispatch_report,
+        return_report=return_report,
+    )
+
+
 @app.route('/vendor/sos')
 @login_required
 def vendor_sos():
