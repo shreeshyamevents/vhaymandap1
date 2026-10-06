@@ -5248,6 +5248,24 @@ def sos_create(item_id):
         # SOS is always today — server-set
         start_date = ist_today()
 
+        # Validate time — must be in future (IST)
+        start_time_raw = request.form.get('start_time', '').strip()
+        try:
+            hh, mm = map(int, start_time_raw.split(':')[:2])
+            if not (0 <= hh <= 23 and 0 <= mm <= 59):
+                raise ValueError
+        except (ValueError, TypeError):
+            flash('Invalid time format.', 'danger')
+            return redirect(url_for('sos_create', item_id=item_id))
+
+        ist_now_dt = ist_now()
+        # Give 5-minute grace window
+        now_minutes = ist_now_dt.hour * 60 + ist_now_dt.minute
+        chosen_minutes = hh * 60 + mm
+        if chosen_minutes < now_minutes - 5:
+            flash(f'Time must be in the future. Current IST: {ist_now_dt.strftime("%I:%M %p")}', 'danger')
+            return redirect(url_for('sos_create', item_id=item_id))
+
         try:
             quantity = int(request.form.get('quantity', 1))
         except (ValueError, TypeError):
