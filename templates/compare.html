@@ -83,7 +83,7 @@
           {% for item in items %}
           <td class="p-4 text-gray-800">
             <a href="/vendor/{{ item.vendor.id }}/public" class="text-plum-600 hover:text-plum-800">
-              {{ item.vendor.company_name or item.vendor.name }}
+              {{ item.vendor.company_name or disp_name(item.vendor) }}
             </a>
           </td>
           {% endfor %}
