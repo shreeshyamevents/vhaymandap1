@@ -2276,7 +2276,12 @@ def book_item(item_id):
             )
             db.session.add(proof)
             db.session.commit()
-            
+
+            notify_all_admins(
+                f"💰 New Payment Proof (Booking) — {booking.booking_reference} — ₹{proof.amount_paid:,.0f} ({proof.method.upper()})",
+                link=url_for('admin_payment_queue')
+            )
+
             if current_user.telegram_chat_id:
                 send_telegram_notification_async(current_user.telegram_chat_id,
                     f"🎉 Booking Confirmed!\n\nItem: {item.title}\nRef: {booking.booking_reference}")
