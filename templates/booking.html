@@ -30,7 +30,7 @@
             </div>
             <div class="flex-1">
                 <h3 class="font-bold text-lg">{{ item.title }}</h3>
-                <p class="text-sm text-gray-500">by {{ item.vendor.name }}
+                <p class="text-sm text-gray-500">by {{ item.vendor.company_name or disp_name(item.vendor) }}
                     {% if item.vendor.is_verified %}<span class="text-blue-600 text-xs font-bold ml-1">✓ Verified</span>{% endif %}
                 </p>
                 <div class="flex gap-3 text-sm mt-1 flex-wrap">
