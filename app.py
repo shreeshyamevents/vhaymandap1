@@ -2794,12 +2794,15 @@ def admin_reject_payment_proof(proof_id):
             f"Reason: {reason}")
     
     # PART J — Event 4: Payment rejected -> customer
-    if booking_cancelled:
+        if booking_cancelled:
         create_notification(
             proof.booking.customer_id, 'payment', 'Payment Rejected — Booking Cancelled',
             f'{proof.booking.booking_reference} cancelled. Reason: {reason}. '
             f'Please re-book or raise a support ticket.',
             f'/my-booking/{proof.booking.id}'
+        )
+        _notify_vendors_of_cancellation(
+            proof.booking, f'Payment rejected: {reason}'
         )
     else:
         create_notification(
