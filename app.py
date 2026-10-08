@@ -1634,6 +1634,9 @@ def register():
 @login_required
 def logout():
     logout_user()
+    # Clear user-specific session data so next login on same device is clean
+    for key in ('cart', 'recent_views', 'recently_viewed', 'recently_viewed_bundles'):
+        session.pop(key, None)
     flash('🔒 You have been logged out.', 'info')
     return redirect(url_for('index'))
 
