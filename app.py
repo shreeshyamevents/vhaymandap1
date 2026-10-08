@@ -2704,6 +2704,40 @@ def _restore_booking_stock(booking):
                 item.is_available = True
 
 
+def _notify_vendors_of_cancellation(booking, reason=''):
+    """Notify vendor(s) when a booking is cancelled.
+    Bundle/cart parents: notify each vendor with their child booking link
+    (deduped by vendor — one notification per vendor)."""
+    notified = set()
+    children = Booking.query.filter_by(parent_booking_id=booking.id).all()
+    if children:
+        for child in children:
+            item = Item.query.get(child.item_id)
+            if not item or not item.vendor_id or item.vendor_id in notified:
+                continue
+            notified.add(item.vendor_id)
+            try:
+                create_notification(
+                    item.vendor_id, 'cancel', 'Booking Cancelled',
+                    f'{booking.booking_reference} cancelled. Reason: {reason or "—"}',
+                    f'/vendor/booking/{child.id}'
+                )
+            except Exception:
+                pass
+    else:
+        item = Item.query.get(booking.item_id)
+        if item and item.vendor_id and item.vendor_id not in notified:
+            notified.add(item.vendor_id)
+            try:
+                create_notification(
+                    item.vendor_id, 'cancel', 'Booking Cancelled',
+                    f'{booking.booking_reference} cancelled. Reason: {reason or "—"}',
+                    f'/vendor/booking/{booking.id}'
+                )
+            except Exception:
+                pass
+
+
 @app.route('/admin/payment-proof/<int:proof_id>/reject', methods=['POST'])
 @login_required
 def admin_reject_payment_proof(proof_id):
