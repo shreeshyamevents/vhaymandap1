@@ -76,7 +76,7 @@
         <h3 class="font-bold text-lg mb-4">💰 Cost Breakdown</h3>
         <div class="space-y-2 text-sm">
             <div class="flex justify-between"><span class="text-gray-500">Base Rent</span><strong>₹{{ '%.2f'|format(booking.base_rent) }}</strong></div>
-            <div class="flex justify-between"><span class="text-gray-500">Platform Commission (5%)</span><strong class="text-green-700">₹{{ '%.2f'|format(booking.commission) }}</strong></div>
+            <div class="flex justify-between"><span class="text-gray-500">Platform Fee (5%)</span><strong class="text-green-700">₹{{ '%.2f'|format(booking.commission) }}</strong></div>
             <div class="flex justify-between"><span class="text-gray-500">Security Deposit (refundable)</span><strong>₹{{ '%.2f'|format(booking.deposit or 0) }}</strong></div>
             {% if booking.transport_fee and booking.transport_fee > 0 %}
             <div class="flex justify-between"><span class="text-gray-500">Transport Fee</span><strong>₹{{ '%.2f'|format(booking.transport_fee) }}</strong></div>
