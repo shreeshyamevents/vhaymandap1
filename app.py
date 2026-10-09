@@ -4065,17 +4065,77 @@ def admin_data_management():
 # ============================================
 # CRON — EXTENDED WITH DPDP DELETION PROCESSING
 # ============================================
-@app.route('/admin/_debug/ocr-test', methods=['GET'])
+@app.route('/admin/_debug/ocr-test', methods=['GET', 'POST'])
 @login_required
 def debug_ocr_test():
-    """Temporary: verify OCR.space connectivity. Remove after KYC P2 verified."""
+    """Temporary: verify OCR.space connectivity + file upload path. Remove after KYC P2 verified."""
     if current_user.role != 'admin':
         return jsonify({'error': 'admin only'}), 403
     if not Config.OCR_SPACE_API_KEY:
         return jsonify({'error': 'OCR_SPACE_API_KEY not set in env'}), 500
+
+    # If a file was uploaded, test the actual upload path
+    if request.method == 'POST' and request.files.get('test_image'):
+        f = request.files['test_image']
+        import tempfile as _tf
+        temp_path = None
+        try:
+            ext = '.jpg'
+            if f.filename and '.' in f.filename:
+                ext = '.' + f.filename.rsplit('.', 1)[1].lower()
+            with _tf.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                f.save(tmp.name)
+                temp_path = tmp.name
+            size = os.path.getsize(temp_path)
+            with open(temp_path, 'rb') as fh:
+                r = requests.post(
+                    'https://api.ocr.space/parse/image',
+                    files={'file': fh},
+                    data={
+                        'apikey': Config.OCR_SPACE_API_KEY,
+                        'language': 'eng',
+                        'isOverlayRequired': False,
+                        'OCREngine': '2',
+                        'scale': True,
+                    },
+                    timeout=30,
+                )
+            resp_json = r.json()
+            # Try to extract PAN from response
+            extracted = None
+            if not resp_json.get('IsErroredOnProcessing'):
+                parsed = resp_json.get('ParsedResults') or []
+                if parsed:
+                    text = (parsed[0].get('ParsedText') or '').upper()
+                    clean = re.sub(r'[^A-Z0-9]', '', text)
+                    m = re.search(r'[A-Z]{5}[0-9]{4}[A-Z]', clean)
+                    if m:
+                        extracted = m.group(0)
+            return jsonify({
+                'uploaded_filename': f.filename,
+                'file_size_bytes': size,
+                'file_size_mb': round(size / 1024 / 1024, 2),
+                'status_code': r.status_code,
+                'extracted_pan': extracted,
+                'response': resp_json,
+            })
+        except Exception as e:
+            import traceback
+            return jsonify({
+                'error': str(e),
+                'type': type(e).__name__,
+                'traceback': traceback.format_exc(),
+            }), 500
+        finally:
+            if temp_path:
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+
+    # Default GET — connectivity test with public URL
     key = Config.OCR_SPACE_API_KEY
     try:
-        # Test with hello-world API which always works
         r = requests.post(
             'https://api.ocr.space/parse/image',
             data={
