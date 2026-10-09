@@ -4065,6 +4065,7 @@ def admin_data_management():
 # ============================================
 # CRON — EXTENDED WITH DPDP DELETION PROCESSING
 # ============================================
+@csrf.exempt
 @app.route('/admin/_debug/ocr-test', methods=['GET', 'POST'])
 @login_required
 def debug_ocr_test():
