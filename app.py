@@ -1460,7 +1460,7 @@ def _ocr_pan_image(image_file):
                 },
                 timeout=30,
             )
-                result = r.json()
+        result = r.json()
         if result.get('IsErroredOnProcessing'):
             err_detail = result.get('ErrorMessage') or result.get('ErrorDetails') or 'unknown'
             app.logger.error(f'OCR.space error: {err_detail} | Full: {result}')
@@ -1502,8 +1502,9 @@ def _validate_kyc_inputs(aadhaar, pan, pan_file):
     extracted, kind = _ocr_pan_image(pan_file)
     if kind == 'no_api':
         return False, 'KYC verification temporarily unavailable. Please try again in a few minutes.'
-    if kind == 'api_error':
-        return False, 'Could not reach verification service. Please try again in a moment.'
+    if kind.startswith('api_error'):
+        detail = kind.split(':', 1)[1] if ':' in kind else 'unknown'
+        return False, f'Verification failed: {detail}'
     if kind == 'read_error':
         return False, 'Image too large or unreadable. Upload a clear photo under 5MB.'
     if kind == 'no_pan':
@@ -4064,6 +4065,37 @@ def admin_data_management():
 # ============================================
 # CRON — EXTENDED WITH DPDP DELETION PROCESSING
 # ============================================
+@app.route('/admin/_debug/ocr-test', methods=['GET'])
+@login_required
+def debug_ocr_test():
+    """Temporary: verify OCR.space connectivity. Remove after KYC P2 verified."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'admin only'}), 403
+    if not Config.OCR_SPACE_API_KEY:
+        return jsonify({'error': 'OCR_SPACE_API_KEY not set in env'}), 500
+    key = Config.OCR_SPACE_API_KEY
+    try:
+        # Test with hello-world API which always works
+        r = requests.post(
+            'https://api.ocr.space/parse/image',
+            data={
+                'apikey': key,
+                'url': 'https://tesseract.projectnaptha.com/img/eng_bw.png',
+                'language': 'eng',
+                'OCREngine': '2',
+            },
+            timeout=30,
+        )
+        return jsonify({
+            'status_code': r.status_code,
+            'key_prefix': key[:6] + '...',
+            'key_length': len(key),
+            'response': r.json(),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e), 'type': type(e).__name__}), 500
+
+
 @app.route('/api/cron/cleanup', methods=['GET', 'POST'])
 def cron_cleanup():
     token = request.args.get('token') or request.form.get('token')
