@@ -1429,11 +1429,13 @@ def _user_blocked(user):
 
 def _ocr_pan_image(image_file):
     """Extract PAN number from image via OCR.space API.
-    Returns (pan_or_none, error_kind). error_kind in {'ok','no_api','api_error','no_pan','read_error'}"""
+    Compresses image to fit free tier (<1MB). Returns (pan_or_none, error_kind)."""
     if not Config.OCR_SPACE_API_KEY:
         return None, 'no_api'
     temp_path = None
+    raw_path = None
     try:
+        # Save raw upload
         ext = '.jpg'
         if image_file.filename and '.' in image_file.filename:
             ext = '.' + image_file.filename.rsplit('.', 1)[1].lower()
@@ -1441,11 +1443,40 @@ def _ocr_pan_image(image_file):
                 ext = '.jpg'
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             image_file.save(tmp.name)
-            temp_path = tmp.name
+            raw_path = tmp.name
 
-        # OCR.space has 5MB limit on free tier
-        if os.path.getsize(temp_path) > 5 * 1024 * 1024:
-            return None, 'read_error'
+        # Compress + resize to fit OCR.space free tier (<1MB)
+        # OCR.space free API: 1MB max file size, and needs sane dimensions
+        try:
+            from PIL import Image
+            img = Image.open(raw_path)
+            # Convert to RGB (handles PNG with alpha, etc.)
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            # Resize if very large (keep aspect ratio, max 2000px on long side)
+            max_dim = 2000
+            if max(img.size) > max_dim:
+                ratio = max_dim / float(max(img.size))
+                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+            # Save as JPEG at decreasing quality until < 900KB
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp2:
+                temp_path = tmp2.name
+            quality = 85
+            for q in [85, 75, 65, 55, 45, 35]:
+                img.save(temp_path, 'JPEG', quality=q, optimize=True)
+                if os.path.getsize(temp_path) < 900 * 1024:
+                    quality = q
+                    break
+            app.logger.info(f'OCR compress: raw={os.path.getsize(raw_path)//1024}KB -> compressed={os.path.getsize(temp_path)//1024}KB (q={quality})')
+        except Exception as e:
+            app.logger.warning(f'Image compression failed, using raw: {e}')
+            temp_path = raw_path
+            raw_path = None
+
+        # Final size sanity check (1MB OCR.space free tier limit)
+        if os.path.getsize(temp_path) > 1024 * 1024:
+            return None, 'read_error:file_too_large_even_after_compression'
 
         with open(temp_path, 'rb') as f:
             r = requests.post(
@@ -1482,11 +1513,12 @@ def _ocr_pan_image(image_file):
         app.logger.error(f'OCR PAN failed: {e}')
         return None, 'api_error'
     finally:
-        if temp_path:
-            try:
-                os.remove(temp_path)
-            except Exception:
-                pass
+        for p in (temp_path, raw_path):
+            if p:
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
 
 
 def _validate_kyc_inputs(aadhaar, pan, pan_file):
@@ -1505,6 +1537,10 @@ def _validate_kyc_inputs(aadhaar, pan, pan_file):
     if kind.startswith('api_error'):
         detail = kind.split(':', 1)[1] if ':' in kind else 'unknown'
         return False, f'Verification failed: {detail}'
+    if kind.startswith('read_error'):
+        return False, 'Image too large or unreadable. Try a smaller, clearer photo (under 2 MB).'
+    if kind == 'no_pan':
+        return False, 'Could not read PAN number from image. Please upload a clear, well-lit photo where the PAN number is clearly visible.'
     if kind == 'read_error':
         return False, 'Image too large or unreadable. Upload a clear photo under 5MB.'
     if kind == 'no_pan':
