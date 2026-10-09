@@ -4415,10 +4415,11 @@ def utility_processor():
                 return user.name
         return user.public_id or user.name
 
-    return dict(
+        return dict(
         disp_name=disp_name,
         cart_count=cart_count(),
         vendor_sos_available=vendor_sos_available,
+        platform_fee_rate=Config.COMMISSION_RATE,
         app_name=Config.APP_NAME, app_tagline=Config.APP_TAGLINE,
         business_phone=Config.BUSINESS_PHONE,
         business_phone_alt=Config.BUSINESS_PHONE_ALT,
