@@ -119,8 +119,10 @@ class Config:
     SOS_FEE_RATE = 0.25
     SOS_VENDOR_BONUS_RATE = 0.10
     SOS_DURATION_MINUTES = 60
-    # 08 Oct 2026 — SOS disabled (testing phase — focus: rent, buy, bundle, cart)
+    # 08 Oct 2026 — SOS disabled (testing phase)
     SOS_ENABLED = False
+    # 10 Oct 2026 — auto-cancel bookings with unpaid proof after TTL
+    PAYMENT_PENDING_TTL_HOURS = 24
 
     # Mail settings (Gmail SMTP — use an App Password)
     MAIL_SERVER = 'smtp.gmail.com'
@@ -4052,7 +4054,64 @@ def cron_cleanup():
         db.session.add(dr)
         db.session.commit()
 
-    # 4. Auto-unblock users whose block has expired
+    # 4. Auto-cancel stale unpaid bookings (release stock)
+    ttl_cutoff = NOW - timedelta(hours=Config.PAYMENT_PENDING_TTL_HOURS)
+    stale_parents = Booking.query.filter(
+        Booking.parent_booking_id.is_(None),
+        Booking.booking_status.in_(['confirmed', 'pending']),
+        Booking.payment_status == 'pending',
+        Booking.created_at < ttl_cutoff,
+        Booking.order_type.notin_(['bundle', 'cart']),  # only top-level simple bookings
+    ).all()
+    # Cart/bundle parents (order_type in ('bundle','cart'))
+    stale_parents += Booking.query.filter(
+        Booking.parent_booking_id.is_(None),
+        Booking.booking_status.in_(['confirmed', 'pending']),
+        Booking.payment_status == 'pending',
+        Booking.created_at < ttl_cutoff,
+        Booking.order_type.in_(['bundle', 'cart']),
+    ).all()
+
+    auto_cancel = {'cancelled': 0, 'restored_skipped': 0}
+    for bk in stale_parents:
+        try:
+            # Skip if any proof is pending review (admin actively looking)
+            has_pending_proof = PaymentProof.query.filter_by(
+                booking_id=bk.id, status='pending'
+            ).first()
+            if has_pending_proof:
+                continue
+            # Skip if any verified proof (paid)
+            has_verified_proof = PaymentProof.query.filter_by(
+                booking_id=bk.id, status='verified'
+            ).first()
+            if has_verified_proof:
+                continue
+
+            bk.booking_status = 'cancelled'
+            bk.payment_status = 'rejected'
+            bk.cancelled_at = NOW
+            bk.cancellation_reason = f'Auto-cancelled: payment not received within {Config.PAYMENT_PENDING_TTL_HOURS}h'
+            bk.cancelled_by = 'system'
+            bk.refund_amount = 0
+            _restore_booking_stock(bk)
+            auto_cancel['cancelled'] += 1
+
+            # Notify customer
+            create_notification(
+                bk.customer_id, 'cancel', 'Booking Auto-Cancelled',
+                f'{bk.booking_reference} was auto-cancelled — no payment received within {Config.PAYMENT_PENDING_TTL_HOURS} hours. Stock has been released.',
+                f'/my-booking/{bk.id}'
+            )
+            # Notify vendors
+            _notify_vendors_of_cancellation(bk, 'Payment not received (auto-cancel)')
+        except Exception as e:
+            app.logger.error(f'Auto-cancel failed for booking {bk.id}: {e}')
+            auto_cancel['restored_skipped'] += 1
+
+    db.session.commit()
+
+    # 5. Auto-unblock users whose block has expired
     expired_blocks = User.query.filter(
         User.is_blocked == True,
         User.block_expires_at != None,
@@ -4103,6 +4162,7 @@ def cron_cleanup():
         'account_deletions': deletion_stats,
         'deletion_reminders': reminder_stats,
         'auto_unblocks': unblock_stats,
+        'auto_cancels': auto_cancel,
         'booking_reminders': booking_reminders,
         'timestamp': NOW.isoformat()
     })
