@@ -1460,12 +1460,15 @@ def _ocr_pan_image(image_file):
                 },
                 timeout=30,
             )
-        result = r.json()
+                result = r.json()
         if result.get('IsErroredOnProcessing'):
-            return None, 'api_error'
+            err_detail = result.get('ErrorMessage') or result.get('ErrorDetails') or 'unknown'
+            app.logger.error(f'OCR.space error: {err_detail} | Full: {result}')
+            return None, f'api_error:{str(err_detail)[:80]}'
         parsed = result.get('ParsedResults') or []
         if not parsed:
-            return None, 'api_error'
+            app.logger.error(f'OCR.space empty parsed: {result}')
+            return None, 'api_error:empty_parsed'
         text = (parsed[0].get('ParsedText') or '').upper()
         # Remove common OCR noise
         clean = re.sub(r'[^A-Z0-9]', '', text)
