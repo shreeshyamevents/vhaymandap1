@@ -85,6 +85,70 @@
 </div>
 {% endif %}
 
+<!-- KYC Status -->
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <h3 class="text-lg font-bold text-gray-900">
+            <i class="fa-solid fa-shield-halved text-blue-600 mr-2"></i>KYC Verification
+        </h3>
+        {% if user.kyc_status == 'verified' and user.kyc_expires_at and user.kyc_expires_at > now %}
+        <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">✅ Verified</span>
+        {% elif user.kyc_status == 'verified' and user.kyc_expires_at and user.kyc_expires_at <= now %}
+        <span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold">⏰ Expired</span>
+        {% else %}
+        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold">Not Verified</span>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
+        <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Aadhaar (last 4)</p>
+            <p class="font-mono font-bold">{{ ('••••' + user.kyc_aadhaar_last4) if user.kyc_aadhaar_last4 else '—' }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">PAN</p>
+            <p class="font-mono font-bold">{{ user.kyc_pan_masked or '—' }}</p>
+        </div>
+        <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Verified On</p>
+            <p class="font-bold">{{ user.kyc_verified_at|ist_date if user.kyc_verified_at else '—' }}</p>
+        </div>
+        {% if user.kyc_expires_at %}
+        <div class="md:col-span-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Expires On</p>
+            <p class="font-bold {% if user.kyc_expires_at <= now %}text-amber-700{% else %}text-gray-700{% endif %}">
+                {{ user.kyc_expires_at|ist_date }}
+                {% if user.kyc_expires_at <= now %}<span class="text-xs font-normal ml-1">(expired)</span>{% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="flex gap-2 flex-wrap pt-4 border-t border-gray-100">
+        {% if user.kyc_status != 'verified' or (user.kyc_expires_at and user.kyc_expires_at <= now) %}
+        <form method="POST" action="{{ url_for('admin_verify_user_kyc', user_id=user.id) }}"
+              onsubmit="return confirm('Mark this user as KYC verified for 1 year?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm">
+                <i class="fa-solid fa-check mr-1"></i>Verify Manually
+            </button>
+        </form>
+        {% endif %}
+        {% if user.kyc_status == 'verified' %}
+        <form method="POST" action="{{ url_for('admin_reset_user_kyc', user_id=user.id) }}"
+              onsubmit="return confirm('Reset KYC for this user? They will need to re-verify on next booking above ₹30,000.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="bg-white border border-red-300 text-red-600 font-bold px-4 py-2 rounded-lg hover:bg-red-50 text-sm">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Reset KYC
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    <p class="text-[11px] text-gray-500 mt-3 italic">
+        Per-user KYC is valid for 1 year. Once verified, users won't be asked for documents on bookings above ₹30,000.
+    </p>
+</div>
+
 <!-- Role Update -->
 <div class="bg-white p-4 rounded-xl border shadow-sm mb-6">
     <form method="POST" action="{{ url_for('admin_update_user_role', user_id=user.id) }}" class="flex gap-3 items-center">
