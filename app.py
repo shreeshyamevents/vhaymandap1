@@ -4415,7 +4415,7 @@ def utility_processor():
                 return user.name
         return user.public_id or user.name
 
-        return dict(
+    return dict(
         disp_name=disp_name,
         cart_count=cart_count(),
         vendor_sos_available=vendor_sos_available,
