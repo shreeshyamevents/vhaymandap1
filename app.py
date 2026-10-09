@@ -4592,18 +4592,27 @@ def admin_update_booking_status(booking_id):
         booking.booking_status = new_status
 
         active_statuses = ['pending', 'confirmed', 'dispatched', 'return_initiated']
-        item = Item.query.get(booking.item_id)
-        if item:
-            # Restore stock when cancelling an active booking
-            if new_status == 'cancelled' and old_status in active_statuses:
-                item.stock += booking.quantity
-                if item.stock > 0 and not item.is_available:
-                    item.is_available = True
-            # Re-reserve stock if a cancelled booking is reactivated (prevents double-restore)
-            elif old_status == 'cancelled' and new_status in active_statuses:
-                item.stock = max(0, item.stock - booking.quantity)
-                if item.stock <= 0:
-                    item.is_available = False
+        # Restore stock when cancelling (handles parent/child for bundle/cart)
+        if new_status == 'cancelled' and old_status in active_statuses:
+            _restore_booking_stock(booking)
+        # Re-reserve stock if a cancelled booking is reactivated
+        elif old_status == 'cancelled' and new_status in active_statuses:
+            children = Booking.query.filter_by(parent_booking_id=booking.id).all()
+            if children:
+                for child in children:
+                    citem = Item.query.get(child.item_id)
+                    if citem:
+                        citem.stock = max(0, (citem.stock or 0) - (child.quantity or 1))
+                        if citem.stock <= 0:
+                            citem.is_available = False
+                    if child.booking_status == 'cancelled':
+                        child.booking_status = new_status
+            else:
+                item = Item.query.get(booking.item_id)
+                if item:
+                    item.stock = max(0, (item.stock or 0) - (booking.quantity or 1))
+                    if item.stock <= 0:
+                        item.is_available = False
 
         db.session.commit()
         flash('Status updated.', 'success')
@@ -7193,11 +7202,8 @@ def booking_cancel(booking_id):
         booking.refund_amount = refund_amount
         booking.cancelled_by = 'admin' if current_user.role == 'admin' else 'customer'
 
-        # Restore stock
-        item = booking.item
-        if item:
-            item.stock = (item.stock or 0) + (booking.quantity or 1)
-            item.is_available = True
+        # Restore stock (handles parent/child hierarchy for bundle/cart)
+        _restore_booking_stock(booking)
 
         db.session.commit()
 
