@@ -52,7 +52,6 @@
                     <th class="p-3">Role</th>
                     <th class="p-3">Bookings</th>
                     <th class="p-3">Joined</th>
-                    <th class="p-3">Telegram</th>
                     <th class="p-3"></th>
                 </tr>
             </thead>
@@ -79,14 +78,7 @@
                         {% endif %}
                     </td>
                     <td class="p-3 text-center">{{ user.bookings|length }}</td>
-                    <td class="p-3 text-xs">{{ user.created_at.strftime('%d %b %Y') }}</td>
-                    <td class="p-3 text-xs">
-                        {% if user.telegram_chat_id %}
-                            <span class="text-blue-600 font-bold"><i class="fa-brands fa-telegram"></i> Yes</span>
-                        {% else %}
-                            <span class="text-gray-400">No</span>
-                        {% endif %}
-                    </td>
+                    <td class="p-3 text-xs">{{ user.created_at|ist_date }}</td>
                     <td class="p-3">
                         <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" 
                            class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded hover:bg-blue-700">
