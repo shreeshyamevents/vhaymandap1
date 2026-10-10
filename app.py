@@ -377,6 +377,9 @@ class Booking(db.Model):
     bundle_id = db.Column(db.Integer, db.ForeignKey('bundles.id'), nullable=True)
     parent_booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True, index=True)
     bundle = db.relationship('Bundle', foreign_keys=[bundle_id])
+    otps = db.relationship('BookingOTP', backref='parent_booking', lazy=True,
+                           cascade='all, delete-orphan',
+                           foreign_keys='BookingOTP.booking_id')
     # 09 Oct 2026 — per-vendor attribution for bundle/cart children.
     # NULL means use base_rent (regular bookings). Parent rows are skipped
     # by vendor dashboard queries (order_type in ('bundle','cart')).
