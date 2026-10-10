@@ -211,6 +211,69 @@
     </div>
     {% endif %}
 
+    <!-- Transport OTP Section -->
+    {% if booking.booking_status in ('dispatched', 'in_use', 'return_initiated', 'return_received') or otp_map %}
+    <div class="bg-white p-6 rounded-2xl border shadow-sm mb-6">
+        <h3 class="font-bold text-lg mb-4">🔐 Delivery OTP</h3>
+
+        {# Status strip #}
+        <div class="space-y-2 mb-4">
+            {% for otype, label in [('dispatch','Item Received'),('return','Item Returned'),('completion','Completed')] %}
+            {% set o = otp_map.get(otype) %}
+            <div class="flex justify-between items-center text-xs p-2 rounded-lg border
+                {% if o and o.status == 'verified' %}bg-green-50 border-green-200
+                {% elif o and o.status == 'active' %}bg-amber-50 border-amber-200
+                {% elif o and o.status == 'locked' %}bg-red-50 border-red-200
+                {% else %}bg-gray-50 border-gray-200{% endif %}">
+                <span class="font-semibold text-gray-800">{{ label }}</span>
+                <span>
+                    {% if not o %}<span class="text-gray-400">—</span>
+                    {% elif o.status == 'verified' %}<span class="text-green-700">✅ {{ o.verified_at|ist_short }}</span>
+                    {% elif o.status == 'active' %}<span class="text-amber-800">⏳ Pending</span>
+                    {% elif o.status == 'locked' %}<span class="text-red-700">🔒 Locked</span>
+                    {% elif o.status == 'expired' %}<span class="text-gray-500">⌛ Expired</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if booking.booking_status == 'dispatched' %}
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p class="text-sm font-bold text-amber-900 mb-1">Enter Delivery OTP</p>
+            <p class="text-xs text-amber-800 mb-3">Ask the transporter for the 6-digit code to confirm you received the item.</p>
+            <form method="POST" action="{{ url_for('transport_verify_code', ref=booking.booking_reference) }}?next=/my-booking/{{ booking.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="otp_code" required maxlength="6" pattern="\d{6}"
+                       inputmode="numeric" placeholder="••••••"
+                       class="w-full border-2 rounded-lg p-3 text-2xl text-center font-mono tracking-widest mb-2">
+                <button type="submit" class="w-full bg-amber-600 text-white font-bold py-2 rounded-lg hover:bg-amber-700 text-sm">
+                    Verify Code
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if booking.booking_status == 'in_use' and (not otp_map.get('return') or otp_map.get('return').status != 'verified') %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p class="text-sm font-bold text-blue-900 mb-1">Return Item</p>
+            <p class="text-xs text-blue-800 mb-3">Generate a return OTP and share it with the transporter when they pick up the item.</p>
+            {% if otp_map.get('return') and otp_map.get('return').status == 'active' %}
+            <div class="bg-white border-2 border-blue-300 rounded-lg p-3 text-center mb-2">
+                <div class="text-[10px] text-gray-500 uppercase tracking-wide">Return OTP</div>
+                <div class="text-3xl font-mono font-bold text-blue-900 tracking-widest">{{ otp_map.get('return').code }}</div>
+                <div class="text-[10px] text-gray-500 mt-1">Expires {{ otp_map.get('return').expires_at|ist_short }}</div>
+            </div>
+            {% endif %}
+            <button type="button" onclick="generateOTP('return')"
+                    class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 text-sm">
+                <i class="fa-solid fa-key mr-1"></i>{% if otp_map.get('return') and otp_map.get('return').status == 'active' %}Regenerate{% else %}Generate{% endif %} Return OTP
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% if proofs %}
     <div class="bg-white p-6 rounded-2xl border shadow-sm">
         <h3 class="font-bold text-lg mb-4">📜 Your Submitted Proofs</h3>
