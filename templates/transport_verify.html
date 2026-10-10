@@ -61,6 +61,7 @@
 
     <form method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
       <label class="block text-sm font-semibold mb-1">Enter 6-digit OTP</label>
       <input type="text" name="otp_code" required maxlength="6" pattern="\d{6}"
              inputmode="numeric" placeholder="••••••"
