@@ -1809,6 +1809,167 @@ def _notify_otp_event(otp, event='verified'):
         db.session.rollback()
 
 
+@app.route('/booking/<int:booking_id>/otp/generate/<otp_type>', methods=['POST'])
+@login_required
+def generate_booking_otp(booking_id, otp_type):
+    """Generate or regenerate an OTP for a booking. Returns JSON with code."""
+    if otp_type not in ('dispatch', 'return', 'completion'):
+        return jsonify({'error': 'invalid_type'}), 400
+
+    booking = Booking.query.get_or_404(booking_id)
+    is_admin = current_user.role == 'admin'
+    is_customer = booking.customer_id == current_user.id
+    is_vendor = (booking.item and booking.item.vendor_id == current_user.id)
+
+    # Permission + status gates
+    if otp_type == 'dispatch':
+        if not (is_vendor or is_admin):
+            return jsonify({'error': 'forbidden', 'message': 'Only the vendor can generate this OTP.'}), 403
+        if booking.booking_status != 'dispatched':
+            return jsonify({'error': 'wrong_status', 'message': 'Dispatch report must be uploaded first.'}), 400
+    elif otp_type == 'return':
+        if not (is_customer or is_admin):
+            return jsonify({'error': 'forbidden', 'message': 'Only the customer can generate this OTP.'}), 403
+        if booking.booking_status not in ('in_use', 'dispatched'):
+            return jsonify({'error': 'wrong_status', 'message': 'Return report must be uploaded first.'}), 400
+    elif otp_type == 'completion':
+        if not (is_vendor or is_admin):
+            return jsonify({'error': 'forbidden', 'message': 'Only the vendor can generate this OTP.'}), 403
+        if booking.booking_status != 'return_received':
+            return jsonify({'error': 'wrong_status', 'message': 'Return must be verified first.'}), 400
+
+    otp, err = _get_or_create_otp(booking.id, otp_type, current_user.id)
+    if err:
+        return jsonify({'error': 'generate_failed', 'message': err}), 400
+    db.session.commit()
+
+    # Notify the receiving party that an OTP is coming
+    try:
+        if otp_type == 'dispatch':
+            create_notification(
+                booking.customer_id, 'otp',
+                f'🔐 Delivery OTP generated — {booking.booking_reference}',
+                'Ask the transporter for the 6-digit code to confirm receipt.',
+                f'/my-booking/{booking.id}'
+            )
+        elif otp_type == 'return':
+            create_notification(
+                booking.item.vendor_id if booking.item else None, 'otp',
+                f'🔐 Return OTP generated — {booking.booking_reference}',
+                'Ask the transporter for the 6-digit code to confirm pickup.',
+                f'/vendor/booking/{booking.id}'
+            )
+        db.session.commit()
+    except Exception:
+        pass
+
+    return jsonify({
+        'success': True,
+        'code': otp.code,
+        'otp_type': otp_type,
+        'expires_at': otp.expires_at.isoformat(),
+    })
+
+
+@app.route('/transport/verify', methods=['GET', 'POST'])
+def transport_verify_landing():
+    """Public landing — enter booking reference."""
+    if request.method == 'POST':
+        ref = (request.form.get('reference') or '').strip().upper()
+        if not ref:
+            flash('Enter a booking reference.', 'danger')
+            return render_template('transport_verify.html', mode='landing')
+        booking = Booking.query.filter_by(booking_reference=ref).first()
+        if not booking:
+            flash('Booking not found. Check the reference.', 'danger')
+            return render_template('transport_verify.html', mode='landing')
+        return redirect(url_for('transport_verify_code', ref=ref))
+    return render_template('transport_verify.html', mode='landing')
+
+
+@app.route('/transport/verify/<ref>', methods=['GET', 'POST'])
+@limiter.limit("20 per hour", methods=["POST"])
+def transport_verify_code(ref):
+    """Public OTP entry — scoped to a single booking (brute-force safe)."""
+    booking = Booking.query.filter_by(booking_reference=ref).first()
+    if not booking:
+        flash('Invalid booking reference.', 'danger')
+        return redirect(url_for('transport_verify_landing'))
+
+    otps = BookingOTP.query.filter_by(booking_id=booking.id).all()
+    otp_map = {o.otp_type: o for o in otps}
+
+    if request.method == 'GET':
+        return render_template('transport_verify.html',
+                               mode='code', booking=booking, otp_map=otp_map)
+
+    # POST — verify
+    code = (request.form.get('otp_code') or '').strip()
+    now = datetime.utcnow()
+
+    if not code or len(code) != 6 or not code.isdigit():
+        flash('Enter a valid 6-digit code.', 'danger')
+        return redirect(url_for('transport_verify_code', ref=ref))
+
+    # Search ONLY within this booking's OTPs — prevents cross-booking guessing
+    otp = BookingOTP.query.filter_by(booking_id=booking.id, code=code).first()
+
+    if not otp:
+        # Wrong code — count against the latest active OTP (if any)
+        latest = BookingOTP.query.filter_by(
+            booking_id=booking.id, status='active'
+        ).order_by(BookingOTP.generated_at.desc()).first()
+        if latest:
+            latest.attempts = (latest.attempts or 0) + 1
+            if latest.attempts >= Config.OTP_MAX_ATTEMPTS:
+                latest.locked_until = now + timedelta(hours=Config.OTP_LOCK_HOURS)
+                latest.status = 'locked'
+                db.session.commit()
+                _notify_otp_event(latest, event='locked')
+                flash(f'🔒 Too many wrong attempts. Locked for {Config.OTP_LOCK_HOURS}h. Contact support.', 'danger')
+            else:
+                remaining = Config.OTP_MAX_ATTEMPTS - latest.attempts
+                db.session.commit()
+                flash(f'Invalid code. {remaining} attempt(s) left.', 'warning')
+        else:
+            flash('Invalid code.', 'danger')
+        return redirect(url_for('transport_verify_code', ref=ref))
+
+    # Code matched — validate state
+    if otp.status == 'verified':
+        flash('This code has already been used.', 'info')
+        return redirect(url_for('transport_verify_code', ref=ref))
+    if otp.locked_until and otp.locked_until > now:
+        mins = int((otp.locked_until - now).total_seconds() / 60) + 1
+        flash(f'Locked. Try again in {mins} minute(s).', 'danger')
+        return redirect(url_for('transport_verify_code', ref=ref))
+    if otp.expires_at < now:
+        otp.status = 'expired'
+        db.session.commit()
+        flash('Code expired. Ask the other party to regenerate.', 'warning')
+        return redirect(url_for('transport_verify_code', ref=ref))
+
+    # Success path
+    otp.status = 'verified'
+    otp.verified_by = current_user.id if current_user.is_authenticated else None
+    otp.verified_at = now
+    _apply_otp_status(otp)
+    db.session.commit()
+
+    # OTP2 verified → auto-generate OTP3 (completion)
+    if otp.otp_type == 'return':
+        try:
+            _get_or_create_otp(booking.id, 'completion', otp.generated_by)
+            db.session.commit()
+        except Exception:
+            pass
+
+    _notify_otp_event(otp, event='verified')
+
+    flash(f'✅ Verified! Booking {booking.booking_reference} updated.', 'success')
+    return redirect(url_for('transport_verify_code', ref=ref))
+
+
 def _kyc_cipher():
     """Return Fernet cipher, or None if key missing/invalid."""
     key = Config.KYC_ENCRYPTION_KEY
