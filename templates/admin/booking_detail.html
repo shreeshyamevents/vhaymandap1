@@ -224,6 +224,74 @@
     {% endif %}
 </div>
 
+<!-- Transport OTP Panel -->
+<div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold text-lg mb-4">🔐 Transport OTP Status</h3>
+
+    {% set otps = booking.otps if booking.otps is defined else [] %}
+    {% set otp_map = {} %}
+    {% for o in booking.otps %}
+        {% set _ = otp_map.update({o.otp_type: o}) %}
+    {% endfor %}
+
+    <div class="space-y-2 mb-4">
+        {% for otype, label in [('dispatch','Delivery (Item Received)'),('return','Return (Item Picked Up)'),('completion','Completion (Inspection)')] %}
+        {% set o = otp_map.get(otype) %}
+        <div class="flex flex-wrap justify-between items-center gap-2 text-xs p-3 rounded-lg border
+            {% if o and o.status == 'verified' %}bg-green-50 border-green-200
+            {% elif o and o.status == 'active' %}bg-amber-50 border-amber-200
+            {% elif o and o.status == 'locked' %}bg-red-50 border-red-200
+            {% else %}bg-gray-50 border-gray-200{% endif %}">
+            <div class="flex-1 min-w-[150px]">
+                <div class="font-bold text-gray-800">{{ label }}</div>
+                <div class="text-[10px] text-gray-500 mt-0.5">
+                    {% if o %}
+                        {% if o.status == 'verified' %}
+                            Verified by {{ o.verifier.name if o.verifier else '—' }} · {{ o.verified_at|ist_short }}
+                        {% elif o.status == 'active' %}
+                            Active · expires {{ o.expires_at|ist_short }} · attempts {{ o.attempts or 0 }}/{{ config.OTP_MAX_ATTEMPTS if config else 3 }}
+                        {% elif o.status == 'locked' %}
+                            Locked until {{ o.locked_until|ist_short }}
+                        {% elif o.status == 'expired' %}
+                            Expired {{ o.expires_at|ist_short }}
+                        {% endif %}
+                    {% else %}
+                        Not generated
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded font-bold text-[10px]
+                    {% if o and o.status == 'verified' %}bg-green-200 text-green-900
+                    {% elif o and o.status == 'active' %}bg-amber-200 text-amber-900
+                    {% elif o and o.status == 'locked' %}bg-red-200 text-red-900
+                    {% else %}bg-gray-200 text-gray-700{% endif %}">
+                    {% if not o %}—
+                    {% elif o.status == 'verified' %}VERIFIED
+                    {% elif o.status == 'active' %}ACTIVE
+                    {% elif o.status == 'locked' %}LOCKED
+                    {% elif o.status == 'expired' %}EXPIRED
+                    {% endif %}
+                </span>
+                {% if not o or o.status != 'verified' %}
+                <form method="POST" action="{{ url_for('admin_force_verify_otp', booking_id=booking.id, otp_type=otype) }}"
+                      onsubmit="return confirm('Force-verify {{ label }}? This bypasses the OTP code.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="bg-amber-600 text-white font-bold px-3 py-1 rounded hover:bg-amber-700 text-[10px]">
+                        <i class="fa-solid fa-unlock mr-1"></i>Force Verify
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <p class="text-[11px] text-gray-500 italic">
+        Force verify is for lost OTPs or transporter issues. Use only when the physical step is confirmed by other means.
+    </p>
+</div>
+
 <!-- Status Update -->
 <div class="bg-white p-6 rounded-xl border shadow-sm">
     <h3 class="font-bold text-lg mb-4">⚙️ Update Status</h3>
