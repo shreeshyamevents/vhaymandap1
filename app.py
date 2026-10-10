@@ -1871,6 +1871,50 @@ def generate_booking_otp(booking_id, otp_type):
     })
 
 
+@app.route('/booking/<int:booking_id>/otp/mark-complete', methods=['POST'])
+@login_required
+def vendor_mark_complete(booking_id):
+    """Vendor confirms inspection done → OTP3 auto-generated + auto-verified."""
+    booking = Booking.query.get_or_404(booking_id)
+    is_admin = current_user.role == 'admin'
+    is_vendor = (booking.item and booking.item.vendor_id == current_user.id)
+    if not (is_vendor or is_admin):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    if booking.booking_status != 'return_received':
+        flash('Booking must be in return_received state.', 'warning')
+        return redirect(url_for('vendor_booking_detail', booking_id=booking.id))
+
+    # Idempotent — reuse existing OTP3 if it exists
+    otp = BookingOTP.query.filter_by(booking_id=booking.id, otp_type='completion').first()
+    now = datetime.utcnow()
+    if not otp:
+        otp = BookingOTP(
+            booking_id=booking.id,
+            otp_type='completion',
+            code=_generate_otp_code(),
+            generated_by=current_user.id,
+            generated_at=now,
+            expires_at=now + timedelta(days=Config.OTP_TTL_COMPLETION_DAYS),
+            status='verified',
+            verified_by=current_user.id,
+            verified_at=now,
+        )
+        db.session.add(otp)
+    else:
+        otp.status = 'verified'
+        otp.verified_by = current_user.id
+        otp.verified_at = now
+
+    booking.booking_status = 'completed'
+    db.session.commit()
+
+    _notify_otp_event(otp, event='verified')
+
+    flash(f'🎉 Booking {booking.booking_reference} marked complete.', 'success')
+    return redirect(url_for('vendor_booking_detail', booking_id=booking.id))
+
+
 @app.route('/transport/verify', methods=['GET', 'POST'])
 def transport_verify_landing():
     """Public landing — enter booking reference."""
