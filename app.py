@@ -1809,6 +1809,66 @@ def _notify_otp_event(otp, event='verified'):
         db.session.rollback()
 
 
+@app.route('/admin/booking/<int:booking_id>/otp/force-verify/<otp_type>', methods=['POST'])
+@login_required
+def admin_force_verify_otp(booking_id, otp_type):
+    """Admin override — verify an OTP without the code. Audit logged."""
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    if otp_type not in ('dispatch', 'return', 'completion'):
+        flash('Invalid OTP type.', 'danger')
+        return redirect(url_for('admin_booking_detail', booking_id=booking_id))
+
+    booking = Booking.query.get_or_404(booking_id)
+    now = datetime.utcnow()
+
+    otp = BookingOTP.query.filter_by(booking_id=booking.id, otp_type=otp_type).first()
+    if not otp:
+        # Create on the fly — admin override means they confirm the step happened
+        otp = BookingOTP(
+            booking_id=booking.id,
+            otp_type=otp_type,
+            code=_generate_otp_code(),
+            generated_by=current_user.id,
+            generated_at=now,
+            expires_at=now + OTP_TTL_MAP[otp_type](),
+            status='verified',
+            verified_by=current_user.id,
+            verified_at=now,
+        )
+        db.session.add(otp)
+    else:
+        if otp.status == 'verified':
+            flash('This OTP is already verified.', 'info')
+            return redirect(url_for('admin_booking_detail', booking_id=booking.id))
+        otp.status = 'verified'
+        otp.verified_by = current_user.id
+        otp.verified_at = now
+        otp.locked_until = None
+        otp.attempts = 0
+
+    _apply_otp_status(otp)
+    db.session.commit()
+
+    # Notify customer + vendor
+    try:
+        _notify_otp_event(otp, event='verified')
+    except Exception:
+        pass
+
+    # OTP2 → auto-generate OTP3
+    if otp.otp_type == 'return':
+        try:
+            _get_or_create_otp(booking.id, 'completion', current_user.id)
+            db.session.commit()
+        except Exception:
+            pass
+
+    flash(f'✅ Force-verified {otp_type} OTP for {booking.booking_reference}.', 'success')
+    return redirect(url_for('admin_booking_detail', booking_id=booking.id))
+
+
 @app.route('/booking/<int:booking_id>/otp/generate/<otp_type>', methods=['POST'])
 @login_required
 def generate_booking_otp(booking_id, otp_type):
@@ -4866,7 +4926,38 @@ def cron_cleanup():
         unblock_stats['unblocked'] += 1
     db.session.commit()
 
-    # 5. Booking reminders — notify vendor 1 day before start
+        # 5. Expire stale OTPs (past expires_at, still active)
+    stale_otps = BookingOTP.query.filter(
+        BookingOTP.status == 'active',
+        BookingOTP.expires_at < NOW,
+    ).all()
+    otp_expired_count = 0
+    for o in stale_otps:
+        o.status = 'expired'
+        otp_expired_count += 1
+
+    # Unlock OTPs whose lock window has passed
+    stale_locks = BookingOTP.query.filter(
+        BookingOTP.status == 'locked',
+        BookingOTP.locked_until != None,
+        BookingOTP.locked_until < NOW,
+    ).all()
+    otp_unlocked_count = 0
+    for o in stale_locks:
+        o.status = 'active'
+        o.locked_until = None
+        o.attempts = 0
+        otp_unlocked_count += 1
+
+    if otp_expired_count or otp_unlocked_count:
+        db.session.commit()
+
+    otp_stats = {
+        'expired': otp_expired_count,
+        'unlocked': otp_unlocked_count,
+    }
+
+    # 6. Booking reminders — notify vendor 1 day before start
     from datetime import date as _date
     tomorrow = _date.today() + timedelta(days=1)
     bookings_tomorrow = Booking.query.filter(
@@ -4899,6 +4990,7 @@ def cron_cleanup():
         'deletion_reminders': reminder_stats,
         'auto_unblocks': unblock_stats,
         'auto_cancels': auto_cancel,
+        'otp_cleanup': otp_stats,
         'booking_reminders': booking_reminders,
         'timestamp': NOW.isoformat()
     })
@@ -5027,7 +5119,7 @@ def admin_update_booking_status(booking_id):
         return redirect(url_for('index'))
     booking = Booking.query.get_or_404(booking_id)
     new_status = request.form.get('status', '')
-    if new_status in ['confirmed', 'cancelled', 'completed', 'pending', 'dispatched', 'return_initiated']:
+        if new_status in ['confirmed', 'cancelled', 'completed', 'pending', 'dispatched', 'in_use', 'return_initiated', 'return_received']:
         old_status = booking.booking_status
         booking.booking_status = new_status
 
