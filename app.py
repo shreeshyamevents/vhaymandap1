@@ -2821,7 +2821,7 @@ def dashboard():
     active_bookings = sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched', 'in_use', 'return_initiated', 'return_received'])
     pending_return = [b for b in bookings 
                      if b.dispatch_report_done and not b.return_report_done 
-                     and b.booking_status in ['dispatched', 'confirmed']]
+                     and b.booking_status in ['dispatched', 'in_use', 'confirmed']]
     
     return render_template('dashboard.html', 
                          bookings=bookings, total_spent=total_spent, 
@@ -3415,7 +3415,7 @@ def vendor_rentals():
                          bookings=bookings, total_spent=total_spent,
                          active_rentals=sum(1 for b in bookings if b.booking_status in ['confirmed', 'dispatched', 'in_use', 'return_initiated', 'return_received']),
                          total_rentals=len(bookings),
-                         pending_return=[b for b in bookings if b.dispatch_report_done and not b.return_report_done and b.booking_status in ['dispatched', 'confirmed']])
+                         pending_return=[b for b in bookings if b.dispatch_report_done and not b.return_report_done and b.booking_status in ['dispatched', 'in_use', 'confirmed']])
 
 
 @app.route('/vendor')
@@ -4721,7 +4721,7 @@ def admin_dashboard():
     reports_pending_dispatch = Booking.query.filter_by(dispatch_report_done=False)\
         .filter(Booking.booking_status == 'confirmed').count()
     reports_pending_return = Booking.query.filter_by(dispatch_report_done=True, return_report_done=False)\
-        .filter(Booking.booking_status.in_(['dispatched', 'confirmed'])).count()
+        .filter(Booking.booking_status.in_(['dispatched', 'in_use', 'confirmed'])).count()
     damage_flagged_count = Booking.query.filter_by(damage_flagged=True).count()
     all_reports = EquipmentReport.query.all()
     pending_payment_proofs = PaymentProof.query.filter_by(status='pending').count()
@@ -7416,9 +7416,9 @@ def booking_cancel(booking_id):
         flash('Access denied.', 'danger')
         return redirect(url_for('dashboard'))
 
-    # Eligibility
-    if booking.booking_status in ('cancelled', 'completed', 'dispatched'):
-        flash('This booking cannot be cancelled.', 'warning')
+    # Eligibility — cannot cancel once physically moved
+    if booking.booking_status in ('cancelled', 'completed', 'dispatched', 'in_use', 'return_received'):
+        flash('This booking cannot be cancelled at this stage.', 'warning')
         return redirect(url_for('my_booking_detail', booking_id=booking.id))
 
     from datetime import date as _date
