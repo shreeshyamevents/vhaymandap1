@@ -300,7 +300,9 @@
             <option value="pending" {% if booking.booking_status == 'pending' %}selected{% endif %}>⏳ Pending</option>
             <option value="confirmed" {% if booking.booking_status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
             <option value="dispatched" {% if booking.booking_status == 'dispatched' %}selected{% endif %}>🚚 Dispatched</option>
-            <option value="return_initiated" {% if booking.booking_status == 'return_initiated' %}selected{% endif %}>📦 Return Initiated</option>
+            <option value="in_use" {% if booking.booking_status == 'in_use' %}selected{% endif %}>📦 In Use (Item with Customer)</option>
+            <option value="return_initiated" {% if booking.booking_status == 'return_initiated' %}selected{% endif %}>↩️ Return Initiated</option>
+            <option value="return_received" {% if booking.booking_status == 'return_received' %}selected{% endif %}>✅ Return Received (Vendor)</option>
             <option value="completed" {% if booking.booking_status == 'completed' %}selected{% endif %}>🎉 Completed</option>
             <option value="cancelled" {% if booking.booking_status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
         </select>
