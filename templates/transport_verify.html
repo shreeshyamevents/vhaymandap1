@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Verify OTP — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-8 px-4">
+
+  <div class="text-center mb-6">
+    <div class="w-16 h-16 bg-plum-100 rounded-full flex items-center justify-center mx-auto mb-3">
+      <i class="fa-solid fa-truck-fast text-plum-600 text-2xl"></i>
+    </div>
+    <h1 class="text-2xl font-bold text-plum-700">Delivery Verification</h1>
+    <p class="text-sm text-gray-500 mt-1">Enter the OTP shared by the sender</p>
+  </div>
+
+  {% if mode == 'landing' %}
+  <form method="POST" class="bg-white p-6 rounded-xl border shadow-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="block text-sm font-semibold mb-1">Booking Reference</label>
+    <input type="text" name="reference" required placeholder="VM-12345678"
+           class="w-full border rounded-lg p-3 text-base font-mono"
+           style="text-transform: uppercase;">
+    <p class="text-xs text-gray-500 mt-1">Ask the sender for their booking reference (starts with VM-)</p>
+    <button type="submit" class="w-full mt-4 bg-plum-600 hover:bg-plum-700 text-white font-bold py-3 rounded-lg">
+      Continue
+    </button>
+  </form>
+  {% else %}
+
+  <div class="bg-white p-6 rounded-xl border shadow-sm">
+    <div class="bg-gray-50 p-3 rounded-lg mb-4 text-sm">
+      <div class="text-xs text-gray-500">Booking</div>
+      <div class="font-mono font-bold">{{ booking.booking_reference }}</div>
+      {% if booking.item %}
+      <div class="text-xs text-gray-500 mt-1">{{ booking.item.title }}</div>
+      {% endif %}
+    </div>
+
+    {% if otp_map %}
+    <div class="mb-4 space-y-2">
+      {% for otype in ['dispatch', 'return', 'completion'] %}
+      {% set o = otp_map.get(otype) %}
+      {% if o %}
+      <div class="flex justify-between text-xs p-2 rounded border
+        {% if o.status == 'verified' %}bg-green-50 border-green-200
+        {% elif o.status == 'active' %}bg-amber-50 border-amber-200
+        {% elif o.status == 'locked' %}bg-red-50 border-red-200
+        {% else %}bg-gray-50 border-gray-200{% endif %}">
+        <span class="font-semibold capitalize">{{ otype }}</span>
+        <span>
+          {% if o.status == 'verified' %}✅ Verified
+          {% elif o.status == 'active' %}⏳ Pending
+          {% elif o.status == 'locked' %}🔒 Locked
+          {% elif o.status == 'expired' %}⌛ Expired
+          {% else %}{{ o.status }}{% endif %}
+        </span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="block text-sm font-semibold mb-1">Enter 6-digit OTP</label>
+      <input type="text" name="otp_code" required maxlength="6" pattern="\d{6}"
+             inputmode="numeric" placeholder="••••••"
+             class="w-full border-2 rounded-lg p-3 text-2xl text-center font-mono tracking-widest">
+      <button type="submit" class="w-full mt-4 bg-plum-600 hover:bg-plum-700 text-white font-bold py-3 rounded-lg">
+        Verify Code
+      </button>
+    </form>
+  </div>
+
+  <div class="text-center mt-4">
+    <a href="{{ url_for('transport_verify_landing') }}" class="text-xs text-plum-600 hover:underline">
+      ← Use a different reference
+    </a>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}
