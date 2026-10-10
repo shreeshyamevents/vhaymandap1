@@ -129,6 +129,9 @@ class Config:
     KYC_ENCRYPTION_KEY = os.environ.get('KYC_ENCRYPTION_KEY') or ''
     # 10 Oct 2026 — KYC reveal rate limit (per admin)
     KYC_REVEAL_RATE_LIMIT_PER_HOUR = 30
+    # 10 Oct 2026 — i18n
+    SUPPORTED_LANGS = [('en', 'English'), ('hi', 'Hinglish')]
+    DEFAULT_LANG = 'en'
     # 10 Oct 2026 — Transport OTP (Option B, public /transport/verify page)
     OTP_TTL_DISPATCH_HOURS = 72        # OTP1 — customer receives item
     OTP_TTL_RETURN_HOURS = 72          # OTP2 — vendor receives item back
@@ -162,6 +165,138 @@ class Config:
         ('electrical', 'Electrical & Power'),
         ('cooling', 'Cooling & Heating'),
     ]
+
+
+# ============================================
+# TRANSLATIONS (English + Hinglish)
+# ============================================
+# Hinglish = Roman-script Hindi mixed with English words commonly used in
+# Indian business speech (Dashboard, Booking, Cart stay English).
+# Used via {{ t('key') }} in templates. Fallback: hi -> en -> key.
+TRANSLATIONS = {
+    'en': {
+        # Nav
+        'home': 'Home',
+        'browse': 'Browse',
+        'marketplace': 'Marketplace',
+        'bundles': 'Event Bundles',
+        'leaderboard': 'Leaderboard',
+        'cart': 'Cart',
+        'messages': 'Messages',
+        'support': 'Support',
+        'login': 'Login',
+        'register': 'Register',
+        'logout': 'Logout',
+        'my_account': 'My Account',
+        'my_dashboard': 'My Dashboard',
+        'my_bookings': 'My Bookings',
+        'wishlist': 'My Wishlist',
+        'recently_viewed': 'Recently Viewed',
+        # CTAs
+        'book_now': 'Book Now',
+        'buy_now': 'Buy Now',
+        'add_to_cart': 'Add to Cart',
+        'add_to_rent_cart': 'Add to Rent Cart',
+        'add_to_buy_cart': 'Add to Buy Cart',
+        'checkout': 'Checkout',
+        'continue_shopping': 'Continue Shopping',
+        'proceed_checkout': 'Proceed to Checkout',
+        'submit': 'Submit',
+        'cancel': 'Cancel',
+        'confirm': 'Confirm',
+        'back': 'Back',
+        'save': 'Save',
+        'close': 'Close',
+        'search': 'Search',
+        'clear_filters': 'Clear filters',
+        # Common labels
+        'start_date': 'Start Date',
+        'end_date': 'End Date',
+        'quantity': 'Quantity',
+        'venue_address': 'Venue Address',
+        'amount': 'Amount',
+        'total': 'Total',
+        'status': 'Status',
+        'subtotal': 'Subtotal',
+        'security_deposit': 'Security Deposit',
+        'platform_fee': 'Platform Fee',
+        # Messages
+        'welcome_back': 'Welcome back, {name}!',
+        'your_cart_empty': 'Your cart is empty',
+        'no_items_found': 'No items found',
+        'loading': 'Loading...',
+        # Status
+        'confirmed': 'Confirmed',
+        'pending': 'Pending',
+        'dispatched': 'Dispatched',
+        'cancelled': 'Cancelled',
+        'completed': 'Completed',
+        'in_use': 'In Use',
+        'return_initiated': 'Return Initiated',
+        'return_received': 'Return Received',
+    },
+    'hi': {
+        # Nav
+        'home': 'Home',
+        'browse': 'Browse Karein',
+        'marketplace': 'Marketplace',
+        'bundles': 'Event Bundles',
+        'leaderboard': 'Top Vendors',
+        'cart': 'Cart',
+        'messages': 'Messages',
+        'support': 'Support',
+        'login': 'Login',
+        'register': 'Register',
+        'logout': 'Logout',
+        'my_account': 'Mera Account',
+        'my_dashboard': 'Mera Dashboard',
+        'my_bookings': 'Meri Bookings',
+        'wishlist': 'Meri Wishlist',
+        'recently_viewed': 'Abhi Dekhe Hue',
+        # CTAs
+        'book_now': 'Book Karein',
+        'buy_now': 'Buy Karein',
+        'add_to_cart': 'Cart Mein Daalein',
+        'add_to_rent_cart': 'Rent Cart Mein',
+        'add_to_buy_cart': 'Buy Cart Mein',
+        'checkout': 'Checkout Karein',
+        'continue_shopping': 'Aur Dekhein',
+        'proceed_checkout': 'Order Aage Badhayein',
+        'submit': 'Submit Karein',
+        'cancel': 'Cancel',
+        'confirm': 'Confirm Karein',
+        'back': 'Wapas',
+        'save': 'Save Karein',
+        'close': 'Band Karein',
+        'search': 'Khojein',
+        'clear_filters': 'Filters Hataayein',
+        # Common labels
+        'start_date': 'Shuru Date',
+        'end_date': 'Aakhri Date',
+        'quantity': 'Kitna',
+        'venue_address': 'Venue Address',
+        'amount': 'Rakam',
+        'total': 'Total',
+        'status': 'Status',
+        'subtotal': 'Total Rakam',
+        'security_deposit': 'Security Deposit',
+        'platform_fee': 'Platform Fee',
+        # Messages
+        'welcome_back': 'Wapas Swagat, {name}!',
+        'your_cart_empty': 'Aapka cart khaali hai',
+        'no_items_found': 'Kuch nahi mila',
+        'loading': 'Load ho raha hai...',
+        # Status
+        'confirmed': 'Confirmed',
+        'pending': 'Pending',
+        'dispatched': 'Bhej Diya',
+        'cancelled': 'Cancel Kiya',
+        'completed': 'Pura Hua',
+        'in_use': 'Use Mein',
+        'return_initiated': 'Wapas Bheja',
+        'return_received': 'Wapas Mil Gaya',
+    },
+}
 
 
 app = Flask(__name__)
@@ -2150,6 +2285,28 @@ def get_display_name(user):
     return user.public_id or user.name
 
 
+def t(key, **kwargs):
+    """Translate key -> current language string. Fallback: hi -> en -> key.
+    Optional kwargs interpolate via str.format (e.g. t('welcome_back', name='Raj'))."""
+    try:
+        lang = session.get('lang', Config.DEFAULT_LANG)
+    except Exception:
+        lang = Config.DEFAULT_LANG
+    if lang not in TRANSLATIONS:
+        lang = Config.DEFAULT_LANG
+    val = None
+    if lang != Config.DEFAULT_LANG:
+        val = TRANSLATIONS.get(lang, {}).get(key)
+    if not val:
+        val = TRANSLATIONS.get(Config.DEFAULT_LANG, {}).get(key) or key
+    if kwargs:
+        try:
+            return val.format(**kwargs)
+        except Exception:
+            return val
+    return val
+
+
 def _time_ago(dt):
     if not dt:
         return ''
@@ -2309,6 +2466,28 @@ def login():
                 db.session.commit()
             flash('❌ Invalid mobile number or password.', 'danger')
     return render_template('auth/login.html')
+
+
+@app.route('/set-language/<lang>')
+def set_language(lang):
+    """Switch UI language. Persists in session. Redirects to same-origin referrer."""
+    if lang not in dict(Config.SUPPORTED_LANGS):
+        lang = Config.DEFAULT_LANG
+    session['lang'] = lang
+    session.modified = True
+
+    # Redirect to referrer (only if same origin) or home
+    ref = request.referrer or ''
+    if ref:
+        try:
+            from urllib.parse import urlparse
+            ref_host = urlparse(ref).netloc
+            this_host = urlparse(request.url_root).netloc
+            if ref_host == this_host:
+                return redirect(ref)
+        except Exception:
+            pass
+    return redirect(url_for('index'))
 
 
 @app.route('/privacy')
@@ -5628,6 +5807,9 @@ def utility_processor():
         pending_payments_count=pending_payments_count(),
         unread_notification_count=unread_notification_count(),
         kyc_valid=(lambda: (_user_kyc_valid(current_user) if current_user.is_authenticated else False)),
+        t=t,
+        current_lang=(session.get('lang', Config.DEFAULT_LANG) if hasattr(session, 'get') else Config.DEFAULT_LANG),
+        supported_langs=Config.SUPPORTED_LANGS,
         get_category_icon=lambda c: {
             'furniture': 'fa-couch', 'lighting': 'fa-lightbulb',
             'decor': 'fa-palette', 'mandap': 'fa-archway',
