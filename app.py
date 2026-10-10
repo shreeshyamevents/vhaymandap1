@@ -5305,7 +5305,7 @@ def admin_update_booking_status(booking_id):
         old_status = booking.booking_status
         booking.booking_status = new_status
 
-        active_statuses = ['pending', 'confirmed', 'dispatched', 'return_initiated']
+        active_statuses = ['pending', 'confirmed', 'dispatched', 'in_use', 'return_initiated', 'return_received']
         item = Item.query.get(booking.item_id)
         if item:
             # Restore stock when cancelling an active booking
