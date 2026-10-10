@@ -304,6 +304,26 @@
 </div>
 
 <script>
+function generateOTP(otpType) {
+    var csrf = document.querySelector('meta[name="csrf-token"]').content;
+    fetch('/booking/{{ booking.id }}/otp/generate/' + otpType, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrf,
+        },
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            location.reload();
+        } else {
+            alert(d.message || d.error || 'Failed to generate OTP');
+        }
+    })
+    .catch(function() { alert('Network error.'); });
+}
+
 function copyUpi() {
     const text = document.getElementById('upiText').textContent;
     navigator.clipboard.writeText(text).then(() => {
