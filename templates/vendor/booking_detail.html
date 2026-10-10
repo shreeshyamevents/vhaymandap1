@@ -212,6 +212,84 @@
     </div>
   </div>
 
+  <!-- Transport OTP Section -->
+  {% if booking.booking_status in ('dispatched', 'in_use', 'return_initiated', 'return_received') or otp_map %}
+  <div class="bg-white p-5 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold mb-3">🔐 Transport OTP</h3>
+
+    {# Status strip #}
+    <div class="space-y-2 mb-4">
+      {% for otype, label in [('dispatch','Item Received'),('return','Item Returned'),('completion','Inspection Done')] %}
+      {% set o = otp_map.get(otype) %}
+      <div class="flex justify-between items-center text-xs p-2 rounded-lg border
+        {% if o and o.status == 'verified' %}bg-green-50 border-green-200
+        {% elif o and o.status == 'active' %}bg-amber-50 border-amber-200
+        {% elif o and o.status == 'locked' %}bg-red-50 border-red-200
+        {% else %}bg-gray-50 border-gray-200{% endif %}">
+        <span class="font-semibold text-gray-800">{{ label }}</span>
+        <span>
+          {% if not o %}<span class="text-gray-400">—</span>
+          {% elif o.status == 'verified' %}<span class="text-green-700">✅ {{ o.verified_at|ist_short }}</span>
+          {% elif o.status == 'active' %}<span class="text-amber-800">⏳ Pending</span>
+          {% elif o.status == 'locked' %}<span class="text-red-700">🔒 Locked</span>
+          {% elif o.status == 'expired' %}<span class="text-gray-500">⌛ Expired</span>
+          {% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# Action buttons #}
+    {% if booking.booking_status == 'dispatched' %}
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-3">
+      <p class="text-sm font-bold text-amber-900 mb-1">Generate Delivery OTP</p>
+      <p class="text-xs text-amber-800 mb-3">Share this code with the transporter. Customer will enter it to confirm receipt.</p>
+      {% if otp_map.get('dispatch') and otp_map.get('dispatch').status == 'active' %}
+      <div class="bg-white border-2 border-amber-300 rounded-lg p-3 text-center mb-2">
+        <div class="text-[10px] text-gray-500 uppercase tracking-wide">Current OTP</div>
+        <div class="text-3xl font-mono font-bold text-amber-900 tracking-widest">{{ otp_map.get('dispatch').code }}</div>
+        <div class="text-[10px] text-gray-500 mt-1">Expires {{ otp_map.get('dispatch').expires_at|ist_short }}</div>
+      </div>
+      {% endif %}
+      <button type="button" onclick="generateOTP('dispatch')"
+              class="w-full bg-amber-600 text-white font-bold py-2 rounded-lg hover:bg-amber-700 text-sm">
+        <i class="fa-solid fa-key mr-1"></i>{% if otp_map.get('dispatch') and otp_map.get('dispatch').status == 'active' %}Regenerate{% else %}Generate{% endif %} OTP
+      </button>
+    </div>
+    {% endif %}
+
+    {% if booking.booking_status == 'return_initiated' %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <p class="text-sm font-bold text-blue-900 mb-1">Enter Return OTP</p>
+      <p class="text-xs text-blue-800 mb-3">Customer will share this code when the transporter delivers the item back to you.</p>
+      <form method="POST" action="{{ url_for('transport_verify_code', ref=booking.booking_reference) }}?next=/vendor/booking/{{ booking.id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="text" name="otp_code" required maxlength="6" pattern="\d{6}"
+               inputmode="numeric" placeholder="••••••"
+               class="w-full border-2 rounded-lg p-3 text-2xl text-center font-mono tracking-widest mb-2">
+        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 text-sm">
+          Verify Return OTP
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if booking.booking_status == 'return_received' %}
+    <form method="POST" action="{{ url_for('vendor_mark_complete', booking_id=booking.id) }}"
+          onsubmit="return confirm('Confirm inspection done and mark this booking complete?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+        <p class="text-sm font-bold text-green-900 mb-1">Item Received Back</p>
+        <p class="text-xs text-green-800 mb-3">After inspection, mark this rental complete. This is the final step.</p>
+        <button type="submit" class="w-full bg-green-700 text-white font-bold py-2 rounded-lg hover:bg-green-600 text-sm">
+          <i class="fa-solid fa-check-circle mr-1"></i>Mark Booking Complete
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Actions -->
   <div class="flex gap-2 flex-wrap">
     <a href="{{ url_for('chat_with', user_id=booking.customer_id) }}?item_id={{ booking.item_id }}"
