@@ -163,6 +163,14 @@
                 <span class="text-white/60 hidden sm:inline">— Taiyari Hamari, Celebration Aapka!</span>
             </span>
             <div class="flex gap-3 items-center flex-wrap">
+                <!-- Language toggle -->
+                <div class="flex items-center gap-1 text-[10px] bg-white/10 rounded-md px-2 py-1">
+                    <a href="{{ url_for('set_language', lang='en') }}"
+                       class="{% if current_lang == 'en' %}font-bold text-white{% else %}text-white/60 hover:text-white{% endif %} transition">EN</a>
+                    <span class="text-white/30">|</span>
+                    <a href="{{ url_for('set_language', lang='hi') }}"
+                       class="{% if current_lang == 'hi' %}font-bold text-white{% else %}text-white/60 hover:text-white{% endif %} transition">HI</a>
+                </div>
                 {% if current_user.is_authenticated %}
                     <span class="text-white/70 hidden sm:inline">
                         👋 {{ current_user.name }}
@@ -172,12 +180,12 @@
                         {% endif %}
                     </span>
                     <a href="{{ url_for('logout') }}" class="text-red-300 hover:text-red-200 transition">
-                        <i class="fa-solid fa-right-from-bracket mr-1"></i>Logout
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i>{{ t('logout') }}
                     </a>
                 {% else %}
-                    <a href="{{ url_for('login') }}" class="hover:text-blush-400 transition">Login</a>
+                    <a href="{{ url_for('login') }}" class="hover:text-blush-400 transition">{{ t('login') }}</a>
                     <a href="{{ url_for('register') }}" class="bg-blush-500 hover:bg-blush-400 text-white px-3 py-1 rounded-md font-semibold transition">
-                        Register
+                        {{ t('register') }}
                     </a>
                 {% endif %}
             </div>
@@ -207,21 +215,21 @@
                 
                 <div class="relative">
                     <button onclick="toggleDropdown(event, 'browseMenu')" class="nav-btn" data-dropdown="browseMenu">
-                        <i class="fa-solid fa-compass text-gray-400"></i>Browse
+                        <i class="fa-solid fa-compass text-gray-400"></i>{{ t('browse') }}
                         <i class="fa-solid fa-chevron-down chevron"></i>
                     </button>
                     <div id="browseMenu" class="dropdown-menu">
                         <a href="{{ url_for('index') }}" class="dropdown-item">
-                            <i class="fa-solid fa-home w-4 text-gray-400"></i>Home
+                            <i class="fa-solid fa-home w-4 text-gray-400"></i>{{ t('home') }}
                         </a>
                         <a href="{{ url_for('index') }}#marketplace" class="dropdown-item">
-                            <i class="fa-solid fa-boxes-stacked w-4 text-gray-400"></i>Marketplace
+                            <i class="fa-solid fa-boxes-stacked w-4 text-gray-400"></i>{{ t('marketplace') }}
                         </a>
                         <a href="{{ url_for('bundles_list') }}" class="dropdown-item">
-                            <i class="fa-solid fa-box-open w-4 text-emerald-600"></i>Event Bundles
+                            <i class="fa-solid fa-box-open w-4 text-emerald-600"></i>{{ t('bundles') }}
                         </a>
                         <a href="{{ url_for('leaderboard') }}" class="dropdown-item">
-                            <i class="fa-solid fa-trophy w-4 text-blush-500"></i>Leaderboard
+                            <i class="fa-solid fa-trophy w-4 text-blush-500"></i>{{ t('leaderboard') }}
                         </a>
                         {% if current_user.role in ['admin', 'vendor'] %}
                         <a href="{{ url_for('vendor_calendar') }}" class="dropdown-item">
@@ -511,6 +519,14 @@
         <a href="{{ url_for('admin_storage') }}" class="mobile-link"><i class="fa-solid fa-database w-5 text-purple-500"></i>Storage</a>
         <a href="{{ url_for('admin_data_management') }}" class="mobile-link"><i class="fa-solid fa-broom w-5 text-red-600"></i>Data Management</a>
         {% endif %}
+
+        <div class="mobile-section-title">Language / Bhasha</div>
+        <a href="{{ url_for('set_language', lang='en') }}" class="mobile-link">
+            <i class="fa-solid {% if current_lang == 'en' %}fa-circle-check text-plum-600{% else %}fa-circle text-gray-300{% endif %} w-5"></i>English
+        </a>
+        <a href="{{ url_for('set_language', lang='hi') }}" class="mobile-link">
+            <i class="fa-solid {% if current_lang == 'hi' %}fa-circle-check text-plum-600{% else %}fa-circle text-gray-300{% endif %} w-5"></i>Hinglish
+        </a>
 
         <div class="mobile-section-title">Settings</div>
         {% if current_user.role != 'admin' %}
