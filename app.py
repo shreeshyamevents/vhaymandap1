@@ -1901,7 +1901,8 @@ def transport_verify_code(ref):
 
     if request.method == 'GET':
         return render_template('transport_verify.html',
-                               mode='code', booking=booking, otp_map=otp_map)
+                               mode='code', booking=booking, otp_map=otp_map,
+                               next_url=request.args.get('next', ''))
 
     # POST — verify
     code = (request.form.get('otp_code') or '').strip()
@@ -1965,6 +1966,12 @@ def transport_verify_code(ref):
             pass
 
     _notify_otp_event(otp, event='verified')
+
+    # Redirect back to referring page if requested (inline verify from booking page)
+    next_url = request.args.get('next') or request.form.get('next')
+    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+        flash(f'✅ Verified! Booking {booking.booking_reference} updated.', 'success')
+        return redirect(next_url)
 
     flash(f'✅ Verified! Booking {booking.booking_reference} updated.', 'success')
     return redirect(url_for('transport_verify_code', ref=ref))
@@ -3022,9 +3029,13 @@ def my_booking_detail(booking_id):
     proofs = PaymentProof.query.filter_by(booking_id=booking_id)\
         .order_by(PaymentProof.created_at.desc()).all()
     
+    otps = BookingOTP.query.filter_by(booking_id=booking.id).all()
+    otp_map = {o.otp_type: o for o in otps}
+
     return render_template('my_booking.html',
                          booking=booking, payment_config=payment_config,
-                         qr_base64=qr_base64, proofs=proofs)
+                         qr_base64=qr_base64, proofs=proofs,
+                         otp_map=otp_map)
 
 
 # ============================================
@@ -6666,12 +6677,15 @@ def vendor_booking_detail(booking_id):
         booking_id=booking.id, report_type='return'
     ).first()
 
+    otps = BookingOTP.query.filter_by(booking_id=booking.id).all()
+    otp_map = {o.otp_type: o for o in otps}
+
     return render_template(
         'vendor/booking_detail.html',
         booking=booking,
         dispatch_report=dispatch_report,
         return_report=return_report,
-        platform_fee_rate=Config.COMMISSION_RATE,
+        otp_map=otp_map,
     )
 
 
