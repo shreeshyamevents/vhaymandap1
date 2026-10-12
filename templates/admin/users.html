@@ -35,6 +35,14 @@
                 <option value="blocked" {% if blocked_filter == 'blocked' %}selected{% endif %}>🚫 Blocked Only</option>
             </select>
         </div>
+        <div>
+            <label class="block text-xs font-bold mb-1">KYC</label>
+            <select name="kyc" class="border rounded-lg p-2 text-sm bg-white">
+                <option value="" {% if not kyc_filter %}selected{% endif %}>All KYC</option>
+                <option value="verified" {% if kyc_filter == 'verified' %}selected{% endif %}>✅ Verified</option>
+                <option value="unverified" {% if kyc_filter == 'unverified' %}selected{% endif %}>❌ Not Verified</option>
+            </select>
+        </div>
         <button type="submit" class="bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-blue-600">Apply</button>
         <a href="{{ url_for('admin_users') }}" class="text-gray-600 hover:text-gray-800 text-sm px-2 py-2">Reset</a>
     </form>
