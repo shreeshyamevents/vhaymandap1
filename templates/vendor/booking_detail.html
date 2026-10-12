@@ -219,7 +219,11 @@
 
     {# Status strip #}
     <div class="space-y-2 mb-4">
-      {% for otype, label in [('dispatch','Item Received'),('return','Item Returned'),('completion','Inspection Done')] %}
+      {% set _rows = [('dispatch','Item Received'),('return','Item Returned')] %}
+      {% if otp_map.get('completion') or booking.booking_status == 'return_received' %}
+        {% set _rows = _rows + [('completion','Inspection Done')] %}
+      {% endif %}
+      {% for otype, label in _rows %}
       {% set o = otp_map.get(otype) %}
       <div class="flex justify-between items-center text-xs p-2 rounded-lg border
         {% if o and o.status == 'verified' %}bg-green-50 border-green-200
