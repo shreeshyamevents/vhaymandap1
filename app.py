@@ -5832,6 +5832,7 @@ def admin_users():
     role_filter = request.args.get('role', 'all')
     search = request.args.get('search', '').strip()
     blocked_filter = request.args.get('blocked', '')
+    kyc_filter = request.args.get('kyc', '')
     query = User.query
     if role_filter != 'all':
         query = query.filter_by(role=role_filter)
@@ -5839,14 +5840,19 @@ def admin_users():
         query = query.filter_by(is_blocked=True)
     elif blocked_filter == 'active':
         query = query.filter_by(is_blocked=False)
+    if kyc_filter == 'verified':
+        query = query.filter_by(kyc_status='verified')
+    elif kyc_filter == 'unverified':
+        query = query.filter((User.kyc_status != 'verified') | (User.kyc_status.is_(None)))
     if search:
         query = query.filter(db.or_(User.name.ilike(f'%{search}%'),
                                     User.mobile.ilike(f'%{search}%'),
-                                    User.email.ilike(f'%{search}%')))
+                                    User.email.ilike(f'%{search}%'),
+                                    User.public_id.ilike(f'%{search}%')))
     return render_template('admin/users.html',
                            users=query.order_by(User.created_at.desc()).all(),
                            role_filter=role_filter, search=search,
-                           blocked_filter=blocked_filter)
+                           blocked_filter=blocked_filter, kyc_filter=kyc_filter)
 
 
 @app.route('/admin/user/<int:user_id>/block', methods=['POST'])
