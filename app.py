@@ -2488,6 +2488,15 @@ def transport_verify_code(ref):
 
     now = datetime.utcnow()
 
+    # Login + role gate — public page can only CHECK, not verify
+    if not current_user.is_authenticated:
+        flash('⚠️ Login required to verify OTP. Only the receiving party can confirm — the code should be relayed to them.', 'warning')
+        return _back()
+
+    is_admin = current_user.role == 'admin'
+    is_customer = booking.customer_id == current_user.id
+    is_vendor = (booking.item and booking.item.vendor_id == current_user.id)
+
     if not code or len(code) != 6 or not code.isdigit():
         flash('Enter a valid 6-digit code.', 'danger')
         return _back()
@@ -2530,9 +2539,20 @@ def transport_verify_code(ref):
         flash('Code expired. Ask the other party to regenerate.', 'warning')
         return _back()
 
+    # Role gate — only the receiver (or admin) can verify this OTP
+    if otp.otp_type == 'dispatch' and not (is_customer or is_admin):
+        flash('⚠️ Only the customer can verify the delivery OTP (after receiving the item).', 'warning')
+        return _back()
+    if otp.otp_type == 'return' and not (is_vendor or is_admin):
+        flash('⚠️ Only the vendor can verify the return OTP (after receiving the item back).', 'warning')
+        return _back()
+    if otp.otp_type == 'completion' and not (is_vendor or is_admin):
+        flash('⚠️ Only the vendor can verify this OTP.', 'warning')
+        return _back()
+
     # Success path
     otp.status = 'verified'
-    otp.verified_by = current_user.id if current_user.is_authenticated else None
+    otp.verified_by = current_user.id
     otp.verified_at = now
     _apply_otp_status(otp, booking)
     db.session.commit()
