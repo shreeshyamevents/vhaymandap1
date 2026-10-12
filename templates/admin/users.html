@@ -84,6 +84,11 @@
                             🚫 Blocked
                         </span>
                         {% endif %}
+                        {% if user.kyc_status == 'verified' %}
+                        <span class="text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 ml-1" title="KYC Verified">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </span>
+                        {% endif %}
                     </td>
                     <td class="p-3 text-center">{{ user.bookings|length }}</td>
                     <td class="p-3 text-xs">{{ user.created_at|ist_date }}</td>
