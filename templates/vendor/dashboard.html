@@ -134,7 +134,7 @@
                     {{ booking.item.title }}
                 </p>
                 <p class="text-xs text-gray-500">
-                    <i class="fa-regular fa-user mr-1"></i>{{ booking.customer.name }}
+                    <i class="fa-regular fa-user mr-1"></i>{{ disp_name(booking.customer) }}
                     <span class="mx-2">•</span>
                     <i class="fa-regular fa-box mr-1"></i>Qty: {{ booking.quantity }}
                 </p>
@@ -280,8 +280,7 @@
                       </a>
                     </td>
                     <td class="p-2">
-                        {{ booking.customer.name }}
-                        <div class="text-[10px] text-gray-500">{{ booking.customer.mobile }}</div>
+                        {{ disp_name(booking.customer) }}
                     </td>
                     <td class="p-2">
                         {{ booking.item.title[:20] }}{% if booking.item.title|length > 20 %}...{% endif %}
