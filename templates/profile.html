@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% block title %}My Profile — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-plum-700">👤 My Profile</h1>
+    <p class="text-sm text-gray-500 mt-1">
+      Manage your account details, bank info, password, and data.
+    </p>
+  </div>
+
+  <!-- Quick summary strip -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div class="flex items-center gap-4 flex-wrap">
+      <div class="w-14 h-14 rounded-full bg-plum-100 flex items-center justify-center text-plum-700 text-xl font-bold">
+        {{ current_user.name[0]|upper if current_user.name else '?' }}
+      </div>
+      <div class="flex-1 min-w-[200px]">
+        <p class="font-bold text-gray-900">{{ current_user.name }}</p>
+        <p class="text-xs text-gray-500">
+          <span class="font-mono">{{ current_user.public_id or '—' }}</span>
+          <span class="mx-1">·</span>{{ current_user.mobile }}
+          <span class="mx-1">·</span>
+          <span class="bg-plum-50 text-plum-700 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wide">{{ current_user.role }}</span>
+        </p>
+      </div>
+      {% if current_user.kyc_status == 'verified' and current_user.kyc_expires_at and current_user.kyc_expires_at > now %}
+      <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
+        <i class="fa-solid fa-shield-halved mr-1"></i>KYC Verified
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Section 1: Personal Info -->
+  <form method="POST" action="{{ url_for('profile_update') }}" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-id-card text-plum-600"></i>Personal Information
+      </h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Name *</label>
+          <input type="text" name="name" value="{{ current_user.name }}" required
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Email</label>
+          <input type="email" name="email" value="{{ current_user.email or '' }}"
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Mobile (cannot change)</label>
+          <input type="text" value="{{ current_user.mobile }}" disabled
+                 class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 text-gray-500">
+        </div>
+        {% if current_user.role in ('vendor', 'admin') %}
+        <div>
+          <label class="block text-sm font-semibold mb-1">Company / Business Name</label>
+          <input type="text" name="company_name" value="{{ current_user.company_name or '' }}"
+                 class="w-full border rounded-lg p-2.5 text-sm"
+                 placeholder="e.g. Shree Shyam Events">
+        </div>
+        {% endif %}
+        <div>
+          <label class="block text-sm font-semibold mb-1">City</label>
+          <input type="text" name="city" value="{{ current_user.city or 'Harda' }}"
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Bank Details -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 class="font-bold text-gray-900 mb-2 flex items-center gap-2">
+        <i class="fa-solid fa-building-columns text-blue-700"></i>Bank / UPI Details
+      </h2>
+      <p class="text-xs text-gray-500 mb-4">
+        Ye details admin ko deposit refund aur payouts ke liye dikhengi. Sahi info bharein.
+      </p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Account Holder Name</label>
+          <input type="text" name="bank_account_name" value="{{ current_user.bank_account_name or '' }}"
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Account Number</label>
+            <input type="text" name="bank_account_number" value="{{ current_user.bank_account_number or '' }}"
+                   inputmode="numeric" class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">IFSC</label>
+            <input type="text" name="bank_ifsc" value="{{ current_user.bank_ifsc or '' }}"
+                   maxlength="11" style="text-transform: uppercase;"
+                   placeholder="HDFC0001234" class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Bank Name</label>
+            <input type="text" name="bank_name" value="{{ current_user.bank_name or '' }}"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Branch</label>
+            <input type="text" name="bank_branch" value="{{ current_user.bank_branch or '' }}"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">UPI ID (optional)</label>
+          <input type="text" name="upi_id" value="{{ current_user.upi_id or '' }}"
+                 placeholder="yourname@ybl" class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit"
+            class="w-full bg-plum-600 hover:bg-plum-700 text-white font-bold py-3 rounded-xl">
+      <i class="fa-solid fa-check mr-2"></i>Save Changes
+    </button>
+  </form>
+
+  <!-- Section 3: Change Password -->
+  <form method="POST" action="{{ url_for('profile_change_password') }}" class="mt-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+      <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-lock text-amber-600"></i>Change Password
+      </h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold mb-1">Current Password *</label>
+          <input type="password" name="current_password" required
+                 class="w-full border rounded-lg p-2.5 text-sm">
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">New Password *</label>
+            <input type="password" name="new_password" required minlength="8"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Confirm New Password *</label>
+            <input type="password" name="confirm_password" required minlength="8"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+        </div>
+        <p class="text-xs text-gray-500">Min 8 chars, at least 1 letter and 1 number.</p>
+      </div>
+      <button type="submit"
+              class="mt-4 bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm">
+        <i class="fa-solid fa-key mr-1"></i>Change Password
+      </button>
+    </div>
+  </form>
+
+  <!-- Section 4: KYC Status -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mt-6">
+    <h2 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+      <i class="fa-solid fa-shield-halved text-blue-600"></i>KYC Status
+    </h2>
+    {% if current_user.kyc_status == 'verified' and current_user.kyc_expires_at and current_user.kyc_expires_at > now %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+      <p class="font-bold">✅ Verified</p>
+      <p class="text-xs mt-1">
+        Valid until {{ current_user.kyc_expires_at|ist_date }}. Bookings above ₹30,000 won't ask for documents again.
+      </p>
+      {% if current_user.kyc_pan_masked %}
+      <p class="text-xs mt-1 font-mono">PAN: {{ current_user.kyc_pan_masked }}</p>
+      {% endif %}
+    </div>
+    {% elif current_user.kyc_status == 'verified' and current_user.kyc_expires_at and current_user.kyc_expires_at <= now %}
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+      <p class="font-bold">⏰ Expired</p>
+      <p class="text-xs mt-1">Expired on {{ current_user.kyc_expires_at|ist_date }}. You'll need to re-verify on next booking above ₹30,000.</p>
+    </div>
+    {% else %}
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+      <p class="font-bold">Not Verified</p>
+      <p class="text-xs mt-1">You'll be asked for Aadhaar + PAN when booking above ₹30,000. Verification is one-time and valid for 1 year.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Section 5: My Data (DPDP) -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5 mt-6">
+    <h2 class="font-bold text-gray-900 mb-3 flex items-center gap-2">
+      <i class="fa-solid fa-database text-purple-600"></i>My Data
+    </h2>
+    <p class="text-xs text-gray-500 mb-4">
+      Your account data summary and privacy controls (DPDP compliance).
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900">{{ bookings_count }}</div>
+        <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Bookings</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900">{{ msg_count }}</div>
+        <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Messages</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900">{{ payments_count }}</div>
+        <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Payments</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900">{{ tickets_count }}</div>
+        <div class="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Tickets</div>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <a href="{{ url_for('my_data') }}"
+         class="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">View Full Data</p>
+          <p class="text-xs text-gray-500">Detailed list of all your bookings, payments, messages, consents</p>
+        </div>
+        <i class="fa-solid fa-arrow-right text-gray-400"></i>
+      </a>
+      <a href="{{ url_for('my_data_export') }}"
+         class="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">Export Data (JSON)</p>
+          <p class="text-xs text-gray-500">Download a copy of all your personal data</p>
+        </div>
+        <i class="fa-solid fa-download text-gray-400"></i>
+      </a>
+      <a href="{{ url_for('my_data') }}#deletion"
+         class="flex items-center justify-between p-3 rounded-lg border border-red-200 hover:bg-red-50 transition">
+        <div>
+          <p class="text-sm font-semibold text-red-700">Delete My Account</p>
+          <p class="text-xs text-red-500">Request account deletion (30-day grace period)</p>
+        </div>
+        <i class="fa-solid fa-trash text-red-400"></i>
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
