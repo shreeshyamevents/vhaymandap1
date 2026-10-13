@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ item.title }} — VyahMandap{% endblock %}
+{% block title %}{{ seo_title or (item.title + ' — VyahMandap') }}{% endblock %}
+{% block og_image %}{{ og_image }}{% endblock %}
+{% block twitter_image %}{{ og_image }}{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto py-8 px-4">
@@ -205,6 +207,36 @@
   </div>
 
 </div>
+
+{# JSON-LD Structured Data #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": {{ item.title|tojson }},
+  "image": {{ og_image|tojson }},
+  "description": {{ (item.description or item.title)|tojson }},
+  "category": {{ item.category|tojson }},
+  {% if avg_rating and all_review_count %}
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": {{ avg_rating }},
+    "reviewCount": {{ all_review_count }}
+  },
+  {% endif %}
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "INR",
+    "price": {{ '%.0f'|format(item.rate_with_commission or item.rate_per_day or 0) }},
+    "availability": "{% if item.is_available and item.stock > 0 %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
+    "url": {{ (site_url.rstrip('/') + '/item/' + item.id|string)|tojson }},
+    "seller": {
+      "@type": "Organization",
+      "name": "VyahMandap"
+    }
+  }
+}
+</script>
 
 {# Compare floating bar #}
 <div id="compare-bar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 bg-plum-700 text-white rounded-full shadow-lg px-5 py-3 z-50">
