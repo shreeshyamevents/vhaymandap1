@@ -6442,6 +6442,11 @@ def utility_processor():
         kyc_valid=(lambda: (_user_kyc_valid(current_user) if current_user.is_authenticated else False)),
         t=t,
         current_lang=(session.get('lang', Config.DEFAULT_LANG) if hasattr(session, 'get') else Config.DEFAULT_LANG),
+        site_url=Config.SITE_URL,
+        seo_title=None,
+        seo_description=None,
+        canonical_url=None,
+        og_image=None,
         supported_langs=Config.SUPPORTED_LANGS,
         get_category_icon=lambda c: {
             'furniture': 'fa-couch', 'lighting': 'fa-lightbulb',
@@ -8812,6 +8817,23 @@ def item_detail(item_id):
             user_id=current_user.id, item_id=item_id
         ).first() is not None
 
+    # SEO — use visible price (rate_with_commission) to match customer-facing rate
+    visible_rate = int(item.rate_with_commission or item.rate_per_day or 0)
+    vname = item.vendor.company_name or item.vendor.public_id or 'a verified vendor'
+    seo_title = f'{item.title} — Rent ₹{visible_rate}/day in Harda | VyahMandap'
+    if item.description and item.description.strip():
+        desc = item.description.strip()[:150]
+    else:
+        desc = f'{item.title} available on rent from {vname}. ₹{visible_rate}/day in Harda.'
+    # Absolute image URL for OG
+    raw_img = item.get_image() or ''
+    if raw_img.startswith('http'):
+        seo_image = raw_img
+    elif raw_img:
+        seo_image = Config.SITE_URL.rstrip('/') + raw_img
+    else:
+        seo_image = url_for('static', filename='images/logo.png', _external=True)
+
     return render_template(
         'item_detail.html',
         item=item,
@@ -8820,6 +8842,10 @@ def item_detail(item_id):
         all_review_count=all_review_count,
         avg_rating=avg_rating,
         in_wishlist=in_wishlist,
+        seo_title=seo_title,
+        seo_description=desc,
+        canonical_url=f'{Config.SITE_URL.rstrip("/")}/item/{item.id}',
+        og_image=seo_image,
     )
 
 
