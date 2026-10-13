@@ -99,6 +99,10 @@ class Config:
     BUSINESS_EMAIL = "vyahmandap@gmail.com"
     BUSINESS_LOCATION = "Harda, Madhya Pradesh"
     MSME_NUMBER = "UDYAM-MP-21-0016639"
+    # 12 Oct 2026 — SEO
+    SITE_URL = os.environ.get('SITE_URL') or 'https://vhaymandap1.onrender.com'
+    SITE_NAME = 'VyahMandap'
+    SITE_DESCRIPTION = 'Book wedding equipment on rent in Harda — mandap, sofa, lighting, decor, tent, and more from verified vendors.'
     
     ADMIN_MOBILE = "8319337063"
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')  # env-only, no fallback
@@ -2847,6 +2851,110 @@ def set_language(lang):
         except Exception:
             pass
     return redirect(url_for('index'))
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Dynamic sitemap for search engines."""
+    from flask import make_response
+    base = Config.SITE_URL.rstrip('/')
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+
+    urls = []
+
+    static_pages = [
+        ('/', '1.0', 'daily'),
+        ('/bundles', '0.9', 'daily'),
+        ('/leaderboard', '0.7', 'weekly'),
+        ('/faq', '0.5', 'monthly'),
+        ('/privacy', '0.4', 'yearly'),
+        ('/terms', '0.4', 'yearly'),
+    ]
+    for path, priority, freq in static_pages:
+        urls.append({'loc': base + path, 'lastmod': today, 'priority': priority, 'changefreq': freq})
+
+    try:
+        items = Item.query.filter_by(is_available=True).order_by(Item.updated_at.desc()).limit(5000).all()
+        for it in items:
+            lastmod = (it.updated_at or it.created_at or datetime.utcnow()).strftime('%Y-%m-%d')
+            urls.append({'loc': f'{base}/item/{it.id}', 'lastmod': lastmod, 'priority': '0.8', 'changefreq': 'weekly'})
+    except Exception as e:
+        app.logger.warning(f'Sitemap items failed: {e}')
+
+    try:
+        bundles = Bundle.query.filter_by(is_active=True).order_by(Bundle.updated_at.desc()).limit(1000).all()
+        for b in bundles:
+            lastmod = (b.updated_at or b.created_at or datetime.utcnow()).strftime('%Y-%m-%d')
+            urls.append({'loc': f'{base}/bundle/{b.id}', 'lastmod': lastmod, 'priority': '0.7', 'changefreq': 'weekly'})
+    except Exception as e:
+        app.logger.warning(f'Sitemap bundles failed: {e}')
+
+    try:
+        vendor_ids = db.session.query(Item.vendor_id).filter_by(is_available=True).distinct().all()
+        for (vid,) in vendor_ids:
+            if vid:
+                urls.append({'loc': f'{base}/vendor/{vid}/public', 'lastmod': today, 'priority': '0.6', 'changefreq': 'weekly'})
+    except Exception as e:
+        app.logger.warning(f'Sitemap vendors failed: {e}')
+
+    xml_parts = ['<?xml version="1.0" encoding="UTF-8"?>',
+                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for u in urls:
+        xml_parts.append(
+            f'<url><loc>{u["loc"]}</loc><lastmod>{u["lastmod"]}</lastmod>'
+            f'<changefreq>{u["changefreq"]}</changefreq><priority>{u["priority"]}</priority></url>'
+        )
+    xml_parts.append('</urlset>')
+
+    resp = make_response('\n'.join(xml_parts))
+    resp.headers['Content-Type'] = 'application/xml; charset=utf-8'
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    """Robots.txt — public crawler access, private blocked. Longest-rule-wins allows exceptions."""
+    base = Config.SITE_URL.rstrip('/')
+    lines = [
+        'User-agent: *',
+        'Allow: /',
+        # Longest-match exceptions (must come AFTER generic Allow)
+        'Allow: /vendor/*/public',
+        'Allow: /item/',
+        'Allow: /bundle/',
+        # Block private
+        'Disallow: /admin/',
+        'Disallow: /vendor/',
+        'Disallow: /my-booking/',
+        'Disallow: /my-data/',
+        'Disallow: /profile/',
+        'Disallow: /cart/',
+        'Disallow: /booking/',
+        'Disallow: /book/',
+        'Disallow: /buy/',
+        'Disallow: /chat/',
+        'Disallow: /tickets/',
+        'Disallow: /notifications/',
+        'Disallow: /wishlist/',
+        'Disallow: /recently-viewed',
+        'Disallow: /compare',
+        'Disallow: /api/',
+        'Disallow: /transport/',
+        'Disallow: /set-language/',
+        'Disallow: /sos/',
+        'Disallow: /login',
+        'Disallow: /register',
+        'Disallow: /forgot-password',
+        'Disallow: /reset-password',
+        'Disallow: /logout',
+        '',
+        f'Sitemap: {base}/sitemap.xml',
+        '',
+    ]
+    resp = app.response_class('\n'.join(lines), mimetype='text/plain')
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
 
 
 @app.route('/privacy')
