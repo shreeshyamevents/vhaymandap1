@@ -2853,6 +2853,15 @@ def set_language(lang):
     return redirect(url_for('index'))
 
 
+@app.route('/google84e4c0bb0f809ec1.html')
+def google_site_verification():
+    """Google Search Console verification file. Safe to keep — one-time check."""
+    return app.response_class(
+        'google-site-verification: google84e4c0bb0f809ec1.html\n',
+        mimetype='text/html'
+    )
+
+
 @app.route('/sitemap.xml')
 def sitemap_xml():
     """Dynamic sitemap for search engines."""
