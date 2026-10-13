@@ -3,7 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}VyahMandap - Wedding Equipment Marketplace{% endblock %}</title>
+    <title>{% block title %}{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}{% endblock %}</title>
+
+    {# SEO Meta #}
+    {% set _desc = (seo_description or 'Book wedding equipment on rent in Harda — mandap, sofa, lighting, decor, tent, and more from verified vendors. 50% cheaper than buying.')[:160] %}
+    <meta name="description" content="{{ _desc }}">
+    <link rel="canonical" href="{{ canonical_url or request.base_url }}">
+
+    {# Open Graph #}
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:site_name" content="VyahMandap">
+    <meta property="og:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}">
+    <meta property="og:description" content="{{ _desc }}">
+    <meta property="og:url" content="{{ canonical_url or request.base_url }}">
+    <meta property="og:image" content="{% block og_image %}{{ url_for('static', filename='images/logo.png', _external=True) }}{% endblock %}">
+    <meta property="og:locale" content="en_IN">
+
+    {# Twitter Card #}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}">
+    <meta name="twitter:description" content="{{ _desc }}">
+    <meta name="twitter:image" content="{% block twitter_image %}{{ url_for('static', filename='images/logo.png', _external=True) }}{% endblock %}">
+
+    {# Robots — noindex for private routes, index for public #}
+    {% set _ep = request.endpoint or '' %}
+    {% set _private_prefixes = ('admin','vendor_','cart','book','buy','dashboard','my_','chat','ticket','notification','profile','wishlist','recently','compare','transport','login','register','forgot','reset','sos','payment','submit','report','blocked') %}
+    {% if _ep != 'vendor_public_profile' and _ep.startswith(_private_prefixes) %}
+    <meta name="robots" content="noindex, nofollow">
+    {% else %}
+    <meta name="robots" content="index, follow">
+    {% endif %}
+
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
