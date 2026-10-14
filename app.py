@@ -7794,7 +7794,7 @@ def _cart_item_ids():
 
 
 def calculate_cart_total(start_date, end_date, area, weight_category):
-    """Compute combined totals for all cart items."""
+    """Compute combined totals for all cart items. Variant-aware."""
     cart = get_cart()
     if not cart:
         return None
@@ -7812,17 +7812,31 @@ def calculate_cart_total(start_date, end_date, area, weight_category):
         if not item:
             continue
         qty = c.get('quantity', 1)
-        if item.is_for_sale and item.sale_price and c.get('type') == 'sale':
-            sub = round((item.sale_price or 0) * qty, 2)
+
+        # Variant (if entry has one)
+        variant = None
+        if c.get('variant_id'):
+            variant = ItemVariant.query.get(c['variant_id'])
+
+        # Effective rate / sale price — variant overrides item
+        if variant:
+            eff_rate = variant.rate_per_day or 0
+            eff_sale = variant.sale_price or (item.sale_price or 0)
+        else:
+            eff_rate = item.rate_per_day or 0
+            eff_sale = item.sale_price or 0
+
+        if c.get('type') == 'sale' and item.is_for_sale:
+            sub = round(eff_sale * qty, 2)
             sale_base += sub
-            item_details.append({'item': item, 'quantity': qty,
+            item_details.append({'item': item, 'variant': variant, 'quantity': qty,
                                  'subtotal': sub, 'type': 'sale', 'days': 0})
         else:
-            sub = round((item.rate_per_day or 0) * days * qty, 2)
+            sub = round(eff_rate * days * qty, 2)
             rental_base += sub
-            item_details.append({'item': item, 'quantity': qty,
+            item_details.append({'item': item, 'variant': variant, 'quantity': qty,
                                  'subtotal': sub, 'type': 'rent', 'days': days})
-        cart_items.append((item, qty))
+        cart_items.append((item, qty))  # backward-compat tuple
 
     base_rent = round(rental_base + sale_base, 2)
     commission = round(base_rent * Config.COMMISSION_RATE, 2)
@@ -8574,21 +8588,30 @@ def cart_checkout():
         db.session.add(parent)
         db.session.flush()
 
-        # Children — one per item
+        # Children — one per item (variant-aware)
         for detail in calc['item_details']:
             item = detail['item']
+            variant = detail.get('variant')
             qty = detail['quantity']
             itype = detail['type']
-            if itype == 'sale':
-                # Stock permanently reduced
+
+            # Effective stock decrement — variant if present, else item
+            if variant:
+                variant.stock = max(0, (variant.stock or 0) - qty)
+                if variant.stock <= 0:
+                    variant.is_available = False
+            else:
                 item.stock = max(0, (item.stock or 0) - qty)
                 if item.stock <= 0:
                     item.stock = 0
                     item.is_available = False
+
+            if itype == 'sale':
                 child = Booking(
                     booking_reference=generate_booking_reference(),
                     customer_id=current_user.id,
                     item_id=item.id,
+                    variant_id=(variant.id if variant else None),
                     parent_booking_id=parent.id,
                     order_type='sale',
                     start_date=start_date, end_date=end_date,
@@ -8603,15 +8626,11 @@ def cart_checkout():
                     vendor_share=detail['subtotal'],
                 )
             else:
-                # Rental child
-                item.stock = max(0, (item.stock or 0) - qty)
-                if item.stock <= 0:
-                    item.stock = 0
-                    item.is_available = False
                 child = Booking(
                     booking_reference=generate_booking_reference(),
                     customer_id=current_user.id,
                     item_id=item.id,
+                    variant_id=(variant.id if variant else None),
                     parent_booking_id=parent.id,
                     order_type='cart_child',
                     start_date=start_date, end_date=end_date,
