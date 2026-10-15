@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Item - VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">✨ Verify Your Item</h2>
+        <a href="{{ url_for('vendor_dashboard') }}" class="text-gray-600 hover:text-gray-800 text-sm">← Back</a>
+    </div>
+
+    <div class="bg-white p-6 rounded-2xl border shadow-sm">
+        <!-- Item Card -->
+        <div class="flex gap-4 mb-6 p-4 bg-gray-50 rounded-xl">
+            <div class="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                <img src="{{ item.get_image() }}" class="w-full h-full object-cover" onerror="this.src='/static/images/default-item.jpg'">
+            </div>
+            <div>
+                <h3 class="font-bold text-lg">{{ item.title }}</h3>
+                <p class="text-sm text-gray-500">{{ item.category|title }}</p>
+                <p class="text-sm mt-1"><strong>₹{{ item.rate_per_day }}</strong>/day</p>
+            </div>
+        </div>
+
+        <!-- Benefits -->
+        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
+            <h4 class="font-bold text-blue-900 mb-2">✨ Verified Badge Benefits:</h4>
+            <ul class="text-sm text-blue-800 space-y-1">
+                <li>✓ Blue verified tick on your item</li>
+                <li>✓ Higher visibility in marketplace</li>
+                <li>✓ Builds customer trust instantly</li>
+                <li>✓ Better conversion rate</li>
+                <li>✓ Valid for <strong>3 months</strong></li>
+            </ul>
+        </div>
+
+        <!-- Payment Info -->
+        <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 mb-6">
+            <h4 class="font-bold text-yellow-900 mb-2">💳 Verification Fee:</h4>
+            <p class="text-2xl font-bold text-yellow-800">₹{{ per_day }}<span class="text-base font-semibold">/day</span></p>
+            <p class="text-xs text-yellow-700 mt-1">₹{{ price }} total for {{ days }} days (3 months)</p>
+        </div>
+
+        {% if pending %}
+        <!-- Waiting for admin -->
+        <div class="bg-amber-50 border border-amber-200 p-5 rounded-xl text-center">
+            <p class="text-lg font-bold text-amber-900">⏳ Payment verify ho raha hai</p>
+            <p class="text-sm text-amber-800 mt-1">UTR <strong>{{ pending.utr }}</strong> admin ke paas hai. Approve hote hi badge lag jayega.</p>
+        </div>
+        {% else %}
+        <!-- Payment Form -->
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="bg-gray-900 text-white p-5 rounded-xl text-center space-y-3">
+                <div class="flex items-center justify-center gap-2 text-sm">
+                    <span class="bg-purple-600 px-3 py-0.5 rounded text-xs font-bold">UPI</span>
+                    <span>Pay ₹{{ price }} to {{ app_name }}</span>
+                </div>
+                <div class="bg-white p-3 inline-block rounded-xl mx-auto">
+                    {% if qr_base64 %}
+                    <img src="data:image/png;base64,{{ qr_base64 }}" alt="Scan to pay ₹{{ price }}" class="w-40 h-40 mx-auto">
+                    <p class="mt-1 text-[11px] text-gray-600">Scan to pay ₹{{ price }}</p>
+                    {% else %}
+                    <div class="w-40 h-40 bg-gray-200 rounded-lg mx-auto flex items-center justify-center text-gray-500 text-xs px-3">
+                        QR abhi available nahi hai. Admin se contact karein.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="text-left">
+                    <label class="block font-semibold mb-1 text-white/80">UTR / Transaction ID *</label>
+                    <input type="text" name="utr" required minlength="8" maxlength="30" pattern="[A-Za-z0-9]{8,30}" placeholder="Payment ke baad UTR yahan daalein" class="w-full border rounded-lg p-2.5 text-black text-sm">
+                    <p class="text-[11px] text-white/60 mt-1">Admin payment check karke badge activate karega.</p>
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-blue-700 text-white font-bold py-3.5 rounded-xl hover:bg-blue-600 transition text-sm">
+                ✨ Submit Payment for Verification
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
