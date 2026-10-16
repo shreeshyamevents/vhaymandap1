@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Transporter Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+
+  <div class="mb-6 flex justify-between items-start flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">🚚 Transporter Dashboard</h1>
+      <p class="text-sm text-gray-500 mt-1">Welcome, {{ current_user.name }}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
+        <i class="fa-solid fa-shield-halved mr-1"></i>KYC Verified
+      </span>
+      <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold">
+        🎯 {{ trip_count }} trips
+      </span>
+    </div>
+  </div>
+
+  <!-- Active Assignments -->
+  <div class="bg-white p-6 rounded-xl border shadow-sm mb-6">
+    <h2 class="font-bold text-lg mb-4">Active Assignments ({{ assigned|length }})</h2>
+
+    {% if assigned %}
+    <div class="space-y-3">
+      {% for b in assigned %}
+      <div class="border rounded-lg p-4 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex-1 min-w-[200px]">
+          <p class="font-mono text-xs text-plum-600 font-bold">{{ b.booking_reference }}</p>
+          <p class="font-bold text-sm mt-1">{{ b.item.title if b.item else '—' }}</p>
+          <p class="text-xs text-gray-500 mt-0.5">
+            {{ b.start_date.strftime('%d %b') }} → {{ b.end_date.strftime('%d %b') }}
+          </p>
+          <p class="text-xs text-gray-600 mt-1">
+            <i class="fa-regular fa-user mr-1"></i>{{ disp_name(b.customer) }}
+            · {{ b.quantity }} units
+          </p>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] font-bold px-2 py-1 rounded-full uppercase
+            {% if b.booking_status == 'dispatched' %}bg-blue-100 text-blue-800
+            {% elif b.booking_status == 'in_use' %}bg-amber-100 text-amber-800
+            {% elif b.booking_status == 'return_initiated' %}bg-orange-100 text-orange-800
+            {% elif b.booking_status == 'return_received' %}bg-purple-100 text-purple-800
+            {% else %}bg-gray-100 text-gray-700{% endif %}">
+            {{ b.booking_status.replace('_', ' ') }}
+          </span>
+          <div class="mt-2">
+            <a href="{{ url_for('transporter_booking_detail', booking_id=b.id) }}"
+               class="inline-block bg-plum-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-plum-700">
+              View Details →
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+      <i class="fa-solid fa-truck text-3xl text-gray-300 mb-2"></i>
+      <p class="text-sm">Abhi koi active assignment nahi hai.</p>
+      <p class="text-xs text-gray-400 mt-1">Admin jab aapko booking dega, yahan dikhega.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Completed -->
+  {% if recent %}
+  <div class="bg-white p-6 rounded-xl border shadow-sm">
+    <h2 class="font-bold text-lg mb-4">Recent Completed</h2>
+    <div class="space-y-2">
+      {% for b in recent %}
+      <div class="flex justify-between items-center text-sm py-2 border-b last:border-b-0">
+        <div>
+          <p class="font-mono text-xs text-gray-500">{{ b.booking_reference }}</p>
+          <p class="text-xs">{{ b.item.title if b.item else '—' }}</p>
+        </div>
+        <span class="text-xs capitalize {% if b.booking_status == 'completed' %}text-emerald-700{% else %}text-gray-500{% endif %}">
+          {{ b.booking_status }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
