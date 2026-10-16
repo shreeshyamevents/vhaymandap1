@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Complete Sign-Up — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-8 px-4">
+    <div class="bg-white p-8 rounded-2xl border shadow-sm">
+        <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-plum-600 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-2xl">VM</div>
+            <h3 class="text-2xl font-bold mt-3">Ek Aakhri Step</h3>
+            <p class="text-sm text-gray-500">Almost there — just need your mobile number</p>
+        </div>
+
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-5 text-xs">
+            <p class="text-emerald-900 font-semibold mb-1">✅ Google account verified</p>
+            <p class="text-emerald-700">{{ pending.email }}</p>
+            <p class="text-emerald-700">{{ pending.name }}</p>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div>
+                <label class="block font-semibold text-sm mb-1">Mobile Number *</label>
+                <input type="text" name="mobile" required pattern="\d{10}" maxlength="10"
+                       inputmode="numeric" placeholder="Enter 10-digit mobile"
+                       class="w-full border rounded-lg p-3 text-sm">
+                <p class="text-xs text-gray-500 mt-1">Booking updates, OTP, aur support ke liye zaroori.</p>
+            </div>
+
+            <div>
+                <label class="block font-semibold text-sm mb-1">Account Type *</label>
+                <select name="account_type" id="accountType" required
+                        onchange="toggleCompanyField()"
+                        class="w-full border rounded-lg p-3 text-sm bg-white">
+                    <option value="customer">Customer (main equipment book karunga)</option>
+                    <option value="vendor">Vendor (main equipment rent pe dunga)</option>
+                </select>
+            </div>
+
+            <div id="companyField" class="hidden">
+                <label class="block font-semibold text-sm mb-1">Company / Business Name</label>
+                <input type="text" name="company_name" maxlength="150"
+                       placeholder="e.g. Shree Shyam Events"
+                       class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <div>
+                <label class="block font-semibold text-sm mb-1">City</label>
+                <input type="text" name="city" value="Harda" maxlength="100"
+                       class="w-full border rounded-lg p-3 text-sm">
+            </div>
+
+            <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700 transition">
+                Create Account
+            </button>
+        </form>
+
+        <p class="text-xs text-gray-500 text-center mt-4">
+            By continuing you agree to our <a href="{{ url_for('terms') }}" class="text-plum-600 hover:underline">Terms</a> and <a href="{{ url_for('privacy') }}" class="text-plum-600 hover:underline">Privacy Policy</a>.
+        </p>
+    </div>
+</div>
+
+<script>
+function toggleCompanyField() {
+    var role = document.getElementById('accountType').value;
+    document.getElementById('companyField').classList.toggle('hidden', role !== 'vendor');
+}
+</script>
+{% endblock %}
