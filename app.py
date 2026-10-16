@@ -21,7 +21,7 @@ from werkzeug.utils import secure_filename
 # Payment QR imports
 import qrcode
 from io import BytesIO
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 # ============================================
 # SAFETY: Clear invalid CLOUDINARY_URL
@@ -99,6 +99,9 @@ class Config:
     BUSINESS_EMAIL = "vyahmandap@gmail.com"
     BUSINESS_LOCATION = "Harda, Madhya Pradesh"
     MSME_NUMBER = "UDYAM-MP-21-0016639"
+    # 16 Oct 2026 — Google Sign-In (OAuth 2.0 server-side)
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID') or ''
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET') or ''
     # 12 Oct 2026 — SEO
     SITE_URL = os.environ.get('SITE_URL') or 'https://vhaymandap1.onrender.com'
     SITE_NAME = 'VyahMandap'
@@ -682,6 +685,8 @@ class User(UserMixin, db.Model):
     # 10 Oct 2026 — full KYC numbers encrypted at rest (business-ready vault)
     kyc_aadhaar_full_enc = db.Column(db.Text, nullable=True)
     kyc_pan_full_enc     = db.Column(db.Text, nullable=True)
+    # 16 Oct 2026 — Google Sign-In
+    google_id = db.Column(db.String(100), nullable=True, unique=True, index=True)
     # 12 Oct 2026 — bank details (customers + vendors, for refunds/payouts)
     bank_account_name   = db.Column(db.String(150), nullable=True)
     bank_account_number = db.Column(db.String(40), nullable=True)
@@ -2595,6 +2600,62 @@ def transport_verify_code(ref):
     return _back()
 
 
+def _google_oauth_url(state):
+    """Return Google OAuth 2.0 authorize URL."""
+    redirect_uri = Config.SITE_URL.rstrip('/') + '/auth/google/callback'
+    params = {
+        'client_id': Config.GOOGLE_CLIENT_ID,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'access_type': 'online',
+        'prompt': 'select_account',
+    }
+    return 'https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(params)
+
+
+def _exchange_google_code(code):
+    """Exchange auth code for access token. Returns dict or None."""
+    try:
+        redirect_uri = Config.SITE_URL.rstrip('/') + '/auth/google/callback'
+        r = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': Config.GOOGLE_CLIENT_ID,
+                'client_secret': Config.GOOGLE_CLIENT_SECRET,
+                'redirect_uri': redirect_uri,
+                'grant_type': 'authorization_code',
+            },
+            timeout=15,
+        )
+        if r.status_code != 200:
+            app.logger.error(f'Google token exchange failed: {r.status_code} {r.text[:200]}')
+            return None
+        return r.json()
+    except Exception as e:
+        app.logger.error(f'Google token exchange exception: {e}')
+        return None
+
+
+def _fetch_google_user(access_token):
+    """Fetch user info from Google. Returns dict or None."""
+    try:
+        r = requests.get(
+            'https://openidconnect.googleapis.com/v1/userinfo',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            app.logger.error(f'Google userinfo failed: {r.status_code}')
+            return None
+        return r.json()
+    except Exception as e:
+        app.logger.error(f'Google userinfo exception: {e}')
+        return None
+
+
 def _kyc_cipher():
     """Return Fernet cipher, or None if key missing/invalid."""
     key = Config.KYC_ENCRYPTION_KEY
@@ -2986,6 +3047,160 @@ def privacy():
 @app.route('/terms')
 def terms():
     return render_template('terms.html')
+
+
+@app.route('/auth/google')
+def google_login():
+    """Initiate Google OAuth flow."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    if not Config.GOOGLE_CLIENT_ID or not Config.GOOGLE_CLIENT_SECRET:
+        flash('Google Sign-In not configured.', 'danger')
+        return redirect(url_for('login'))
+
+    state = _secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    session.modified = True
+    return redirect(_google_oauth_url(state))
+
+
+@app.route('/auth/google/callback')
+def google_callback():
+    """Handle Google OAuth callback."""
+    # Validate state (CSRF protection)
+    expected_state = session.pop('oauth_state', None)
+    actual_state = request.args.get('state')
+    if not expected_state or expected_state != actual_state:
+        flash('⚠️ Invalid OAuth state. Please try again.', 'danger')
+        return redirect(url_for('login'))
+
+    error = request.args.get('error')
+    if error:
+        flash(f'Google sign-in cancelled: {error}', 'warning')
+        return redirect(url_for('login'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('Google sign-in failed — no code returned.', 'danger')
+        return redirect(url_for('login'))
+
+    token_data = _exchange_google_code(code)
+    if not token_data or not token_data.get('access_token'):
+        flash('Google authentication failed. Please try again.', 'danger')
+        return redirect(url_for('login'))
+
+    user_info = _fetch_google_user(token_data['access_token'])
+    if not user_info or not user_info.get('email'):
+        flash('Could not fetch your Google profile.', 'danger')
+        return redirect(url_for('login'))
+
+    email = user_info.get('email', '').strip().lower()
+    name = user_info.get('name', '').strip() or email.split('@')[0]
+    google_id = user_info.get('sub') or user_info.get('id')
+
+    # Check 1: google_id match (already linked)
+    user = User.query.filter_by(google_id=google_id).first()
+    if user:
+        if _user_blocked(user):
+            flash(f'🚫 Your account is blocked. Reason: {user.block_reason or "Contact support."}', 'danger')
+            return redirect(url_for('login'))
+        login_user(user, remember=True)
+        flash(f'🎉 Welcome back, {user.name}!', 'success')
+        return redirect(url_for('admin_dashboard') if user.role == 'admin'
+                        else url_for('vendor_dashboard') if user.role == 'vendor'
+                        else url_for('dashboard'))
+
+    # Check 2: email match (link Google to existing account)
+    user = User.query.filter_by(email=email).first()
+    if user:
+        if _user_blocked(user):
+            flash(f'🚫 Your account is blocked. Reason: {user.block_reason or "Contact support."}', 'danger')
+            return redirect(url_for('login'))
+        user.google_id = google_id
+        db.session.commit()
+        login_user(user, remember=True)
+        flash(f'✅ Google linked. Welcome back, {user.name}!', 'success')
+        return redirect(url_for('admin_dashboard') if user.role == 'admin'
+                        else url_for('vendor_dashboard') if user.role == 'vendor'
+                        else url_for('dashboard'))
+
+    # Check 3: brand new user — hold info in session, ask for mobile
+    session['google_pending'] = {
+        'email': email,
+        'name': name,
+        'google_id': google_id,
+    }
+    session.modified = True
+    return redirect(url_for('google_complete_profile'))
+
+
+@app.route('/auth/google/complete', methods=['GET', 'POST'])
+def google_complete_profile():
+    """New Google user — collect mobile + role."""
+    pending = session.get('google_pending')
+    if not pending:
+        flash('Please start Google sign-in again.', 'warning')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        mobile = request.form.get('mobile', '').strip()
+        account_type = request.form.get('account_type', 'customer')
+        city = request.form.get('city', 'Harda').strip()[:100] or 'Harda'
+        company_name = request.form.get('company_name', '').strip() or None
+
+        errors = []
+        if not mobile or not validate_mobile(mobile):
+            errors.append('Please enter a valid 10-digit mobile number.')
+        elif User.query.filter_by(mobile=mobile).first():
+            errors.append('This mobile number is already registered. Please login with mobile + password and link Google from your profile.')
+
+        if errors:
+            for e in errors:
+                flash(e, 'danger')
+            return render_template('auth/google_complete.html', pending=pending)
+
+        role = 'vendor' if account_type == 'vendor' else 'customer'
+        user = User(
+            name=pending['name'][:100],
+            mobile=mobile,
+            email=pending['email'],
+            role=role,
+            city=city,
+            google_id=pending['google_id'],
+        )
+        if role == 'vendor' and company_name:
+            user.company_name = company_name
+
+        # Random unguessable password — user logs in via Google only
+        user.set_password(_secrets.token_urlsafe(32))
+        db.session.add(user)
+        db.session.flush()
+        try:
+            user.public_id = generate_user_public_id(role)
+        except Exception:
+            pass
+        db.session.commit()
+
+        # DPDP consent
+        try:
+            consent = ConsentLog(
+                user_id=user.id,
+                purpose='terms_google',
+                granted=True,
+                ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+                user_agent=request.headers.get('User-Agent', '')[:300]
+            )
+            db.session.add(consent)
+            db.session.commit()
+        except Exception:
+            pass
+
+        session.pop('google_pending', None)
+        login_user(user, remember=True)
+        flash(f'🎉 Account created via Google. Welcome, {user.name}!', 'success')
+        return redirect(url_for('vendor_dashboard') if role == 'vendor' else url_for('dashboard'))
+
+    return render_template('auth/google_complete.html', pending=pending)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -6790,6 +7005,7 @@ def utility_processor():
         t=t,
         current_lang=(session.get('lang', Config.DEFAULT_LANG) if hasattr(session, 'get') else Config.DEFAULT_LANG),
         site_url=Config.SITE_URL,
+        google_enabled=bool(Config.GOOGLE_CLIENT_ID and Config.GOOGLE_CLIENT_SECRET),
         seo_title=None,
         seo_description=None,
         canonical_url=None,
@@ -6959,6 +7175,9 @@ def init_database():
                 "CREATE INDEX IF NOT EXISTS idx_booking_otp_booking ON booking_otp(booking_id)",
                 "CREATE INDEX IF NOT EXISTS idx_booking_otp_status ON booking_otp(status)",
                 "CREATE INDEX IF NOT EXISTS idx_booking_otp_code ON booking_otp(code)",
+                # 16 Oct 2026 — Google Sign-In
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(100)",
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL",
                 # 14 Oct 2026 — ItemVariant + dimensions
                 """CREATE TABLE IF NOT EXISTS item_variants (
                     id SERIAL PRIMARY KEY,
