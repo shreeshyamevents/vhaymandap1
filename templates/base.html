@@ -222,15 +222,15 @@
 
     <!-- Main Header -->
     <header class="header-glow bg-white/90 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 h-20 md:h-24 flex items-center justify-between gap-4">
+        <div class="max-w-7xl mx-auto px-4 h-16 md:h-20 flex items-center justify-between gap-4">
 
             <!-- Logo -->
-            <a href="{{ url_for('index') }}" class="flex items-center flex-shrink-0 group" aria-label="VyahMandap home">
+            <a href="{{ url_for('index') }}" class="flex items-center flex-shrink-0 h-full py-2 group" aria-label="VyahMandap home">
                 <img src="{{ url_for('static', filename='images/logo.png') }}"
                      alt="VyahMandap"
-                     class="h-16 md:h-20 w-auto object-contain group-hover:opacity-90 transition"
+                     class="h-full w-auto max-w-[180px] md:max-w-[240px] object-contain group-hover:opacity-90 transition"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <div class="h-16 md:h-20 w-16 md:w-20 rounded-xl bg-plum-600 items-center justify-center text-white font-extrabold text-2xl md:text-3xl shadow-sm" style="display:none;">VM</div>
+                <div class="h-full aspect-square rounded-xl bg-plum-600 items-center justify-center text-white font-extrabold text-xl shadow-sm" style="display:none;">VM</div>
             </a>
 
             {% if not current_user.is_authenticated %}
