@@ -178,6 +178,7 @@ class Config:
         ('entertainment', 'Entertainment'),
         ('electrical', 'Electrical & Power'),
         ('cooling', 'Cooling & Heating'),
+        ('sfx', 'SFX & Special Effects'),
     ]
 
 
