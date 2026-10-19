@@ -1367,6 +1367,18 @@ def enforce_user_block():
 
 
 @app.before_request
+def log_request_info():
+    """Log requests to stdout so they appear in Render Free Tier logs."""
+    # Static files ignore karo taaki log spam na ho
+    if request.path.startswith('/static') or request.path.startswith('/favicon'):
+        return
+    
+    role = current_user.role if current_user.is_authenticated else 'anonymous'
+    # flush=True zaroori hai warna Render me log real-time nahi dikhega
+    print(f"[VISITOR] {role} | {request.method} {request.path}", flush=True)
+
+
+@app.before_request
 def sos_killswitch():
     """SOS disabled 08 Oct 2026. Flip Config.SOS_ENABLED = True to re-enable.
     Code/routes untouched — only request gate."""
