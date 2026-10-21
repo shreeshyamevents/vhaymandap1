@@ -1,0 +1,21 @@
+{# Pagination controls for Flask-SQLAlchemy Pagination objects.
+   Usage in a page template (inside the content block):
+     {% from '_pagination.html' import page_nav with context %}
+     {{ page_nav(pagination) }}
+   Keeps all current query-string filters and swaps only ?page= #}
+{% macro page_nav(pagination) %}
+  {% if pagination and pagination.pages > 1 %}
+  {% set args = request.args.to_dict() %}
+  <nav class="flex justify-center items-center gap-2 mt-6 text-sm" aria-label="Pagination">
+    {% if pagination.has_prev %}
+      {% set _ = args.update({'page': pagination.prev_num}) %}
+      <a href="{{ url_for(request.endpoint, **args) }}" class="px-3 py-1 border rounded bg-white hover:bg-gray-50">← Prev</a>
+    {% endif %}
+    <span class="px-3 py-1 text-gray-600">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}
+      {% set _ = args.update({'page': pagination.next_num}) %}
+      <a href="{{ url_for(request.endpoint, **args) }}" class="px-3 py-1 border rounded bg-white hover:bg-gray-50">Next →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}
