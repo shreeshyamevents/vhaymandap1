@@ -1051,5 +1051,22 @@
         });
     </script>
     {% block extra_scripts %}{% endblock %}
+    <script>
+document.addEventListener('submit', function (e) {
+  var f = e.target;
+  // Skip forms already handled by page JS, new-tab forms, and opted-out forms
+  if (e.defaultPrevented || f.hasAttribute('data-no-lock') ||
+      (f.target && f.target !== '_self')) return;
+  if (f.dataset.submitted) { e.preventDefault(); return; }
+  f.dataset.submitted = '1';
+  f.querySelectorAll('button[type=submit],input[type=submit]').forEach(function (b) {
+    b.disabled = true;
+    if (b.tagName === 'BUTTON') b.textContent = 'Please wait…';
+  });
+});
+window.addEventListener('pageshow', function (e) {
+  if (e.persisted) location.reload();
+});
+</script>
 </body>
 </html>
