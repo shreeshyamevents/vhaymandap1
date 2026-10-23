@@ -162,6 +162,8 @@ class Config:
         ('electrical', 'Electrical & Power'),
         ('cooling', 'Cooling & Heating'),
         ('sfx', 'SFX & Special Effects'),
+        ('props', 'Props & Photo Booths'),
+        ('misc', 'Miscellaneous / Other'),
     ]
 
 
