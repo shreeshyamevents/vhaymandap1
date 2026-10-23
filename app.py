@@ -7471,7 +7471,9 @@ def utility_processor():
             'catering': 'fa-utensils', 'sound': 'fa-music',
             'bar': 'fa-wine-glass', 'entertainment': 'fa-dice',
             'electrical': 'fa-bolt', 'cooling': 'fa-wind',
-            'sfx': 'fa-wand-magic-sparkles'
+            'sfx': 'fa-wand-magic-sparkles',
+            'props': 'fa-camera-retro',
+            'misc': 'fa-shapes'
         }.get(c, 'fa-box')
     )
 
