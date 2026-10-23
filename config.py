@@ -156,7 +156,7 @@ class Config:
         ('tent', 'Tent & Canopy'),
         ('flooring', 'Flooring & Carpet'),
         ('catering', 'Catering Equipment'),
-        ('sound', 'Sound & Music'),
+        ('sound', 'Sound & LED'),
         ('bar', 'Bar & Beverages'),
         ('entertainment', 'Entertainment'),
         ('electrical', 'Electrical & Power'),
