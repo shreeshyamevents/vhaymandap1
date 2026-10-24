@@ -690,7 +690,11 @@
             <div class="grid grid-cols-2 md:grid-cols-12 gap-8 mb-8">
                 <div class="col-span-2 md:col-span-5">
                     <div class="flex items-center gap-3 mb-3">
-                        <span class="font-display font-extrabold text-xl text-gray-900">Vyah<span class="italic text-plum-600">Mandap</span></span>
+                        <img src="{{ url_for('static', filename='images/logo.png') }}"
+                             alt="VyahMandap"
+                             class="h-12 md:h-16 w-auto object-contain"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="h-12 md:h-16 w-12 md:w-16 rounded-xl bg-plum-600 items-center justify-center text-white font-extrabold text-lg shadow-sm" style="display:none;">VM</div>
                     </div>
                     <p class="font-display italic text-plum-600 text-sm mb-2">Taiyari Hamari, Celebration Aapka.</p>
                     <p class="text-sm text-gray-500 max-w-sm leading-relaxed mb-4">
