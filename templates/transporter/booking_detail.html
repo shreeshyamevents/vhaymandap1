@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Booking {{ booking.booking_reference }} — Transporter{% endblock %}
+
+{% block content %}
+{% set st = booking.booking_status %}
+{% if st == 'dispatched' %}{% set banner = 'bg-blue-50 border-blue-200' %}
+{% elif st == 'in_use' %}{% set banner = 'bg-amber-50 border-amber-200' %}
+{% elif st == 'return_initiated' %}{% set banner = 'bg-orange-50 border-orange-200' %}
+{% elif st == 'return_received' %}{% set banner = 'bg-purple-50 border-purple-200' %}
+{% else %}{% set banner = 'bg-gray-50 border-gray-200' %}{% endif %}
+
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">📋 Delivery Details</h1>
+      <p class="font-mono text-sm text-gray-500">{{ booking.booking_reference }}</p>
+    </div>
+    <a href="{{ url_for('transporter_dashboard') }}" class="text-sm text-plum-600 hover:underline">← Back</a>
+  </div>
+
+  <!-- Status banner -->
+  <div class="{{ banner }} border-2 p-4 rounded-xl mb-6">
+    <p class="text-sm font-bold">
+      Current Step:
+      {% if st == 'confirmed' %}Pickup Pending (from vendor)
+      {% elif st == 'dispatched' %}Deliver to Customer
+      {% elif st == 'in_use' %}Item with Customer
+      {% elif st == 'return_initiated' %}Pickup from Customer, deliver to Vendor
+      {% elif st == 'return_received' %}Delivered to Vendor
+      {% else %}{{ st.replace('_', ' ')|title }}
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- Item summary -->
+  <div class="bg-white p-5 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold mb-3">📦 Item</h3>
+    <div class="flex gap-3">
+      {% if booking.item %}
+      <img src="{{ booking.item.get_image() }}" class="w-16 h-16 rounded object-cover" onerror="this.src='/static/images/default-item.jpg'">
+      {% endif %}
+      <div>
+        <p class="font-bold text-sm">{{ booking.item.title if booking.item else '—' }}</p>
+        <p class="text-xs text-gray-500 mt-1">Qty: {{ booking.quantity }}</p>
+        {% if booking.variant %}
+        <p class="text-xs text-plum-700 font-semibold mt-0.5">
+          <i class="fas fa-layer-group mr-1"></i>{{ booking.variant.variant_name }}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Delivery locations -->
+  <div class="bg-white p-5 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold mb-3">📍 Delivery Locations</h3>
+    <div class="space-y-3 text-sm">
+      <div class="pb-3 border-b">
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Customer</p>
+        <p class="font-semibold">{{ disp_name(booking.customer) }}</p>
+        {% if booking.customer and booking.customer.mobile %}
+        <a href="tel:+91{{ booking.customer.mobile }}" class="text-plum-600 hover:underline text-sm mt-0.5 inline-block">
+          <i class="fa-solid fa-phone mr-1"></i>{{ booking.customer.mobile }}
+        </a>
+        {% endif %}
+        <p class="text-xs text-gray-600 mt-1">
+          <i class="fa-solid fa-location-dot mr-1"></i>{{ booking.venue_address }}
+        </p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Vendor (Item Owner)</p>
+        {% if booking.item and booking.item.vendor %}
+        <p class="font-semibold">{{ booking.item.vendor.company_name or disp_name(booking.item.vendor) }}</p>
+        {% if booking.item.vendor.mobile %}
+        <a href="tel:+91{{ booking.item.vendor.mobile }}" class="text-plum-600 hover:underline text-sm mt-0.5 inline-block">
+          <i class="fa-solid fa-phone mr-1"></i>{{ booking.item.vendor.mobile }}
+        </a>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Dates -->
+  <div class="bg-white p-5 rounded-xl border shadow-sm mb-6">
+    <h3 class="font-bold mb-3">📅 Dates</h3>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Start</p>
+        <p class="font-semibold">{{ booking.start_date.strftime('%d %b %Y') }}</p>
+        <p class="text-xs text-gray-500">{{ booking.start_time }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500 uppercase tracking-wide">End</p>
+        <p class="font-semibold">{{ booking.end_date.strftime('%d %b %Y') }}</p>
+        <p class="text-xs text-gray-500">{{ booking.end_time }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transport Charges QR -->
+  {% if st in ('dispatched', 'return_initiated') %}
+    {% if qr_base64 %}
+    <div class="bg-white p-5 rounded-xl border-2 border-emerald-200 shadow-sm mb-6">
+      <h3 class="font-bold mb-1 text-emerald-800">💳 Collect Transport Charges</h3>
+      <p class="text-xs text-gray-500 mb-4">
+        Customer se transport charge lene ke liye ye QR scan karwayein. Ye amount platform bill me shamil nahi hai.
+      </p>
+      <div class="flex flex-col items-center">
+        <div class="bg-white border-2 border-gray-200 rounded-xl p-2 inline-block">
+          <img src="data:image/png;base64,{{ qr_base64 }}" alt="Transport charges UPI QR" class="w-48 h-48">
+        </div>
+        <p class="text-xs text-gray-500 mt-2 font-mono">{{ current_user.transporter_upi_id }}</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 mb-6 text-sm text-yellow-800">
+      ⚠️ Aapne apna UPI ID set nahi kiya hai. Transport charge lene ke liye
+      <a href="{{ url_for('transporter_kyc') }}" class="underline font-bold">KYC page</a> par jaakar UPI ID add karein.
+    </div>
+    {% endif %}
+  {% endif %}
+
+  <!-- OTP Access -->
+  {% if st in ('dispatched', 'in_use', 'return_initiated') %}
+  <div class="bg-white p-5 rounded-xl border-2 border-amber-200 shadow-sm mb-6">
+    <h3 class="font-bold mb-1">🔐 OTP Access</h3>
+    <p class="text-xs text-gray-500 mb-4">
+      OTP view-only hai — verify karne wala party (customer/vendor) hi verify karega.
+      Aap code customer/vendor ko physically de denge.
+    </p>
+
+    <div id="otpBox" class="space-y-3">
+      {% if st == 'dispatched' %}
+        {% set otp_kind = 'dispatch' %}
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <p class="text-xs font-bold text-amber-900 mb-2">Delivery OTP (Vendor se)</p>
+      {% else %}
+        {% set otp_kind = 'return' %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p class="text-xs font-bold text-blue-900 mb-2">Return OTP (Customer se)</p>
+      {% endif %}
+          <button type="button" onclick="viewOtp('{{ otp_kind }}')"
+                  class="w-full {{ 'bg-amber-600 hover:bg-amber-700' if otp_kind == 'dispatch' else 'bg-blue-600 hover:bg-blue-700' }} text-white font-bold py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-eye mr-1"></i>Show OTP
+          </button>
+          <div id="otpDisplay" class="hidden mt-3 bg-white border-2 {{ 'border-amber-400' if otp_kind == 'dispatch' else 'border-blue-400' }} rounded-lg p-3 text-center">
+            <p class="text-[10px] text-gray-500 uppercase tracking-wide">OTP Code</p>
+            <p id="otpCode" class="text-3xl font-mono font-bold tracking-widest {{ 'text-amber-900' if otp_kind == 'dispatch' else 'text-blue-900' }} mt-1">—</p>
+            <p id="otpExpiry" class="text-[10px] text-gray-500 mt-1"></p>
+            <button type="button" onclick="hideOtp()" class="text-xs text-gray-600 underline mt-2">Hide</button>
+          </div>
+        </div>
+
+      <div id="otpError" class="hidden bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-lg"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- OTP Status -->
+  <div class="bg-white p-5 rounded-xl border shadow-sm">
+    <h3 class="font-bold mb-3">📊 OTP Status</h3>
+    <div class="space-y-2">
+      {% for otype, label in [('dispatch','Delivery (Item Received)'),('return','Return (Item Returned)')] %}
+      {% set o = otp_map.get(otype) %}
+      <div class="flex justify-between items-center text-xs p-2 rounded-lg border
+        {% if o and o.status == 'verified' %}bg-green-50 border-green-200
+        {% elif o and o.status == 'active' %}bg-amber-50 border-amber-200
+        {% else %}bg-gray-50 border-gray-200{% endif %}">
+        <span class="font-semibold">{{ label }}</span>
+        <span>
+          {% if not o %}<span class="text-gray-400">—</span>
+          {% elif o.status == 'verified' %}<span class="text-green-700">✅ Done</span>
+          {% elif o.status == 'active' %}<span class="text-amber-800">⏳ Pending</span>
+          {% else %}<span class="text-gray-500">{{ o.status|title }}</span>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+function viewOtp(otpType) {
+    var err = document.getElementById('otpError');
+    var box = document.getElementById('otpDisplay');
+    fetch('/transporter/booking/{{ booking.id }}/view-otp/' + otpType, {credentials: 'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.error) {
+                err.textContent = d.message || 'Could not fetch OTP';
+                err.classList.remove('hidden');
+                box.classList.add('hidden');
+                return;
+            }
+            err.classList.add('hidden');
+            document.getElementById('otpCode').textContent = d.code;
+            document.getElementById('otpExpiry').textContent = 'Expires: ' + d.expires_display;
+            box.classList.remove('hidden');
+        })
+        .catch(function(){
+            err.textContent = 'Network error. Try again.';
+            err.classList.remove('hidden');
+        });
+}
+function hideOtp() {
+    document.getElementById('otpDisplay').classList.add('hidden');
+    document.getElementById('otpCode').textContent = '—';
+}
+</script>
+{% endblock %}
