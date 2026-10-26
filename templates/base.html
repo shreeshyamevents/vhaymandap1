@@ -6,7 +6,7 @@
     <title>{% block title %}{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}{% endblock %}</title>
 
     {# SEO Meta #}
-    {% set _desc = (seo_description or 'Book wedding equipment on rent in Harda — mandap, sofa, lighting, decor, tent, and more from verified vendors. 50% cheaper than buying.')[:160] %}
+    {% set _desc = (seo_description or 'Book wedding equipment — mandap, sofa, lighting, decor, tent, and more from verified vendors. 50% cheaper than buying.')[:160] %}
     <meta name="description" content="{{ _desc }}">
     <link rel="canonical" href="{{ canonical_url or request.base_url }}">
 
