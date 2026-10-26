@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>{% block title %}{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}{% endblock %}</title>
+    <title>{% block title %}{{ seo_title or 'VyahMandap — Wedding Equipment Marketplce' }}{% endblock %}</title>
 
     {# SEO Meta #}
     {% set _desc = (seo_description or 'Book wedding equipment — mandap, sofa, lighting, decor, tent, and more from verified vendors. 50% cheaper than buying.')[:160] %}
@@ -13,7 +13,7 @@
     {# Open Graph #}
     <meta property="og:type" content="{% block og_type %}website{% endblock %}">
     <meta property="og:site_name" content="VyahMandap">
-    <meta property="og:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}">
+    <meta property="og:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Marketplace' }}">
     <meta property="og:description" content="{{ _desc }}">
     <meta property="og:url" content="{{ canonical_url or request.base_url }}">
     <meta property="og:image" content="{% block og_image %}{{ url_for('static', filename='images/logo.png', _external=True) }}{% endblock %}">
@@ -21,7 +21,7 @@
 
     {# Twitter Card #}
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Rental in Harda' }}">
+    <meta name="twitter:title" content="{{ seo_title or 'VyahMandap — Wedding Equipment Marketplace' }}">
     <meta name="twitter:description" content="{{ _desc }}">
     <meta name="twitter:image" content="{% block twitter_image %}{{ url_for('static', filename='images/logo.png', _external=True) }}{% endblock %}">
 
@@ -698,7 +698,7 @@
                     </div>
                     <p class="font-display italic text-plum-600 text-sm mb-2">Taiyari Hamari, Celebration Aapka.</p>
                     <p class="text-sm text-gray-500 max-w-sm leading-relaxed mb-4">
-                        Wedding equipment marketplace — connecting trusted vendors with families across Harda and Madhya Pradesh.
+                        Wedding equipment marketplace — connecting trusted vendors with families.
                     </p>
                 </div>
 
