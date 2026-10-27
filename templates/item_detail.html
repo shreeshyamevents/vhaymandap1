@@ -116,7 +116,7 @@
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
             <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ t('vendor') }}</p>
-            <p class="font-medium text-gray-900">{{ vendor.company_name or disp_name(vendor) }}</p>
+            <p class="font-medium text-gray-900">{{ disp_name(vendor) }}</p>
             {% if vendor.public_id %}
             <p class="text-[10px] text-gray-400 font-mono">{{ vendor.public_id }}</p>
             {% endif %}
