@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Make Unavailable — {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4">
+
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">⛔ Make Unavailable</h1>
+      <p class="text-sm text-gray-600 mt-1">{{ item.title }}</p>
+    </div>
+    <a href="{{ url_for('vendor_dashboard') }}" class="text-sm text-plum-600 hover:underline">← Back</a>
+  </div>
+
+  <form method="POST" class="bg-white p-6 rounded-xl border shadow-sm space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <p class="font-semibold text-sm">Ye item kab tak unavailable rahega?</p>
+
+    <label class="flex gap-3 items-start p-4 border-2 rounded-xl cursor-pointer hover:bg-gray-50 has-[:checked]:border-plum-600 has-[:checked]:bg-plum-50">
+      <input type="radio" name="mode" value="dates" class="mt-1" checked onchange="toggleDates()">
+      <div class="flex-1">
+        <p class="font-bold text-sm">📅 Sirf kuch dino ke liye</p>
+        <p class="text-xs text-gray-500 mt-0.5">Item listed rahega. Sirf chune hue dino par customers booking nahi kar payenge.</p>
+        <div id="dateFields" class="grid grid-cols-2 gap-3 mt-3">
+          <div>
+            <label class="block text-xs font-semibold mb-1">From *</label>
+            <input type="date" name="start_date" min="{{ today }}" value="{{ today }}"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">To *</label>
+            <input type="date" name="end_date" min="{{ today }}" value="{{ today }}"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-semibold mb-1">Reason (optional)</label>
+            <input type="text" name="reason" maxlength="200" placeholder="e.g. Repair, my own event"
+                   class="w-full border rounded-lg p-2.5 text-sm">
+          </div>
+        </div>
+      </div>
+    </label>
+
+    <label class="flex gap-3 items-start p-4 border-2 rounded-xl cursor-pointer hover:bg-gray-50 has-[:checked]:border-plum-600 has-[:checked]:bg-plum-50">
+      <input type="radio" name="mode" value="indefinite" class="mt-1" onchange="toggleDates()">
+      <div>
+        <p class="font-bold text-sm">⛔ Jab tak main wapas available na karun</p>
+        <p class="text-xs text-gray-500 mt-0.5">Item booking ke liye band rahega. Dashboard se "Available" dabane par dobara khulega.</p>
+      </div>
+    </label>
+
+    <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">
+      Save
+    </button>
+    <p class="text-xs text-gray-500">Jo bookings pehle se confirm hain wo cancel nahi hongi.</p>
+  </form>
+
+  <div class="bg-white p-5 rounded-xl border shadow-sm mt-6">
+    <h3 class="font-bold mb-3">🗓️ Upcoming unavailable dates</h3>
+    {% if blocks %}
+    <div class="space-y-2">
+      {% for b in blocks %}
+      <div class="flex justify-between items-center gap-3 p-3 rounded-lg border bg-gray-50 text-sm">
+        <div>
+          <p class="font-semibold">{{ b.start_date.strftime('%d %b %Y') }} → {{ b.end_date.strftime('%d %b %Y') }}</p>
+          {% if b.reason %}<p class="text-xs text-gray-500">{{ b.reason }}</p>{% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('vendor_item_unavailable_delete', item_id=item.id, block_id=b.id) }}"
+              onsubmit="return confirm('Remove these unavailable dates?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="text-xs text-red-600 font-semibold hover:underline">Remove</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-500">Koi date block nahi hai.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function toggleDates() {
+  var dates = document.querySelector('input[name="mode"][value="dates"]').checked;
+  document.querySelectorAll('#dateFields input').forEach(function(i){ i.disabled = !dates; });
+  document.getElementById('dateFields').style.opacity = dates ? '1' : '0.4';
+}
+document.addEventListener('DOMContentLoaded', function () {
+  var from = document.querySelector('input[name="start_date"]');
+  var to = document.querySelector('input[name="end_date"]');
+  from.addEventListener('change', function () {
+    to.min = from.value;
+    if (to.value < from.value) to.value = from.value;
+  });
+  toggleDates();
+});
+</script>
+{% endblock %}
