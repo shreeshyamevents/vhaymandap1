@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Banners — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">📢 Ad Banners</h1>
+      <p class="text-sm text-gray-500 mt-1">Apne ya sponsors ke banners. Sponsor ka naam bharoge to "Sponsored" tag dikhega.</p>
+    </div>
+    <a href="{{ url_for('admin_offers') }}" class="text-sm text-plum-600 hover:underline">🎁 Manage Offers →</a>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="bg-white p-5 rounded-xl border shadow-sm mb-8 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2 class="font-bold">➕ New Banner</h2>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Title * <span class="text-gray-400 font-normal">(sirf aapke liye + alt text)</span></label>
+        <input type="text" name="title" required maxlength="120" class="w-full border rounded-lg p-2.5 text-sm" placeholder="Diwali Offer / Sharma Tent House">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">Sponsor name <span class="text-gray-400 font-normal">(khali = aapka apna banner)</span></label>
+        <input type="text" name="sponsor_name" maxlength="120" class="w-full border rounded-lg p-2.5 text-sm" placeholder="e.g. Sharma Tent House">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold mb-1">Banner image * <span class="text-gray-400 font-normal">(wide size, jaise 1200×300 px; PNG/JPG/WEBP)</span></label>
+      <input type="file" name="image" accept="image/*" required class="w-full border rounded-lg p-2.5 text-sm bg-white">
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+        <input type="text" name="link_url" class="w-full border rounded-lg p-2.5 text-sm" placeholder="https://... ya /offers">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">Placement *</label>
+        <select name="placement" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+          {% for val, label in placements %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-semibold mb-1">Start date <span class="text-gray-400 font-normal">(optional)</span></label>
+        <input type="date" name="start_date" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-1">End date <span class="text-gray-400 font-normal">(optional)</span></label>
+        <input type="date" name="end_date" class="w-full border rounded-lg p-2.5 text-sm">
+      </div>
+    </div>
+
+    <button type="submit" class="bg-plum-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-plum-700">Add Banner</button>
+  </form>
+
+  <h2 class="font-bold mb-3">All Banners ({{ banners|length }})</h2>
+  {% if banners %}
+  <div class="space-y-3">
+    {% for b in banners %}
+    {% set expired = b.end_date and b.end_date < today %}
+    {% set upcoming = b.start_date and b.start_date > today %}
+    <div class="bg-white p-4 rounded-xl border shadow-sm flex gap-4 flex-wrap md:flex-nowrap items-center">
+      <img src="{{ b.image_url }}" alt="" class="w-full md:w-60 h-auto rounded-lg border">
+      <div class="flex-1 min-w-0 text-sm">
+        <p class="font-bold">{{ b.title }}
+          {% if b.sponsor_name %}<span class="ml-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Sponsor: {{ b.sponsor_name }}</span>
+          {% else %}<span class="ml-1 text-xs bg-plum-50 text-plum-700 px-2 py-0.5 rounded-full">Own</span>{% endif %}
+        </p>
+        <p class="text-xs text-gray-500 mt-1">
+          Placement: <strong>{{ b.placement }}</strong> ·
+          {% if b.start_date or b.end_date %}
+            {{ b.start_date.strftime('%d %b %Y') if b.start_date else 'now' }} → {{ b.end_date.strftime('%d %b %Y') if b.end_date else 'no end' }}
+          {% else %}always{% endif %}
+        </p>
+        {% if b.link_url %}<p class="text-xs text-gray-500 truncate mt-0.5">🔗 {{ b.link_url }}</p>{% endif %}
+        <p class="text-xs mt-1">
+          👁 {{ b.views or 0 }} views · 👆 {{ b.clicks or 0 }} clicks
+          {% if b.views %}· CTR {{ '%.1f'|format((b.clicks or 0) * 100 / b.views) }}%{% endif %}
+        </p>
+        <p class="text-xs mt-1 font-semibold">
+          {% if not b.is_active %}<span class="text-gray-500">⏸ OFF</span>
+          {% elif expired %}<span class="text-red-600">⌛ Expired</span>
+          {% elif upcoming %}<span class="text-blue-600">🕒 Scheduled</span>
+          {% else %}<span class="text-green-600">● Live</span>{% endif %}
+        </p>
+      </div>
+      <div class="flex md:flex-col gap-2">
+        <form method="POST" action="{{ url_for('admin_banner_toggle', banner_id=b.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="text-xs font-semibold border rounded-lg px-3 py-1.5 hover:bg-gray-50">{{ 'Turn OFF' if b.is_active else 'Turn ON' }}</button>
+        </form>
+        <form method="POST" action="{{ url_for('admin_banner_delete', banner_id=b.id) }}" onsubmit="return confirm('Delete this banner?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50">Delete</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm text-gray-500">Abhi koi banner nahi hai.</p>
+  {% endif %}
+</div>
+{% endblock %}
