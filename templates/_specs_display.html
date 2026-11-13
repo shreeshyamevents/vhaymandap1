@@ -1,0 +1,20 @@
+{# Specs block for the item page. Include: {% include '_specs_display.html' %}  (needs item_dims + item) #}
+{% if item_dims %}
+{% set _labels = {} %}
+{% for f in category_measurements.get(item.category, []) %}{% set _ = _labels.update({f.key: f.label}) %}{% endfor %}
+<div class="mb-5">
+  <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
+    <i class="fas fa-ruler-combined text-plum-600 mr-1"></i>Specifications
+  </h2>
+  <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      {% for key, val in item_dims.items() %}
+      <div>
+        <p class="text-gray-500 uppercase tracking-wide font-semibold">{{ _labels.get(key) or (key|replace('_', ' ')|title) }}</p>
+        <p class="font-bold text-gray-900 text-sm">{{ val }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,50 @@
+{# Category-specific specs fields. Include inside the item form: {% include '_measurements_form.html' %}
+   Needs the category <select name="category"> on the same page. #}
+{% set _dims = item.dims if (item is defined and item) else {} %}
+<div id="measurementsContainer" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+  <h4 class="font-bold text-sm text-gray-800 mb-3">
+    <i class="fas fa-ruler-combined text-plum-600 mr-1"></i>Specifications / Dimensions
+  </h4>
+  <p id="measurementsHint" class="text-xs text-gray-500">Pehle category chuno, phir uske hisaab se fields aayenge.</p>
+  <div id="measurementsGrid" class="grid grid-cols-2 gap-3"></div>
+</div>
+
+<script>
+(function () {
+  var CATS = {{ category_measurements|tojson }};
+  var EXISTING = {{ _dims|tojson }};
+  var sel = document.querySelector('select[name="category"]');
+  var grid = document.getElementById('measurementsGrid');
+  var hint = document.getElementById('measurementsHint');
+  if (!sel || !grid) return;
+
+  function render() {
+    var fields = CATS[sel.value] || CATS['misc'] || [];
+    // keep what the vendor already typed when the category changes
+    var typed = {};
+    grid.querySelectorAll('input').forEach(function (i) { typed[i.dataset.key] = i.value; });
+    grid.innerHTML = '';
+    hint.style.display = sel.value ? 'none' : '';
+    if (!sel.value) return;
+    fields.forEach(function (f) {
+      var wrap = document.createElement('div');
+      var label = document.createElement('label');
+      label.className = 'block text-xs font-semibold mb-1 text-gray-700';
+      label.textContent = f.label;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.name = 'measure_' + f.key;
+      input.dataset.key = f.key;
+      input.maxLength = 100;
+      input.placeholder = f.ph || '';
+      input.className = 'w-full border rounded-lg p-2.5 text-sm bg-white';
+      input.value = (typed[f.key] !== undefined ? typed[f.key] : (EXISTING[f.key] || ''));
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      grid.appendChild(wrap);
+    });
+  }
+  sel.addEventListener('change', render);
+  render();
+})();
+</script>
