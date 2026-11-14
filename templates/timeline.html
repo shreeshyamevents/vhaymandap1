@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Timeline — {{ booking.booking_reference }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="mb-6 flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-plum-700">Booking Timeline</h1>
+      <p class="text-sm text-gray-500 mt-1 font-mono">{{ booking.booking_reference }}</p>
+    </div>
+    <a href="{{ url_for('booking_receipt', booking_id=booking.id) }}"
+       class="text-sm text-plum-600 hover:text-plum-800">
+      <i class="fas fa-receipt mr-1"></i> Receipt
+    </a>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <p class="text-sm text-gray-700"><strong>{{ booking.item.title }}</strong></p>
+    <p class="text-xs text-gray-500 mt-1">
+      {{ booking.start_date.strftime('%d %b %Y') }} → {{ booking.end_date.strftime('%d %b %Y') }}
+    </p>
+  </div>
+
+  {# ---- derived state ---- #}
+  {% set reports = booking.equipment_reports|sort(attribute='created_at') %}
+  {% set dispatch_report = reports|selectattr('report_type', 'equalto', 'dispatch')|list|first %}
+  {% set return_report = reports|selectattr('report_type', 'equalto', 'return')|list|first %}
+  {% set rank = {'pending': 0, 'confirmed': 1, 'dispatched': 2, 'in_use': 3,
+                 'return_initiated': 4, 'return_received': 5, 'completed': 6}.get(booking.booking_status, 0) %}
+  {% set cancelled = booking.booking_status == 'cancelled' %}
+  {% set paid = booking.payment_status in ('paid', 'verified') %}
+  {% set lead_days = (booking.start_date - booking.created_at.date()).days %}
+  {% set start_s = booking.start_date.strftime('%d %b %Y') %}
+  {% set end_s = booking.end_date.strftime('%d %b %Y') %}
+
+  {# ---- delivery promise banner (only while the vendor still has to deliver) ---- #}
+  {% if not cancelled and rank < 2 %}
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-900">
+    <p class="font-semibold"><i class="fas fa-truck mr-1"></i> Delivery due by {{ start_s }}</p>
+    <p class="text-xs mt-1 text-blue-800">
+      Vendors need at least {{ min_lead_days|default(2) }} days to prepare and deliver.
+      {% if lead_days >= 0 %}Your vendor has {{ lead_days }} day{{ 's' if lead_days != 1 }} from booking to your start date.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+  {# ---- stages ---- #}
+  {% set stages = [
+    {'title': 'Booking Created', 'icon': 'fa-check', 'done': true,
+     'note': booking.created_at|ist_dt},
+    {'title': 'Payment Verified', 'icon': 'fa-rupee-sign', 'done': paid,
+     'note': ('Amount: ₹' ~ ('%.2f'|format(booking.total_amount))) if paid else
+             ('Payment proof submitted — waiting for verification' if booking.utr_number else 'Waiting for payment proof')},
+    {'title': 'Vendor Preparing', 'icon': 'fa-box-open', 'done': rank >= 2,
+     'note': 'Vendor packs your items — delivery due by ' ~ start_s},
+    {'title': 'Dispatched & Delivered', 'icon': 'fa-truck', 'done': rank >= 3,
+     'note': ('On the way — enter the Delivery OTP when you receive the items' if rank == 2 else
+              ((dispatch_report.created_at|ist_dt) if dispatch_report else 'Delivery OTP verified') if rank >= 3 else
+              'Delivery before ' ~ start_s)},
+    {'title': 'Rental Period', 'icon': 'fa-calendar-check', 'done': rank >= 4,
+     'note': start_s ~ ' → ' ~ end_s},
+    {'title': 'Return', 'icon': 'fa-undo', 'done': rank >= 6,
+     'note': ('Return OTP shared with the transporter' if rank in (4, 5) else
+              ((return_report.created_at|ist_dt) if return_report else 'Item returned') if rank >= 6 else
+              'Return due by ' ~ end_s)},
+    {'title': 'Completed', 'icon': 'fa-flag', 'done': rank >= 6,
+     'note': (booking.updated_at|ist_dt) if rank >= 6 else 'Deposit is refunded after return'},
+  ] %}
+
+  <div class="relative pl-8">
+    <div class="absolute left-3 top-2 bottom-2 w-0.5 bg-plum-200"></div>
+
+    {% set ns = namespace(current_done=false) %}
+    {% for st in stages %}
+      {% if st.done %}
+        {% set state = 'done' %}
+      {% elif not ns.current_done and not cancelled %}
+        {% set state = 'current' %}
+        {% set ns.current_done = true %}
+      {% else %}
+        {% set state = 'upcoming' %}
+      {% endif %}
+
+      {% if not (cancelled and state == 'upcoming') %}
+      <div class="relative mb-6">
+        <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full flex items-center justify-center text-xs text-white
+                    {% if state == 'done' %}bg-emerald-500{% elif state == 'current' %}bg-plum-600 ring-4 ring-plum-100{% else %}bg-gray-300{% endif %}">
+          <i class="fas {{ st.icon }}"></i>
+        </div>
+        <p class="font-semibold {% if state == 'upcoming' %}text-gray-400{% else %}text-gray-900{% endif %}">
+          {{ st.title }}
+          {% if state == 'current' %}<span class="ml-1 text-[10px] font-bold uppercase tracking-wide text-plum-700 bg-plum-50 px-2 py-0.5 rounded-full">In progress</span>{% endif %}
+        </p>
+        <p class="text-xs {% if state == 'upcoming' %}text-gray-400{% else %}text-gray-500{% endif %}">{{ st.note }}</p>
+
+        {% if st.title == 'Dispatched & Delivered' and dispatch_report and state == 'done' %}
+        <a href="{{ url_for('report_view', booking_id=booking.id) }}" class="text-xs text-plum-600 hover:underline">View report →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% endfor %}
+
+    {# Damage flagged (extra event) #}
+    {% if booking.damage_flagged %}
+    <div class="relative mb-6">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <p class="font-semibold text-red-700">Damage Flagged</p>
+      <p class="text-xs text-gray-500">Admin notified</p>
+    </div>
+    {% endif %}
+
+    {# Cancelled (terminal) #}
+    {% if cancelled %}
+    <div class="relative">
+      <div class="absolute -left-[22px] top-0 w-6 h-6 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs">
+        <i class="fas fa-ban"></i>
+      </div>
+      <p class="font-semibold text-gray-700">Cancelled</p>
+      <p class="text-xs text-gray-500">{{ booking.updated_at|ist_dt }}</p>
+    </div>
+    {% endif %}
+
+  </div>
+
+</div>
+{% endblock %}
