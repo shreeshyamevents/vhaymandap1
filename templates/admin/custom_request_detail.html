@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ cr.ref }} — Custom request{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Custom request</p>
+      <h1 class="text-2xl font-bold text-plum-700">{{ cr.ref }}</h1>
+    </div>
+    <a href="{{ url_for('admin_custom_requests') }}" class="text-sm text-plum-600 hover:underline">← Pipeline</a>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="space-y-4">
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <h2 class="font-bold mb-2">Customer</h2>
+        <p class="font-semibold">{{ disp_name(cr.customer) }}</p>
+        <a href="tel:+91{{ cr.phone }}" class="inline-block mt-2 bg-plum-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-plum-700"><i class="fa-solid fa-phone mr-1"></i>Call {{ cr.phone }}</a>
+        <a href="https://wa.me/91{{ cr.phone }}" target="_blank" rel="noopener" class="inline-block mt-2 ml-2 border border-plum-300 text-plum-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-plum-50">WhatsApp</a>
+      </div>
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <h2 class="font-bold mb-2">Request</h2>
+        <p><strong>{{ event_label }}</strong> · {{ cr.city }}{% if cr.event_date %} · {{ cr.event_date.strftime('%d %b %Y') }}{% endif %}</p>
+        <p class="mt-1">Stage: {{ '%g'|format(cr.stage_width_ft) }} × {{ '%g'|format(cr.stage_depth_ft) }} ft</p>
+        <p class="mt-2 whitespace-pre-line text-gray-700">{{ cr.theme }}</p>
+        <p class="text-xs text-gray-500 mt-3">Received {{ cr.created_at|ist_dt }}</p>
+      </div>
+      {% if cr.photo_list %}
+      <div class="bg-white border rounded-xl p-5">
+        <h2 class="font-bold mb-2 text-sm">Reference photos</h2>
+        <div class="grid grid-cols-3 gap-2">
+          {% for u in cr.photo_list %}
+          <a href="{{ u }}" target="_blank" rel="noopener"><img src="{{ u }}" alt="Reference photo {{ loop.index }}" class="w-full h-24 object-cover rounded-lg border" loading="lazy"></a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <form method="POST" class="bg-white border rounded-xl p-5 space-y-4 h-fit">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="font-bold">Update</h2>
+      <div>
+        <label for="status" class="block text-sm font-semibold mb-1">Stage</label>
+        <select id="status" name="status" class="w-full border rounded-lg p-2.5 text-sm bg-white">
+          {% for key, label in statuses.items() %}<option value="{{ key }}" {% if cr.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="quote_amount" class="block text-sm font-semibold mb-1">Quote amount (₹)</label>
+        <input id="quote_amount" type="number" name="quote_amount" min="0" step="1" value="{{ '%g'|format(cr.quote_amount) if cr.quote_amount is not none else '' }}" class="w-full border rounded-lg p-2.5 text-sm">
+        <p class="text-xs text-gray-500 mt-1">Customer sees this once the stage is "Quoted" or later.</p>
+      </div>
+      <div>
+        <label for="quote_note" class="block text-sm font-semibold mb-1">Note for customer</label>
+        <textarea id="quote_note" name="quote_note" rows="3" maxlength="1000" class="w-full border rounded-lg p-2.5 text-sm">{{ cr.quote_note or '' }}</textarea>
+      </div>
+      <div>
+        <label for="admin_notes" class="block text-sm font-semibold mb-1">Internal notes <span class="text-gray-400 font-normal">(only admin)</span></label>
+        <textarea id="admin_notes" name="admin_notes" rows="3" maxlength="2000" class="w-full border rounded-lg p-2.5 text-sm">{{ cr.admin_notes or '' }}</textarea>
+      </div>
+      <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">Save</button>
+      <a href="{{ url_for('custom_request_status', req_id=cr.id) }}" class="block text-center text-xs text-plum-600 hover:underline">View as customer</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
