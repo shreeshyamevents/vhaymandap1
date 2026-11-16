@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Request {{ cr.ref }} — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div>
+      <p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Custom request</p>
+      <h1 class="text-2xl font-bold text-plum-700">{{ cr.ref }}</h1>
+    </div>
+    <a href="{{ url_for('customize_request') }}" class="text-sm text-plum-600 hover:underline">← My requests</a>
+  </div>
+
+  {% if cr.status == 'cancelled' %}
+  <div class="bg-gray-100 border border-gray-300 rounded-xl p-4 mb-6 text-sm text-gray-700">This request was cancelled. Please send a new request if you still need a custom stage.</div>
+  {% endif %}
+
+  <div class="grid md:grid-cols-5 gap-5">
+    <div class="md:col-span-3 bg-white border rounded-xl p-5">
+      <h2 class="font-bold mb-4">Progress</h2>
+      <ol class="space-y-0">
+        {% for s in steps %}
+        <li class="flex gap-3">
+          <div class="flex flex-col items-center">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+              {% if s.state == 'done' %}bg-plum-600 text-white{% elif s.state == 'current' %}border-4 border-plum-600 bg-white{% else %}border-2 border-gray-300 bg-white{% endif %}">{% if s.state == 'done' %}✓{% endif %}</span>
+            {% if not loop.last %}<span class="w-0.5 flex-1 min-h-[22px] {% if s.state == 'done' %}bg-plum-600{% else %}bg-gray-200{% endif %}"></span>{% endif %}
+          </div>
+          <div class="pb-5">
+            <p class="text-sm font-semibold {% if s.state == 'todo' %}text-gray-500{% elif s.state == 'current' %}text-plum-700{% endif %}">{{ s.label }}</p>
+            <p class="text-xs text-gray-500">{% if s.state == 'current' and not s.date %}In progress{% else %}{{ s.date }}{% endif %}</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+
+    <div class="md:col-span-2 space-y-4">
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <p class="text-xs font-bold tracking-widest text-plum-600 uppercase mb-1">Your request</p>
+        <p class="font-bold">{{ event_label }} stage, {{ '%g'|format(cr.stage_width_ft) }} × {{ '%g'|format(cr.stage_depth_ft) }} ft</p>
+        <p class="text-gray-600 mt-1">{{ cr.city }}{% if cr.event_date %} · {{ cr.event_date.strftime('%d %b %Y') }}{% endif %}</p>
+        <p class="text-gray-700 mt-2 whitespace-pre-line">{{ cr.theme }}</p>
+      </div>
+
+      <div class="rounded-xl p-5 text-sm border {% if cr.quoted_at and cr.quote_amount is not none %}bg-white border-plum-300{% else %}bg-plum-50 border-plum-100{% endif %}">
+        <p class="text-xs font-bold tracking-widest text-plum-600 uppercase mb-1">Quote</p>
+        {% if cr.quoted_at and cr.quote_amount is not none %}
+          <p class="text-2xl font-bold text-plum-700">₹{{ '{:,.0f}'.format(cr.quote_amount) }}</p>
+          {% if cr.quote_note %}<p class="text-gray-700 mt-2 whitespace-pre-line">{{ cr.quote_note }}</p>{% endif %}
+          <p class="text-xs text-gray-500 mt-2">Our team will call you to confirm.</p>
+        {% else %}
+          <p class="text-gray-600">Your quote will appear here once our team sends it.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if cr.photo_list %}
+  <div class="bg-white border rounded-xl p-5 mt-5">
+    <h2 class="font-bold mb-3">Reference photos</h2>
+    <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+      {% for u in cr.photo_list %}
+      <a href="{{ u }}" target="_blank" rel="noopener"><img src="{{ u }}" alt="Reference photo {{ loop.index }}" class="w-full h-24 object-cover rounded-lg border" loading="lazy"></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
