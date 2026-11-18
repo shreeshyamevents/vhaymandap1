@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}My services — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <h1 class="text-2xl font-bold text-plum-700">My services</h1>
+    <a href="{{ url_for('service_new') }}" class="bg-plum-600 text-white font-bold px-4 py-2 rounded-lg text-sm hover:bg-plum-700">+ List a service</a>
+  </div>
+  {% for s in services %}
+  <div class="bg-white border rounded-xl p-5 mb-4">
+    <div class="flex justify-between gap-3 flex-wrap">
+      <div>
+        <p class="font-bold">{{ s.title }} <span class="text-xs font-semibold ml-1 px-2 py-0.5 rounded-full {% if s.status == 'approved' %}bg-emerald-100 text-emerald-800{% elif s.status == 'pending' %}bg-amber-100 text-amber-800{% elif s.status == 'rejected' %}bg-red-100 text-red-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ {'approved': 'Live', 'pending': 'Under review', 'rejected': 'Not approved', 'paused': 'Paused'}.get(s.status, s.status) }}</span></p>
+        <p class="text-sm text-gray-600">{{ s.category.icon }} {{ s.category.name }} · {{ s.business_name }} · {{ s.price_text }}</p>
+        {% if s.status == 'rejected' and s.rejection_reason %}<p class="text-xs text-red-600 mt-1">Reason: {{ s.rejection_reason }}. Edit and submit again.</p>{% endif %}
+      </div>
+      <div class="flex gap-2 items-start">
+        {% if s.status == 'approved' %}<a href="{{ url_for('service_detail', service_id=s.id) }}" class="text-xs font-semibold border rounded-lg px-3 py-1.5 hover:bg-gray-50">View</a>{% endif %}
+        <a href="{{ url_for('service_edit', service_id=s.id) }}" class="text-xs font-semibold border rounded-lg px-3 py-1.5 hover:bg-gray-50">Edit</a>
+        {% if s.status in ('approved', 'paused') %}
+        <form method="POST" action="{{ url_for('service_toggle_pause', service_id=s.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-xs font-semibold border rounded-lg px-3 py-1.5 hover:bg-gray-50">{{ 'Pause' if s.status == 'approved' else 'Resume' }}</button></form>
+        {% endif %}
+      </div>
+    </div>
+    {% set es = enqs.get(s.id, []) %}
+    <div class="mt-4 border-t pt-3">
+      <p class="text-xs font-bold tracking-widest text-plum-600 uppercase mb-2">Enquiries ({{ es|length }})</p>
+      {% for e in es %}
+      <div class="flex justify-between gap-3 text-sm py-1.5 {% if not loop.first %}border-t{% endif %}">
+        <span><strong>{{ e.ref }}</strong> · {{ disp_name(e.customer) }} · {{ event_types.get(e.event_type, e.event_type) }} · {{ e.city }}{% if e.event_date %} · {{ e.event_date.strftime('%d %b %Y') }}{% endif %}{% if e.guests %} · {{ e.guests }} guests{% endif %}</span>
+        <span class="text-xs font-semibold text-plum-700 whitespace-nowrap">{{ labels.get(e.status, e.status) }}</span>
+      </div>
+      {% else %}<p class="text-xs text-gray-500">No enquiries yet. Our team will call you when a customer enquires.</p>{% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="bg-white border rounded-2xl p-10 text-center"><p class="font-semibold text-gray-800">You have not listed a service yet</p><a href="{{ url_for('service_new') }}" class="text-sm text-plum-600 underline">List your first service</a></div>
+  {% endfor %}
+</div>
+{% endblock %}

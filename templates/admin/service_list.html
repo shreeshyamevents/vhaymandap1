@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Services — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center flex-wrap gap-3 mb-6">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Admin</p><h1 class="text-2xl font-bold text-plum-700">🤝 Services</h1></div>
+    <div class="flex gap-2 flex-wrap text-sm">
+      <a href="{{ url_for('admin_service_enquiries') }}" class="border border-plum-300 text-plum-700 font-semibold px-3 py-2 rounded-lg hover:bg-plum-50">Enquiries</a>
+      <a href="{{ url_for('admin_service_commissions') }}" class="border border-plum-300 text-plum-700 font-semibold px-3 py-2 rounded-lg hover:bg-plum-50">Commissions</a>
+      <a href="{{ url_for('admin_service_categories') }}" class="border border-plum-300 text-plum-700 font-semibold px-3 py-2 rounded-lg hover:bg-plum-50">Categories</a>
+      <a href="{{ url_for('service_new') }}" class="bg-plum-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-plum-700">+ Add service</a>
+    </div>
+  </div>
+
+  <h2 class="font-bold mb-3">Waiting for approval ({{ pending|length }})</h2>
+  {% for s in pending %}
+  <div class="bg-white border-2 border-amber-200 rounded-xl p-4 mb-3 flex gap-4 flex-wrap md:flex-nowrap">
+    {% if s.photo_list %}<img src="{{ s.photo_list[0] }}" alt="" class="w-full md:w-40 h-28 object-cover rounded-lg border">{% endif %}
+    <div class="flex-1 min-w-0 text-sm">
+      <p class="font-bold">{{ s.title }} <span class="text-xs text-gray-500">· {{ s.category.icon }} {{ s.category.name }}</span></p>
+      <p class="text-gray-600">{{ s.business_name }} · {{ s.city }} · {{ s.price_text }}</p>
+      <p class="text-xs text-gray-500 mt-1">By {{ s.provider.name if s.provider else 'admin' }} · contact {{ s.contact_phone }}</p>
+      <p class="text-gray-700 mt-2 whitespace-pre-line line-clamp-3">{{ s.description }}</p>
+      <a href="{{ url_for('service_detail', service_id=s.id) }}" target="_blank" class="text-xs text-plum-600 underline">Preview</a>
+    </div>
+    <div class="flex md:flex-col gap-2 md:w-56">
+      <form method="POST" action="{{ url_for('admin_service_action', service_id=s.id, action='approve') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="w-full bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-emerald-700">Approve</button></form>
+      <form method="POST" action="{{ url_for('admin_service_action', service_id=s.id, action='reject') }}" class="flex gap-1"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="reason" required minlength="3" maxlength="300" placeholder="Reason" aria-label="Reason to reject" class="border rounded-lg p-2 text-xs flex-1 min-w-0"><button class="border border-red-300 text-red-600 text-xs font-bold px-2 rounded-lg hover:bg-red-50">Reject</button></form>
+    </div>
+  </div>
+  {% else %}<p class="text-sm text-gray-500 mb-4">Nothing waiting.</p>{% endfor %}
+
+  <h2 class="font-bold mt-8 mb-3">All services ({{ others|length }})</h2>
+  <div class="bg-white border rounded-xl overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs uppercase tracking-wide text-gray-500 border-b"><th class="p-3">Service</th><th class="p-3">Category</th><th class="p-3">By</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead>
+      <tbody>
+      {% for s in others %}
+      <tr class="border-b last:border-0">
+        <td class="p-3"><strong>{{ s.title }}</strong><br><span class="text-xs text-gray-500">{{ s.business_name }} · {{ s.city }}</span></td>
+        <td class="p-3">{{ s.category.icon }} {{ s.category.name }}</td>
+        <td class="p-3 text-xs">{{ s.provider.name if s.provider else 'Admin listed' }}</td>
+        <td class="p-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full {% if s.status == 'approved' %}bg-emerald-100 text-emerald-800{% elif s.status == 'rejected' %}bg-red-100 text-red-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ s.status|title }}</span></td>
+        <td class="p-3 whitespace-nowrap text-xs">
+          <a href="{{ url_for('service_edit', service_id=s.id) }}" class="font-semibold text-plum-600 hover:underline mr-2">Edit</a>
+          {% if s.status == 'approved' %}<form method="POST" action="{{ url_for('admin_service_action', service_id=s.id, action='pause') }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="font-semibold text-gray-600 hover:underline mr-2">Pause</button></form>
+          {% elif s.status in ('paused', 'rejected') %}<form method="POST" action="{{ url_for('admin_service_action', service_id=s.id, action='resume' if s.status == 'paused' else 'approve') }}" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="font-semibold text-emerald-700 hover:underline mr-2">{{ 'Resume' if s.status == 'paused' else 'Approve' }}</button></form>{% endif %}
+          <form method="POST" action="{{ url_for('admin_service_action', service_id=s.id, action='delete') }}" class="inline" onsubmit="return confirm('Delete this service?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="font-semibold text-red-600 hover:underline">Delete</button></form>
+        </td>
+      </tr>
+      {% else %}<tr><td class="p-4 text-gray-500" colspan="5">No services yet. Click "Add service" to list your first partner.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

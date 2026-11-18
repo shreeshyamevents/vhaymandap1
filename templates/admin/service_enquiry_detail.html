@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ enq.ref }} — Service enquiry{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Service enquiry</p><h1 class="text-2xl font-bold text-plum-700">{{ enq.ref }}</h1></div>
+    <a href="{{ url_for('admin_service_enquiries') }}" class="text-sm text-plum-600 hover:underline">← Pipeline</a>
+  </div>
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="space-y-4">
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <h2 class="font-bold mb-2">Customer</h2>
+        <p class="font-semibold">{{ disp_name(enq.customer) }}</p>
+        <a href="tel:+91{{ enq.phone }}" class="inline-block mt-2 bg-plum-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-plum-700"><i class="fa-solid fa-phone mr-1"></i>Call {{ enq.phone }}</a>
+        <a href="https://wa.me/91{{ enq.phone }}" target="_blank" rel="noopener" class="inline-block mt-2 ml-2 border border-plum-300 text-plum-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-plum-50">WhatsApp</a>
+      </div>
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <h2 class="font-bold mb-2">Provider</h2>
+        <p class="font-semibold">{{ enq.service.business_name }}</p>
+        <p class="text-gray-600">{{ enq.service.title }} · {{ enq.service.category.name }}</p>
+        {% if enq.service.contact_phone %}<a href="tel:+91{{ enq.service.contact_phone }}" class="inline-block mt-2 bg-plum-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-plum-700"><i class="fa-solid fa-phone mr-1"></i>Call {{ enq.service.contact_phone }}</a>
+        <a href="https://wa.me/91{{ enq.service.contact_phone }}" target="_blank" rel="noopener" class="inline-block mt-2 ml-2 border border-plum-300 text-plum-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-plum-50">WhatsApp</a>{% endif %}
+      </div>
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <h2 class="font-bold mb-2">Enquiry</h2>
+        <p><strong>{{ event_label }}</strong> · {{ enq.city }}{% if enq.event_date %} · {{ enq.event_date.strftime('%d %b %Y') }}{% endif %}</p>
+        {% if enq.guests %}<p class="mt-1">Guests: {{ enq.guests }}</p>{% endif %}
+        {% if enq.budget %}<p>Budget: ₹{{ '{:,.0f}'.format(enq.budget) }}</p>{% endif %}
+        {% if enq.message %}<p class="mt-2 whitespace-pre-line text-gray-700">{{ enq.message }}</p>{% endif %}
+        <p class="text-xs text-gray-500 mt-3">Received {{ enq.created_at|ist_dt }}</p>
+      </div>
+    </div>
+    <form method="POST" class="bg-white border rounded-xl p-5 space-y-4 h-fit">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="font-bold">Update</h2>
+      <div><label for="status" class="block text-sm font-semibold mb-1">Stage</label>
+        <select id="status" name="status" class="w-full border rounded-lg p-2.5 text-sm bg-white">{% for key, label in statuses.items() %}<option value="{{ key }}" {% if enq.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label for="deal_amount" class="block text-sm font-semibold mb-1">Agreed amount (₹)</label><input id="deal_amount" type="number" name="deal_amount" min="1" step="1" value="{{ '%g'|format(enq.deal_amount) if enq.deal_amount else '' }}" class="w-full border rounded-lg p-2.5 text-sm"></div>
+        <div><label for="commission_pct" class="block text-sm font-semibold mb-1">Commission %</label><input id="commission_pct" type="number" name="commission_pct" min="0" max="100" step="0.5" value="{{ '%g'|format(enq.commission_pct) if enq.commission_pct is not none else '' }}" placeholder="{{ '%g'|format(default_pct) }}" class="w-full border rounded-lg p-2.5 text-sm"></div>
+      </div>
+      <p class="text-xs text-gray-500 -mt-2">Needed when marking Booked. Blank commission uses the category default ({{ '%g'|format(default_pct) }}%).</p>
+      {% if enq.commission_status != 'none' %}
+      <div class="rounded-lg p-3 text-sm {% if enq.commission_status == 'paid' %}bg-emerald-50 border border-emerald-200 text-emerald-800{% else %}bg-amber-50 border border-amber-200 text-amber-900{% endif %}">
+        Commission: <strong>₹{{ '{:,.2f}'.format(enq.commission_amount) }}</strong> ({{ '%g'|format(enq.commission_pct) }}% of ₹{{ '{:,.0f}'.format(enq.deal_amount) }}) · {{ 'received' if enq.commission_status == 'paid' else 'due from provider' }}
+      </div>
+      {% endif %}
+      <div><label for="admin_notes" class="block text-sm font-semibold mb-1">Internal notes <span class="text-gray-400 font-normal">(only admin)</span></label><textarea id="admin_notes" name="admin_notes" rows="3" maxlength="2000" class="w-full border rounded-lg p-2.5 text-sm">{{ enq.admin_notes or '' }}</textarea></div>
+      <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">Save</button>
+      <a href="{{ url_for('service_enquiry_status', enq_id=enq.id) }}" class="block text-center text-xs text-plum-600 hover:underline">View as customer</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

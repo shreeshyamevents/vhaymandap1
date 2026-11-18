@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Service categories — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Admin</p><h1 class="text-2xl font-bold text-plum-700">Service categories</h1>
+      <p class="text-sm text-gray-500 mt-1">Add new kinds of services any time. Commission left blank uses the default ({{ '%g'|format(default_pct) }}%).</p></div>
+    <a href="{{ url_for('admin_services') }}" class="text-sm text-plum-600 hover:underline">← Services</a>
+  </div>
+
+  <form method="POST" class="bg-white p-5 rounded-xl border shadow-sm mb-8 space-y-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h2 class="font-bold">➕ New category</h2>
+    <div class="grid sm:grid-cols-3 gap-3">
+      <div class="sm:col-span-2"><label for="n" class="block text-sm font-semibold mb-1">Name *</label><input id="n" name="name" required maxlength="80" placeholder="e.g. Mehendi artists" class="w-full border rounded-lg p-2.5 text-sm"></div>
+      <div><label for="ic" class="block text-sm font-semibold mb-1">Icon (emoji)</label><input id="ic" name="icon" maxlength="10" placeholder="🌿" class="w-full border rounded-lg p-2.5 text-sm"></div>
+      <div><label for="cp" class="block text-sm font-semibold mb-1">Commission %</label><input id="cp" type="number" name="commission_pct" min="0" max="100" step="0.5" placeholder="{{ '%g'|format(default_pct) }}" class="w-full border rounded-lg p-2.5 text-sm"></div>
+    </div>
+    <div><label for="sc" class="block text-sm font-semibold mb-1">Extra details to ask providers <span class="text-gray-400 font-normal">(one per line: Label | example)</span></label>
+      <textarea id="sc" name="schema" rows="3" placeholder="Designs offered | e.g. Bridal, Arabic&#10;Time per hand | e.g. 45 minutes" class="w-full border rounded-lg p-2.5 text-sm"></textarea></div>
+    <button class="bg-plum-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-plum-700">Add category</button>
+  </form>
+
+  <div class="space-y-3">
+    {% for c in cats %}
+    <form method="POST" action="{{ url_for('admin_service_category_update', cat_id=c.id) }}" class="bg-white border rounded-xl p-4 grid sm:grid-cols-12 gap-3 items-start">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="sm:col-span-3"><p class="font-bold">{{ c.name }}</p><p class="text-xs text-gray-500">{{ counts.get(c.id, 0) }} service(s)</p>
+        <label class="flex items-center gap-2 text-xs mt-2"><input type="checkbox" name="is_active" {% if c.is_active %}checked{% endif %}> Active</label></div>
+      <div class="sm:col-span-2"><label class="block text-xs font-semibold mb-1" for="i{{ c.id }}">Icon</label><input id="i{{ c.id }}" name="icon" value="{{ c.icon }}" maxlength="10" class="w-full border rounded-lg p-2 text-sm">
+        <label class="block text-xs font-semibold mb-1 mt-2" for="p{{ c.id }}">Commission %</label><input id="p{{ c.id }}" type="number" name="commission_pct" min="0" max="100" step="0.5" value="{{ '%g'|format(c.commission_pct) if c.commission_pct is not none else '' }}" placeholder="{{ '%g'|format(default_pct) }}" class="w-full border rounded-lg p-2 text-sm"></div>
+      <div class="sm:col-span-5"><label class="block text-xs font-semibold mb-1" for="s{{ c.id }}">Extra details (Label | example)</label><textarea id="s{{ c.id }}" name="schema" rows="4" class="w-full border rounded-lg p-2 text-xs">{{ schema_text(c.schema) }}</textarea></div>
+      <div class="sm:col-span-2"><button class="w-full border border-plum-300 text-plum-700 text-sm font-bold px-3 py-2 rounded-lg hover:bg-plum-50">Save</button></div>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

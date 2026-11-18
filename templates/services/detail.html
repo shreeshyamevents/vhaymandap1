@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ svc.title }} — VyahMandap{% endblock %}
+
+{% block content %}
+{% set labels = {} %}
+{% for f in svc.category.schema %}{% set _ = labels.update({f.key: f.label}) %}{% endfor %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <a href="{{ url_for('services_index', cat=svc.category.slug) }}" class="text-sm text-plum-600 hover:underline">← {{ svc.category.name }}</a>
+
+  {% if svc.status != 'approved' %}
+  <div class="mt-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm">Preview only. This service is <strong>{{ svc.status }}</strong> and not visible to customers.</div>
+  {% endif %}
+
+  <div class="grid md:grid-cols-5 gap-6 mt-4">
+    <div class="md:col-span-3">
+      {% if svc.photo_list %}
+      <img src="{{ svc.photo_list[0] }}" alt="{{ svc.title }}" class="w-full h-72 object-cover rounded-2xl border">
+      {% if svc.photo_list|length > 1 %}
+      <div class="grid grid-cols-5 gap-2 mt-2">
+        {% for u in svc.photo_list[1:] %}<a href="{{ u }}" target="_blank" rel="noopener"><img src="{{ u }}" alt="{{ svc.title }} photo {{ loop.index + 1 }}" class="w-full h-16 object-cover rounded-lg border" loading="lazy"></a>{% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="mt-5">
+        <span class="text-[11px] font-semibold bg-plum-50 text-plum-700 px-2 py-0.5 rounded-full">{{ svc.category.icon }} {{ svc.category.name }}</span>
+        <h1 class="text-2xl font-bold text-plum-700 mt-2">{{ svc.title }}</h1>
+        <p class="text-gray-600 text-sm">{{ svc.business_name }}{% if svc.city %} · {{ svc.city }}{% endif %}{% if svc.experience_years %} · {{ svc.experience_years }} yrs experience{% endif %}</p>
+        <p class="text-lg font-bold text-plum-700 mt-2">{{ svc.price_text }}</p>
+        <p class="text-sm text-gray-700 mt-3 whitespace-pre-line">{{ svc.description }}</p>
+      </div>
+
+      {% if svc.details_dict %}
+      <div class="bg-white border rounded-xl p-4 mt-4 grid grid-cols-2 gap-3 text-sm">
+        {% for key, val in svc.details_dict.items() %}
+        <div><p class="text-xs text-gray-500 uppercase tracking-wide font-semibold">{{ labels.get(key) or (key|replace('_', ' ')|title) }}</p><p class="font-semibold">{{ val }}</p></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="md:col-span-2">
+      <div class="bg-white border rounded-2xl p-5 shadow-sm md:sticky md:top-4">
+        <h2 class="font-bold text-plum-700 mb-1">Send an enquiry</h2>
+        <p class="text-xs text-gray-500 mb-4">No payment now. Our team calls you, confirms details and connects you with the provider.</p>
+        {% if svc.status != 'approved' %}
+          <p class="text-sm text-gray-500">Enquiries are closed while this service is not live.</p>
+        {% elif not current_user.is_authenticated %}
+          <a href="{{ url_for('login', next=request.path) }}" class="block text-center bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">Log in to send an enquiry</a>
+        {% else %}
+        <form method="POST" class="space-y-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="flex flex-wrap gap-2">
+            {% for val, label in event_types %}
+            <label class="cursor-pointer"><input type="radio" name="event_type" value="{{ val }}" class="peer sr-only" required {% if (form.get('event_type') or 'wedding') == val %}checked{% endif %}>
+              <span class="block px-3 py-1.5 border rounded-full text-xs bg-white peer-checked:bg-plum-600 peer-checked:text-white peer-checked:border-plum-600 peer-focus-visible:ring-2 peer-focus-visible:ring-plum-400">{{ label }}</span></label>
+            {% endfor %}
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label for="ed" class="block text-xs font-semibold mb-1">Event date *</label><input id="ed" type="date" name="event_date" required min="{{ today }}" value="{{ form.get('event_date', '') }}" class="w-full border rounded-lg p-2 text-sm"></div>
+            <div><label for="ec" class="block text-xs font-semibold mb-1">City *</label><input id="ec" name="city" required maxlength="100" value="{{ form.get('city') or current_user.city or svc.city or '' }}" class="w-full border rounded-lg p-2 text-sm"></div>
+            <div><label for="eg" class="block text-xs font-semibold mb-1">Guests</label><input id="eg" type="number" name="guests" min="1" value="{{ form.get('guests', '') }}" class="w-full border rounded-lg p-2 text-sm"></div>
+            <div><label for="eb" class="block text-xs font-semibold mb-1">Budget (₹)</label><input id="eb" type="number" name="budget" min="0" value="{{ form.get('budget', '') }}" class="w-full border rounded-lg p-2 text-sm"></div>
+          </div>
+          <div><label for="ep" class="block text-xs font-semibold mb-1">Your phone *</label><input id="ep" type="tel" name="phone" required inputmode="numeric" maxlength="14" value="{{ form.get('phone') or current_user.mobile or '' }}" class="w-full border rounded-lg p-2 text-sm"></div>
+          <div><label for="em" class="block text-xs font-semibold mb-1">Message</label><textarea id="em" name="message" rows="3" maxlength="1000" placeholder="Tell us what you need" class="w-full border rounded-lg p-2 text-sm">{{ form.get('message', '') }}</textarea></div>
+          <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">Send enquiry</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

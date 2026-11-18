@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Service commissions — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Admin</p><h1 class="text-2xl font-bold text-plum-700">💰 Service commissions</h1></div>
+    <a href="{{ url_for('admin_service_enquiries') }}" class="text-sm text-plum-600 hover:underline">← Enquiries</a>
+  </div>
+  <div class="grid grid-cols-2 gap-4 mb-8">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4"><p class="text-xs font-bold uppercase tracking-wide text-amber-800">Due from providers</p><p class="text-2xl font-bold text-amber-900">₹{{ '{:,.2f}'.format(due_total) }}</p></div>
+    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4"><p class="text-xs font-bold uppercase tracking-wide text-emerald-800">Received</p><p class="text-2xl font-bold text-emerald-900">₹{{ '{:,.2f}'.format(paid_total) }}</p></div>
+  </div>
+
+  <h2 class="font-bold mb-3">Due ({{ due|length }})</h2>
+  <div class="space-y-2 mb-8">
+    {% for e in due %}
+    <div class="bg-white border rounded-xl p-4 flex justify-between gap-3 flex-wrap items-center text-sm">
+      <div><a href="{{ url_for('admin_service_enquiry_detail', enq_id=e.id) }}" class="font-bold text-plum-700 hover:underline">{{ e.ref }}</a> · {{ e.service.business_name }}
+        <p class="text-xs text-gray-500">{{ e.service.title }} · {{ e.event_date.strftime('%d %b %Y') if e.event_date else '' }} · {{ labels.get(e.status) }}</p>
+        <p class="text-xs text-gray-600">Deal ₹{{ '{:,.0f}'.format(e.deal_amount) }} × {{ '%g'|format(e.commission_pct) }}%</p></div>
+      <form method="POST" action="{{ url_for('admin_service_commission_paid', enq_id=e.id) }}" class="flex gap-2 items-center" onsubmit="return confirm('Commission ₹{{ '{:,.2f}'.format(e.commission_amount) }} received from {{ e.service.business_name }}?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <span class="font-bold">₹{{ '{:,.2f}'.format(e.commission_amount) }}</span>
+        <input name="note" maxlength="200" placeholder="UTR / note" aria-label="UTR or note" class="border rounded-lg p-2 text-xs w-36">
+        <button class="bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-emerald-700">Mark received</button>
+      </form>
+    </div>
+    {% else %}<p class="text-sm text-gray-500">Nothing due.</p>{% endfor %}
+  </div>
+
+  <h2 class="font-bold mb-3">Received ({{ paid|length }})</h2>
+  <div class="bg-white border rounded-xl overflow-x-auto"><table class="w-full text-sm">
+    <thead><tr class="text-left text-xs uppercase text-gray-500 border-b"><th class="p-3">Enquiry</th><th class="p-3">Provider</th><th class="p-3 text-right">Commission</th><th class="p-3">Received</th><th class="p-3">Note</th></tr></thead>
+    <tbody>{% for e in paid %}<tr class="border-b last:border-0"><td class="p-3">{{ e.ref }}</td><td class="p-3">{{ e.service.business_name }}</td><td class="p-3 text-right">₹{{ '{:,.2f}'.format(e.commission_amount) }}</td><td class="p-3">{{ e.commission_paid_at|ist_dt }}</td><td class="p-3 text-xs text-gray-500">{{ e.commission_note or '' }}</td></tr>
+    {% else %}<tr><td class="p-4 text-gray-500" colspan="5">No commission received yet.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+{% endblock %}

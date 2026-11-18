@@ -490,6 +490,119 @@ class CustomPayment(db.Model):
         'payments', order_by='CustomPayment.created_at', cascade='all, delete-orphan', passive_deletes=True))
 
 
+class ServiceCategory(db.Model):
+    """Admin-managed service category (Caterers, Photographers, ...). Add more any time."""
+    __tablename__ = 'service_categories'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
+    slug = db.Column(db.String(60), unique=True, nullable=False)
+    icon = db.Column(db.String(10), default='🤝')
+    details_schema = db.Column(db.Text, nullable=True)          # JSON [{"key","label","ph"}]
+    commission_pct = db.Column(db.Float, nullable=True)         # blank = default
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def schema(self):
+        try:
+            v = json_lib.loads(self.details_schema) if self.details_schema else []
+            return v if isinstance(v, list) else []
+        except Exception:
+            return []
+
+
+class Service(db.Model):
+    """A service offered by a tied-up business (listed by the admin or by the provider)."""
+    __tablename__ = 'services'
+    id = db.Column(db.Integer, primary_key=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)  # None = admin-managed
+    category_id = db.Column(db.Integer, db.ForeignKey('service_categories.id'), nullable=False, index=True)
+    title = db.Column(db.String(150), nullable=False)
+    business_name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    city = db.Column(db.String(100), nullable=True)
+    price_from = db.Column(db.Float, nullable=True)
+    price_unit = db.Column(db.String(20), default='per event')
+    experience_years = db.Column(db.Integer, nullable=True)
+    details = db.Column(db.Text, nullable=True)                 # JSON {key: value}
+    photos = db.Column(db.Text, nullable=True)                  # JSON list of URLs (portfolio)
+    contact_phone = db.Column(db.String(15), nullable=True)     # never shown to customers
+    status = db.Column(db.String(12), default='pending', index=True)  # pending/approved/rejected/paused
+    rejection_reason = db.Column(db.Text, nullable=True)
+    created_by_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    provider = db.relationship('User', foreign_keys=[provider_id])
+    category = db.relationship('ServiceCategory', foreign_keys=[category_id])
+
+    @property
+    def photo_list(self):
+        try:
+            v = json_lib.loads(self.photos) if self.photos else []
+            return v if isinstance(v, list) else []
+        except Exception:
+            return []
+
+    @property
+    def details_dict(self):
+        try:
+            v = json_lib.loads(self.details) if self.details else {}
+            return v if isinstance(v, dict) else {}
+        except Exception:
+            return {}
+
+    @property
+    def price_text(self):
+        if not self.price_from:
+            return 'Price on request'
+        return f'From ₹{self.price_from:,.0f} {self.price_unit or ""}'.strip()
+
+
+class ServiceEnquiry(db.Model):
+    """Customer enquiry for a service. The team calls both sides; commission is tracked on booking."""
+    __tablename__ = 'service_enquiries'
+    id = db.Column(db.Integer, primary_key=True)
+    service_id = db.Column(db.Integer, db.ForeignKey('services.id'), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    event_type = db.Column(db.String(20), nullable=False)
+    event_date = db.Column(db.Date, nullable=True)
+    city = db.Column(db.String(100), nullable=True)
+    guests = db.Column(db.Integer, nullable=True)
+    budget = db.Column(db.Float, nullable=True)
+    message = db.Column(db.Text, nullable=True)
+    phone = db.Column(db.String(15), nullable=True)
+    status = db.Column(db.String(12), default='new', index=True)  # new/contacted/connected/booked/completed/cancelled/lost
+    admin_notes = db.Column(db.Text, nullable=True)
+    deal_amount = db.Column(db.Float, nullable=True)            # agreed amount (set by admin)
+    commission_pct = db.Column(db.Float, nullable=True)
+    commission_amount = db.Column(db.Float, default=0)
+    commission_status = db.Column(db.String(8), default='none', index=True)  # none/due/paid
+    commission_paid_at = db.Column(db.DateTime, nullable=True)
+    commission_note = db.Column(db.String(200), nullable=True)
+    status_log = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    service = db.relationship('Service', foreign_keys=[service_id])
+    customer = db.relationship('User', foreign_keys=[customer_id])
+
+    @property
+    def ref(self):
+        return f'SV-{1000 + (self.id or 0)}'
+
+    @property
+    def log(self):
+        try:
+            v = json_lib.loads(self.status_log) if self.status_log else []
+            return v if isinstance(v, list) else []
+        except Exception:
+            return []
+
+    def add_log(self, status):
+        entries = self.log
+        entries.append({'s': status, 'at': datetime.utcnow().isoformat()})
+        self.status_log = json_lib.dumps(entries)
+
+
 class ItemView(db.Model):
     __tablename__ = 'item_views'
     id = db.Column(db.Integer, primary_key=True)
@@ -11384,6 +11497,597 @@ def admin_custom_payment_action(req_id, pay_id, action):
         pass
     db.session.commit()
     return redirect(url_for('admin_custom_request_detail', req_id=cr.id))
+
+
+# ============================================
+# SERVICES (caterers, photographers, videographers, drone operators, ...)
+# Listed by admin or by the provider (admin approves). Customers send an enquiry only;
+# the team calls both sides. Commission is tracked when an enquiry is marked "booked".
+# ============================================
+SERVICE_DEFAULT_COMMISSION_PCT = 10
+SERVICE_PRICE_UNITS = ['per event', 'per day', 'per hour', 'per plate', 'per piece']
+SERVICE_PIPELINE = [('new', 'Enquiry sent'), ('contacted', 'Team called you'),
+                    ('connected', 'Connected with the provider'), ('booked', 'Booked'),
+                    ('completed', 'Service completed')]
+SERVICE_STATUS_LABELS = dict(SERVICE_PIPELINE, cancelled='Cancelled', lost='Not going ahead')
+SERVICE_ADMIN_LABELS = {'new': 'New', 'contacted': 'Contacted', 'connected': 'Connected',
+                        'booked': 'Booked', 'completed': 'Completed',
+                        'cancelled': 'Cancelled', 'lost': 'Not going ahead'}
+_SERVICE_DEFAULT_CATEGORIES = [
+    ('Caterers', '🍽️', [('cuisine', 'Cuisine', 'e.g. North Indian, Jain'), ('min_guests', 'Minimum guests', 'e.g. 50'),
+                        ('food_type', 'Food type', 'e.g. Pure veg / Veg and non-veg')]),
+    ('Photographers', '📸', [('deliverables', 'What you deliver', 'e.g. 300 edited photos + album'),
+                             ('hours', 'Coverage hours', 'e.g. 8 hours'), ('team', 'Team size', 'e.g. 2 photographers')]),
+    ('Videographers', '🎥', [('deliverables', 'What you deliver', 'e.g. Highlight film + full video'),
+                             ('hours', 'Coverage hours', 'e.g. 8 hours'), ('format', 'Video quality', 'e.g. 4K')]),
+    ('Drone operators', '🚁', [('flight_time', 'Flight time', 'e.g. 2 hours'),
+                               ('footage', 'What you deliver', 'e.g. 4K aerial video + photos'),
+                               ('licensed', 'Licensed pilot?', 'e.g. Yes, DGCA')]),
+]
+
+
+def _svc_slug(text):
+    return re.sub(r'[^a-z0-9]+', '-', (text or '').lower()).strip('-')[:60] or 'category'
+
+
+def _ensure_service_categories():
+    """First use: create the starting categories (admin can add more later)."""
+    try:
+        if ServiceCategory.query.count() == 0:
+            for name, icon, fields in _SERVICE_DEFAULT_CATEGORIES:
+                db.session.add(ServiceCategory(
+                    name=name, slug=_svc_slug(name), icon=icon,
+                    details_schema=json_lib.dumps([{'key': k, 'label': l, 'ph': p} for k, l, p in fields])))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _schema_from_text(text):
+    """Admin textarea: one field per line as 'Label | placeholder'."""
+    out, seen = [], set()
+    for line in (text or '').splitlines()[:12]:
+        label, _, ph = line.partition('|')
+        label, ph = label.strip()[:60], ph.strip()[:80]
+        key = re.sub(r'[^a-z0-9]+', '_', label.lower()).strip('_')[:30]
+        if label and key and key not in seen:
+            seen.add(key)
+            out.append({'key': key, 'label': label, 'ph': ph})
+    return out
+
+
+def _schema_to_text(schema):
+    return '\n'.join(f"{f.get('label', '')} | {f.get('ph', '')}" for f in schema)
+
+
+def _svc_commission_pct(service):
+    pct = service.category.commission_pct if service and service.category else None
+    return SERVICE_DEFAULT_COMMISSION_PCT if pct is None else pct
+
+
+def _svc_steps(enq):
+    keys = [k for k, _ in SERVICE_PIPELINE]
+    cur = keys.index(enq.status) if enq.status in keys else 0
+    first_seen = {}
+    for e in enq.log:
+        first_seen.setdefault(e.get('s'), e.get('at'))
+    steps = []
+    for i, (k, label) in enumerate(SERVICE_PIPELINE):
+        state = 'done' if (i < cur or (enq.status == 'completed' and i == cur)) else ('current' if i == cur else 'todo')
+        steps.append({'label': label, 'state': state, 'date': _fmt_log_date(first_seen.get(k))})
+    return steps
+
+
+def _svc_apply_form(svc, is_admin):
+    """Validate the service form and apply it to `svc`. Returns a list of errors (empty = saved to session)."""
+    f, errors = request.form, []
+    cat_id = f.get('category_id', '')
+    cat = ServiceCategory.query.get(int(cat_id)) if cat_id.isdigit() else None
+    if not cat or not cat.is_active:
+        errors.append('Please choose a category.')
+    title = f.get('title', '').strip()[:150]
+    business = f.get('business_name', '').strip()[:150]
+    city = f.get('city', '').strip()[:100]
+    desc = f.get('description', '').strip()[:3000]
+    phone = re.sub(r'\D', '', f.get('contact_phone', ''))[-10:]
+    unit = f.get('price_unit', 'per event')
+    if not title:
+        errors.append('Please enter a title for your service.')
+    if not business:
+        errors.append('Please enter the business name.')
+    if not city:
+        errors.append('Please enter the city.')
+    if len(desc) < 20:
+        errors.append('Please describe the service (at least 20 characters).')
+    if len(phone) != 10:
+        errors.append('Please enter a valid 10-digit contact number (only our team sees it).')
+    if unit not in SERVICE_PRICE_UNITS:
+        errors.append('Please choose a price unit.')
+    price = exp = None
+    try:
+        if f.get('price_from', '').strip():
+            price = float(f.get('price_from'))
+            if price < 0:
+                raise ValueError
+    except ValueError:
+        errors.append('Starting price must be a valid number.')
+    try:
+        if f.get('experience_years', '').strip():
+            exp = int(f.get('experience_years'))
+            if not 0 <= exp <= 60:
+                raise ValueError
+    except ValueError:
+        errors.append('Experience must be between 0 and 60 years.')
+    existing = svc.photo_list
+    removed = set(f.getlist('remove_photo'))
+    kept = [u for i, u in enumerate(existing) if str(i) not in removed]
+    new_files = [x for x in request.files.getlist('photos') if x and x.filename]
+    for x in new_files:
+        if not _is_image_upload(x):
+            errors.append('Portfolio files must be photos (JPG / PNG / WEBP).')
+            break
+    if len(kept) + len(new_files) == 0:
+        errors.append('Please add at least one portfolio photo.')
+    if len(kept) + len(new_files) > 6:
+        errors.append('You can have at most 6 portfolio photos.')
+    if errors:
+        return errors
+    urls = list(kept)
+    for x in new_files:
+        res = upload_file_to_cloudinary(x, folder='vyahmandap/services')
+        if res and res.get('url'):
+            urls.append(res['url'])
+    if not urls:
+        return ['Photo upload failed. Please try again.']
+    details = {}
+    for fld in cat.schema:
+        v = f.get('detail_' + fld['key'], '').strip()[:100]
+        if v:
+            details[fld['key']] = v
+    svc.category_id, svc.title, svc.business_name, svc.city = cat.id, title, business, city
+    svc.description, svc.contact_phone, svc.price_unit = desc, phone, unit
+    svc.price_from, svc.experience_years = price, exp
+    svc.details = json_lib.dumps(details) if details else None
+    svc.photos = json_lib.dumps(urls)
+    return []
+
+
+def _svc_form_context(svc, is_admin):
+    _ensure_service_categories()
+    cats = ServiceCategory.query.filter_by(is_active=True).order_by(ServiceCategory.id).all()
+    return dict(service=svc, categories=cats, units=SERVICE_PRICE_UNITS, is_admin=is_admin,
+                schemas={c.id: c.schema for c in cats})
+
+
+@app.route('/services')
+def services_index():
+    _ensure_service_categories()
+    cats = ServiceCategory.query.filter_by(is_active=True).order_by(ServiceCategory.id).all()
+    cat_slug = request.args.get('cat', '').strip()
+    city = request.args.get('city', '').strip()
+    q = request.args.get('q', '').strip()
+    query = Service.query.join(ServiceCategory, Service.category_id == ServiceCategory.id).filter(
+        Service.status == 'approved', ServiceCategory.is_active == True)
+    if cat_slug:
+        query = query.filter(ServiceCategory.slug == cat_slug)
+    if city:
+        query = query.filter(Service.city.ilike(f'%{city}%'))
+    if q:
+        query = query.filter(_or(Service.title.ilike(f'%{q}%'), Service.business_name.ilike(f'%{q}%')))
+    services = query.order_by(Service.created_at.desc()).limit(60).all()
+    return render_template('services/index.html', services=services, categories=cats,
+                           cat_slug=cat_slug, city=city, q=q)
+
+
+@app.route('/services/<int:service_id>', methods=['GET', 'POST'])
+@limiter.limit("5 per hour", methods=["POST"])
+def service_detail(service_id):
+    svc = Service.query.get_or_404(service_id)
+    is_owner = current_user.is_authenticated and (current_user.role == 'admin' or svc.provider_id == current_user.id)
+    if (svc.status != 'approved' or not svc.category.is_active) and not is_owner:
+        flash('This service is not available.', 'warning')
+        return redirect(url_for('services_index'))
+    form = {}
+    if request.method == 'POST':
+        if not current_user.is_authenticated:
+            flash('Please log in to send an enquiry.', 'info')
+            return redirect(url_for('login', next=request.path))
+        if svc.status != 'approved':
+            flash('This service is not taking enquiries right now.', 'warning')
+            return redirect(url_for('service_detail', service_id=svc.id))
+        if svc.provider_id == current_user.id:
+            flash('You cannot send an enquiry to your own service.', 'warning')
+            return redirect(url_for('service_detail', service_id=svc.id))
+        f, errors, form = request.form, [], request.form
+        event_type = f.get('event_type', '')
+        if event_type not in dict(CUSTOM_EVENT_TYPES):
+            errors.append('Please choose the event type.')
+        try:
+            event_date = datetime.strptime(f.get('event_date', ''), '%Y-%m-%d').date()
+            if event_date < ist_today():
+                errors.append('Event date cannot be in the past.')
+        except ValueError:
+            event_date = None
+            errors.append('Please choose the event date.')
+        city = f.get('city', '').strip()[:100]
+        if not city:
+            errors.append('Please enter the event city.')
+        guests = budget = None
+        try:
+            if f.get('guests', '').strip():
+                guests = int(f.get('guests'))
+                if not 1 <= guests <= 100000:
+                    raise ValueError
+        except ValueError:
+            errors.append('Guests must be a valid number.')
+        try:
+            if f.get('budget', '').strip():
+                budget = float(f.get('budget'))
+                if budget < 0:
+                    raise ValueError
+        except ValueError:
+            errors.append('Budget must be a valid number.')
+        phone = re.sub(r'\D', '', f.get('phone', ''))[-10:]
+        if len(phone) != 10:
+            errors.append('Please enter a valid 10-digit phone number.')
+        message = f.get('message', '').strip()[:1000]
+        if errors:
+            for e in errors:
+                flash(e, 'danger')
+        else:
+            enq = ServiceEnquiry(service_id=svc.id, customer_id=current_user.id, event_type=event_type,
+                                 event_date=event_date, city=city, guests=guests, budget=budget,
+                                 message=message or None, phone=phone, status='new')
+            enq.add_log('new')
+            db.session.add(enq)
+            db.session.commit()
+            notify_all_admins(f'🤝 New service enquiry {enq.ref}: {svc.title} ({svc.business_name})',
+                              link=url_for('admin_service_enquiry_detail', enq_id=enq.id))
+            if svc.provider_id:
+                create_notification(svc.provider_id, 'booking', 'New enquiry for your service',
+                                    f'{enq.ref} · {svc.title} · {dict(CUSTOM_EVENT_TYPES).get(event_type)} · {city}',
+                                    '/services/mine')
+                db.session.commit()
+            flash('✅ Enquiry sent! Our team will call you shortly.', 'success')
+            return redirect(url_for('service_enquiry_status', enq_id=enq.id))
+    return render_template('services/detail.html', svc=svc, event_types=CUSTOM_EVENT_TYPES,
+                           today=ist_today().isoformat(), form=form, is_owner=is_owner)
+
+
+@app.route('/services/enquiry/<int:enq_id>')
+@login_required
+def service_enquiry_status(enq_id):
+    enq = ServiceEnquiry.query.get_or_404(enq_id)
+    if current_user.role != 'admin' and enq.customer_id != current_user.id:
+        flash('Not authorized.', 'danger')
+        return redirect(url_for('services_index'))
+    return render_template('services/enquiry_status.html', enq=enq, steps=_svc_steps(enq),
+                           event_label=dict(CUSTOM_EVENT_TYPES).get(enq.event_type, enq.event_type))
+
+
+@app.route('/services/enquiries')
+@login_required
+def my_service_enquiries():
+    rows = ServiceEnquiry.query.filter_by(customer_id=current_user.id)\
+        .order_by(ServiceEnquiry.created_at.desc()).limit(50).all()
+    return render_template('services/my_enquiries.html', enquiries=rows, labels=SERVICE_STATUS_LABELS)
+
+
+@app.route('/services/mine')
+@login_required
+def my_services():
+    rows = Service.query.filter_by(provider_id=current_user.id).order_by(Service.created_at.desc()).all()
+    enqs = {}
+    if rows:
+        for e in ServiceEnquiry.query.filter(ServiceEnquiry.service_id.in_([s.id for s in rows]))\
+                .order_by(ServiceEnquiry.created_at.desc()).all():
+            enqs.setdefault(e.service_id, []).append(e)
+    return render_template('services/mine.html', services=rows, enqs=enqs, labels=SERVICE_STATUS_LABELS,
+                           event_types=dict(CUSTOM_EVENT_TYPES))
+
+
+@app.route('/services/new', methods=['GET', 'POST'])
+@login_required
+@limiter.limit("10 per day", methods=["POST"])
+def service_new():
+    is_admin = current_user.role == 'admin'
+    svc = Service(created_by_admin=is_admin, provider_id=None if is_admin else current_user.id,
+                  status='approved' if is_admin else 'pending')
+    if request.method == 'POST':
+        errors = _svc_apply_form(svc, is_admin)
+        if errors:
+            for e in errors:
+                flash(e, 'danger')
+        else:
+            db.session.add(svc)
+            db.session.commit()
+            if is_admin:
+                flash('✅ Service listed.', 'success')
+                return redirect(url_for('admin_services'))
+            notify_all_admins(f'🆕 New service to approve: {svc.title} ({svc.business_name})', link=url_for('admin_services'))
+            flash('✅ Submitted! Our team will review it and publish it soon.', 'success')
+            return redirect(url_for('my_services'))
+    return render_template('services/form.html', **_svc_form_context(svc, is_admin), form=request.form)
+
+
+@app.route('/services/<int:service_id>/edit', methods=['GET', 'POST'])
+@login_required
+@limiter.limit("20 per day", methods=["POST"])
+def service_edit(service_id):
+    svc = Service.query.get_or_404(service_id)
+    is_admin = current_user.role == 'admin'
+    if not is_admin and svc.provider_id != current_user.id:
+        flash('Not authorized.', 'danger')
+        return redirect(url_for('services_index'))
+    if request.method == 'POST':
+        errors = _svc_apply_form(svc, is_admin)
+        if errors:
+            db.session.rollback()
+            svc = Service.query.get_or_404(service_id)
+            for e in errors:
+                flash(e, 'danger')
+        else:
+            if not is_admin:
+                svc.status = 'pending'          # provider edits need approval again
+                svc.rejection_reason = None
+            db.session.commit()
+            if is_admin:
+                flash('✅ Service updated.', 'success')
+                return redirect(url_for('admin_services'))
+            notify_all_admins(f'✏️ Service edited, please re-approve: {svc.title}', link=url_for('admin_services'))
+            flash('✅ Saved. Our team will review the changes before it is shown again.', 'success')
+            return redirect(url_for('my_services'))
+    return render_template('services/form.html', **_svc_form_context(svc, is_admin), form=request.form)
+
+
+@app.route('/services/<int:service_id>/pause', methods=['POST'])
+@login_required
+def service_toggle_pause(service_id):
+    svc = Service.query.get_or_404(service_id)
+    if svc.provider_id != current_user.id:
+        flash('Not authorized.', 'danger')
+        return redirect(url_for('my_services'))
+    if svc.status == 'approved':
+        svc.status = 'paused'
+        flash('Service paused. Customers cannot see it now.', 'success')
+    elif svc.status == 'paused':
+        svc.status = 'approved'
+        flash('Service is visible again.', 'success')
+    else:
+        flash('Only approved services can be paused.', 'warning')
+    db.session.commit()
+    return redirect(url_for('my_services'))
+
+
+@app.route('/admin/services')
+@login_required
+def admin_services():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    rows = Service.query.order_by(Service.created_at.desc()).all()
+    pending = [s for s in rows if s.status == 'pending']
+    others = [s for s in rows if s.status != 'pending']
+    return render_template('admin/service_list.html', pending=pending, others=others)
+
+
+@app.route('/admin/services/<int:service_id>/<action>', methods=['POST'])
+@login_required
+def admin_service_action(service_id, action):
+    if current_user.role != 'admin' or action not in ('approve', 'reject', 'pause', 'resume', 'delete'):
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    svc = Service.query.get_or_404(service_id)
+    if action == 'approve':
+        svc.status, svc.rejection_reason = 'approved', None
+        if svc.provider_id:
+            create_notification(svc.provider_id, 'booking', '✅ Your service is live',
+                                f'"{svc.title}" is now visible to customers.', '/services/mine')
+        flash('Service approved.', 'success')
+    elif action == 'reject':
+        reason = request.form.get('reason', '').strip()[:300]
+        if len(reason) < 3:
+            flash('Please write a short reason.', 'danger')
+            return redirect(url_for('admin_services'))
+        svc.status, svc.rejection_reason = 'rejected', reason
+        if svc.provider_id:
+            create_notification(svc.provider_id, 'warning', 'Service not approved',
+                                f'"{svc.title}": {reason}. You can edit and submit again.', '/services/mine')
+        flash('Service rejected.', 'success')
+    elif action == 'pause':
+        svc.status = 'paused'
+        flash('Service paused.', 'success')
+    elif action == 'resume':
+        svc.status = 'approved'
+        flash('Service is live again.', 'success')
+    else:
+        if ServiceEnquiry.query.filter_by(service_id=svc.id).count():
+            flash('This service has enquiries, so it cannot be deleted. Pause it instead.', 'warning')
+            return redirect(url_for('admin_services'))
+        db.session.delete(svc)
+        flash('Service deleted.', 'success')
+    db.session.commit()
+    return redirect(url_for('admin_services'))
+
+
+@app.route('/admin/service-categories', methods=['GET', 'POST'])
+@login_required
+def admin_service_categories():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    _ensure_service_categories()
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()[:80]
+        icon = request.form.get('icon', '').strip()[:10] or '🤝'
+        slug = _svc_slug(name)
+        if not name:
+            flash('Category name is required.', 'danger')
+        elif ServiceCategory.query.filter(_or(ServiceCategory.name == name, ServiceCategory.slug == slug)).first():
+            flash('A category with this name already exists.', 'danger')
+        else:
+            pct = _svc_parse_pct(request.form.get('commission_pct'))
+            if pct is False:
+                flash('Commission must be a number between 0 and 100.', 'danger')
+            else:
+                db.session.add(ServiceCategory(name=name, slug=slug, icon=icon, commission_pct=pct,
+                                               details_schema=json_lib.dumps(_schema_from_text(request.form.get('schema', '')))))
+                db.session.commit()
+                flash(f'✅ "{name}" added.', 'success')
+        return redirect(url_for('admin_service_categories'))
+    cats = ServiceCategory.query.order_by(ServiceCategory.id).all()
+    counts = {c.id: Service.query.filter_by(category_id=c.id).count() for c in cats}
+    return render_template('admin/service_categories.html', cats=cats, counts=counts,
+                           default_pct=SERVICE_DEFAULT_COMMISSION_PCT, schema_text=_schema_to_text)
+
+
+def _svc_parse_pct(raw):
+    """None = blank (use default); False = invalid; else float 0..100."""
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        v = float(raw)
+        return v if 0 <= v <= 100 else False
+    except ValueError:
+        return False
+
+
+@app.route('/admin/service-categories/<int:cat_id>', methods=['POST'])
+@login_required
+def admin_service_category_update(cat_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    cat = ServiceCategory.query.get_or_404(cat_id)
+    pct = _svc_parse_pct(request.form.get('commission_pct'))
+    if pct is False:
+        flash('Commission must be a number between 0 and 100.', 'danger')
+        return redirect(url_for('admin_service_categories'))
+    cat.commission_pct = pct
+    cat.icon = request.form.get('icon', '').strip()[:10] or cat.icon
+    cat.is_active = bool(request.form.get('is_active'))
+    cat.details_schema = json_lib.dumps(_schema_from_text(request.form.get('schema', '')))
+    db.session.commit()
+    flash(f'✅ "{cat.name}" updated.', 'success')
+    return redirect(url_for('admin_service_categories'))
+
+
+@app.route('/admin/service-enquiries')
+@login_required
+def admin_service_enquiries():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    rows = ServiceEnquiry.query.order_by(ServiceEnquiry.created_at.desc()).all()
+    columns = [{'key': k, 'label': SERVICE_ADMIN_LABELS[k], 'items': [r for r in rows if r.status == k]}
+               for k, _ in SERVICE_PIPELINE]
+    closed = [r for r in rows if r.status in ('cancelled', 'lost')]
+    return render_template('admin/service_enquiries.html', columns=columns, closed=closed,
+                           event_types=dict(CUSTOM_EVENT_TYPES), labels=SERVICE_ADMIN_LABELS)
+
+
+@app.route('/admin/service-enquiries/<int:enq_id>', methods=['GET', 'POST'])
+@login_required
+def admin_service_enquiry_detail(enq_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    enq = ServiceEnquiry.query.get_or_404(enq_id)
+    back = redirect(url_for('admin_service_enquiry_detail', enq_id=enq.id))
+    if request.method == 'POST':
+        new_status = request.form.get('status', enq.status)
+        if new_status not in SERVICE_STATUS_LABELS:
+            flash('Invalid status.', 'danger')
+            return back
+        raw_amt = request.form.get('deal_amount', '').strip()
+        try:
+            amount = float(raw_amt) if raw_amt else None
+            if amount is not None and amount <= 0:
+                raise ValueError
+        except ValueError:
+            flash('Deal amount must be a valid number.', 'danger')
+            return back
+        pct_override = _svc_parse_pct(request.form.get('commission_pct'))
+        if pct_override is False:
+            flash('Commission must be a number between 0 and 100.', 'danger')
+            return back
+        if new_status in ('booked', 'completed') and amount is None and enq.deal_amount is None:
+            flash('Please enter the agreed deal amount before marking it booked.', 'danger')
+            return back
+        if enq.commission_status == 'paid' and amount is not None and amount != enq.deal_amount:
+            flash('The commission was already received, so the deal amount cannot change.', 'danger')
+            return back
+        changed = new_status != enq.status
+        enq.admin_notes = request.form.get('admin_notes', '').strip()[:2000] or None
+        if amount is not None:
+            enq.deal_amount = amount
+        if new_status in ('booked', 'completed') and enq.deal_amount:
+            pct = pct_override if pct_override is not None else (
+                enq.commission_pct if enq.commission_pct is not None else _svc_commission_pct(enq.service))
+            if enq.commission_status != 'paid':      # a received commission is never recalculated
+                enq.commission_pct = pct
+                enq.commission_amount = round(enq.deal_amount * pct / 100, 2)
+                enq.commission_status = 'due'
+        elif new_status in ('cancelled', 'lost', 'new', 'contacted', 'connected') and enq.commission_status == 'due':
+            enq.commission_status, enq.commission_amount = 'none', 0    # not booked (any more): nothing due
+        if changed:
+            enq.status = new_status
+            enq.add_log(new_status)
+            create_notification(enq.customer_id, 'booking', f'Update on {enq.ref}',
+                                f'Status: {SERVICE_STATUS_LABELS.get(new_status)}', f'/services/enquiry/{enq.id}')
+            if new_status == 'booked' and enq.service.provider_id:
+                create_notification(enq.service.provider_id, 'booking', '🎉 Booking confirmed',
+                                    f'{enq.ref} · {enq.service.title} · {enq.event_date.strftime("%d %b %Y") if enq.event_date else ""}',
+                                    '/services/mine')
+        try:
+            _audit_admin('service_enquiry_update', target_user_id=enq.customer_id, target_ref=enq.ref,
+                         details=f'status={enq.status}', commit=False)
+        except Exception:
+            pass
+        db.session.commit()
+        flash('✅ Enquiry updated.', 'success')
+        return back
+    return render_template('admin/service_enquiry_detail.html', enq=enq,
+                           event_label=dict(CUSTOM_EVENT_TYPES).get(enq.event_type, enq.event_type),
+                           statuses=SERVICE_ADMIN_LABELS,
+                           default_pct=_svc_commission_pct(enq.service))
+
+
+@app.route('/admin/service-commissions')
+@login_required
+def admin_service_commissions():
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    due = ServiceEnquiry.query.filter_by(commission_status='due').order_by(ServiceEnquiry.created_at.desc()).all()
+    paid = ServiceEnquiry.query.filter_by(commission_status='paid').order_by(ServiceEnquiry.commission_paid_at.desc()).limit(100).all()
+    return render_template('admin/service_commissions.html', due=due, paid=paid,
+                           due_total=sum(e.commission_amount or 0 for e in due),
+                           paid_total=sum(e.commission_amount or 0 for e in paid))
+
+
+@app.route('/admin/service-enquiries/<int:enq_id>/commission-paid', methods=['POST'])
+@login_required
+def admin_service_commission_paid(enq_id):
+    if current_user.role != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('index'))
+    enq = ServiceEnquiry.query.get_or_404(enq_id)
+    if enq.commission_status != 'due':
+        flash('There is no commission due on this enquiry.', 'warning')
+        return redirect(url_for('admin_service_commissions'))
+    enq.commission_status = 'paid'
+    enq.commission_paid_at = datetime.utcnow()
+    enq.commission_note = request.form.get('note', '').strip()[:200] or None
+    try:
+        _audit_admin('service_commission_received', target_ref=enq.ref,
+                     details=f'Rs{enq.commission_amount}', commit=False)
+    except Exception:
+        pass
+    db.session.commit()
+    flash(f'✅ Commission received for {enq.ref}.', 'success')
+    return redirect(url_for('admin_service_commissions'))
 
 
 @app.route('/admin/announcements')

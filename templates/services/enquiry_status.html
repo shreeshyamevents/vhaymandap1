@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Enquiry {{ enq.ref }} — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Service enquiry</p><h1 class="text-2xl font-bold text-plum-700">{{ enq.ref }}</h1></div>
+    <a href="{{ url_for('my_service_enquiries') }}" class="text-sm text-plum-600 hover:underline">← My enquiries</a>
+  </div>
+
+  {% if enq.status in ('cancelled', 'lost') %}
+  <div class="bg-gray-100 border border-gray-300 rounded-xl p-4 mb-6 text-sm text-gray-700">This enquiry is closed. You can send a new enquiry any time.</div>
+  {% endif %}
+
+  <div class="grid md:grid-cols-5 gap-5">
+    <div class="md:col-span-3 bg-white border rounded-xl p-5">
+      <h2 class="font-bold mb-4">Progress</h2>
+      <ol>
+        {% for s in steps %}
+        <li class="flex gap-3">
+          <div class="flex flex-col items-center">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold {% if s.state == 'done' %}bg-plum-600 text-white{% elif s.state == 'current' %}border-4 border-plum-600 bg-white{% else %}border-2 border-gray-300 bg-white{% endif %}">{% if s.state == 'done' %}✓{% endif %}</span>
+            {% if not loop.last %}<span class="w-0.5 flex-1 min-h-[22px] {% if s.state == 'done' %}bg-plum-600{% else %}bg-gray-200{% endif %}"></span>{% endif %}
+          </div>
+          <div class="pb-5"><p class="text-sm font-semibold {% if s.state == 'todo' %}text-gray-500{% elif s.state == 'current' %}text-plum-700{% endif %}">{{ s.label }}</p>
+            <p class="text-xs text-gray-500">{% if s.state == 'current' and not s.date %}In progress{% else %}{{ s.date }}{% endif %}</p></div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    <div class="md:col-span-2 space-y-4">
+      <div class="bg-white border rounded-xl p-5 text-sm">
+        <p class="text-xs font-bold tracking-widest text-plum-600 uppercase mb-1">Service</p>
+        <p class="font-bold">{{ enq.service.title }}</p>
+        <p class="text-gray-600">{{ enq.service.business_name }}</p>
+        <p class="text-gray-600 mt-2">{{ event_label }} · {{ enq.city }}{% if enq.event_date %} · {{ enq.event_date.strftime('%d %b %Y') }}{% endif %}</p>
+        {% if enq.guests %}<p class="text-gray-600">Guests: {{ enq.guests }}</p>{% endif %}
+        {% if enq.message %}<p class="text-gray-700 mt-2 whitespace-pre-line">{{ enq.message }}</p>{% endif %}
+      </div>
+      <div class="bg-plum-50 border border-plum-100 rounded-xl p-5 text-sm">
+        {% if enq.status in ('booked', 'completed') and enq.deal_amount %}
+          <p class="text-xs font-bold tracking-widest text-plum-600 uppercase mb-1">Agreed amount</p>
+          <p class="text-2xl font-bold text-plum-700">₹{{ '{:,.0f}'.format(enq.deal_amount) }}</p>
+          <p class="text-xs text-gray-600 mt-1">You pay the provider directly, as agreed on the call.</p>
+        {% else %}
+          <p class="text-gray-700">Our team will call you on <strong>{{ enq.phone }}</strong> to confirm the details and connect you with the provider.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

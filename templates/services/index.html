@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Event Services — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-end flex-wrap gap-3 mb-5">
+    <div>
+      <p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Our partners</p>
+      <h1 class="text-3xl font-bold text-plum-700">🤝 Event services</h1>
+      <p class="text-sm text-gray-600 mt-1">Caterers, photographers, videographers, drone operators and more. Send an enquiry and our team calls you.</p>
+    </div>
+    <div class="flex gap-2 flex-wrap text-sm">
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('my_service_enquiries') }}" class="border border-plum-300 text-plum-700 font-semibold px-3 py-2 rounded-lg hover:bg-plum-50">My enquiries</a>
+      <a href="{{ url_for('my_services') }}" class="border border-plum-300 text-plum-700 font-semibold px-3 py-2 rounded-lg hover:bg-plum-50">My services</a>
+      {% endif %}
+      <a href="{{ url_for('service_new') }}" class="bg-plum-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-plum-700">List your service</a>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <a href="{{ url_for('services_index', city=city, q=q) }}" class="px-4 py-2 border rounded-full text-sm {% if not cat_slug %}bg-plum-600 text-white border-plum-600{% else %}bg-white{% endif %}">All</a>
+    {% for c in categories %}
+    <a href="{{ url_for('services_index', cat=c.slug, city=city, q=q) }}" class="px-4 py-2 border rounded-full text-sm {% if cat_slug == c.slug %}bg-plum-600 text-white border-plum-600{% else %}bg-white{% endif %}">{{ c.icon }} {{ c.name }}</a>
+    {% endfor %}
+  </div>
+
+  <form method="GET" class="flex gap-2 flex-wrap mb-6">
+    {% if cat_slug %}<input type="hidden" name="cat" value="{{ cat_slug }}">{% endif %}
+    <input type="text" name="q" value="{{ q }}" placeholder="Search name or service" aria-label="Search" class="border rounded-lg p-2.5 text-sm flex-1 min-w-[160px]">
+    <input type="text" name="city" value="{{ city }}" placeholder="City" aria-label="City" class="border rounded-lg p-2.5 text-sm w-40">
+    <button class="bg-plum-600 text-white text-sm font-bold px-5 rounded-lg hover:bg-plum-700">Search</button>
+  </form>
+
+  {% if services %}
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    {% for s in services %}
+    <a href="{{ url_for('service_detail', service_id=s.id) }}" class="bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+      {% if s.photo_list %}<img src="{{ s.photo_list[0] }}" alt="{{ s.title }}" class="w-full h-44 object-cover" loading="lazy">{% else %}<div class="w-full h-44 bg-plum-50 flex items-center justify-center text-4xl">{{ s.category.icon }}</div>{% endif %}
+      <div class="p-4 flex flex-col flex-1">
+        <span class="text-[11px] font-semibold bg-plum-50 text-plum-700 px-2 py-0.5 rounded-full self-start">{{ s.category.icon }} {{ s.category.name }}</span>
+        <h2 class="font-bold text-gray-900 mt-2">{{ s.title }}</h2>
+        <p class="text-sm text-gray-600">{{ s.business_name }}{% if s.city %} · {{ s.city }}{% endif %}</p>
+        <p class="text-sm font-semibold text-plum-700 mt-auto pt-3">{{ s.price_text }}</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-white border rounded-2xl p-10 text-center">
+    <p class="text-4xl mb-2">🤝</p>
+    <p class="font-semibold text-gray-800">No services found</p>
+    <p class="text-sm text-gray-500 mt-1">Try another category or city. New partners are joining soon.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

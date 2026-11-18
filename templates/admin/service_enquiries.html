@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Service enquiries — Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-8 px-4">
+  <div class="flex justify-between items-center flex-wrap gap-3 mb-6">
+    <div><p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Admin</p><h1 class="text-2xl font-bold text-plum-700">Service enquiries</h1>
+      <p class="text-sm text-gray-500 mt-1">Call the customer and the provider, connect them, then mark it booked with the agreed amount.</p></div>
+    <div class="flex gap-2 text-sm"><a href="{{ url_for('admin_services') }}" class="text-plum-600 hover:underline">Services</a><a href="{{ url_for('admin_service_commissions') }}" class="text-plum-600 hover:underline">Commissions</a></div>
+  </div>
+  <div class="flex gap-3 overflow-x-auto pb-3">
+    {% for col in columns %}
+    <div class="bg-plum-50 rounded-xl p-3 min-w-[230px] flex-1">
+      <p class="text-xs font-bold tracking-widest text-plum-700 uppercase mb-3">{{ col.label }} · {{ col['items']|length }}</p>
+      <div class="space-y-2">
+        {% for r in col['items'] %}
+        <a href="{{ url_for('admin_service_enquiry_detail', enq_id=r.id) }}" class="block bg-white border rounded-lg p-3 hover:shadow-sm">
+          <p class="text-sm font-bold">{{ r.ref }}</p>
+          <p class="text-xs text-gray-700">{{ r.service.title }}</p>
+          <p class="text-xs text-gray-500">{{ r.service.business_name }}</p>
+          <p class="text-xs text-gray-500 mt-1">{{ event_types.get(r.event_type, r.event_type) }}{% if r.event_date %} · {{ r.event_date.strftime('%d %b') }}{% endif %} · {{ r.city }}</p>
+          {% if r.commission_status == 'due' %}<span class="inline-block mt-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Commission ₹{{ '{:,.0f}'.format(r.commission_amount) }}</span>{% endif %}
+        </a>
+        {% else %}<p class="text-xs text-gray-400">Empty</p>{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if closed %}
+  <details class="mt-6"><summary class="text-sm text-gray-600 cursor-pointer">Closed ({{ closed|length }})</summary>
+    <div class="mt-2 space-y-1">{% for r in closed %}<a href="{{ url_for('admin_service_enquiry_detail', enq_id=r.id) }}" class="block text-sm text-gray-600 hover:underline">{{ r.ref }} · {{ r.service.title }} · {{ labels.get(r.status) }}</a>{% endfor %}</div></details>
+  {% endif %}
+</div>
+{% endblock %}
