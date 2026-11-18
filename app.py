@@ -9368,7 +9368,7 @@ CATEGORY_MEASUREMENTS = {
                {'key': 'height', 'label': 'Height', 'ph': 'e.g. 15 ft'}],
     'flooring': [{'key': 'width', 'label': 'Width', 'ph': 'e.g. 6 ft'},
                  {'key': 'length', 'label': 'Length', 'ph': 'e.g. 6 ft'},
-                 {'key': 'pile', 'label': 'Pile Height', 'ph': 'e.g. 12 mm'}],
+                 {'key': 'pile', 'label': 'Thickness', 'ph': 'e.g. 12 mm'}],
     'catering': [{'key': 'capacity', 'label': 'Capacity', 'ph': 'e.g. 50 Liters'},
                  {'key': 'weight', 'label': 'Weight', 'ph': 'e.g. 10 kg'}],
     'sound': [{'key': 'wattage', 'label': 'Power Output', 'ph': 'e.g. 1000W'},
