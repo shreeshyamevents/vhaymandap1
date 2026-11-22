@@ -1,0 +1,32 @@
+{# VENDOR location page — GitHub path: templates/vendor/locality.html #}{% extends "base.html" %}
+{% block title %}My business location — VyahMandap{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto py-8 px-4">
+  <div class="mb-6">
+    <p class="text-xs font-bold tracking-widest text-plum-600 uppercase">Vendor</p>
+    <h1 class="text-2xl font-bold text-plum-700">📍 My business location</h1>
+    <p class="text-sm text-gray-600 mt-1">Customers see your city and area on your bundles, so they know if you are in their city. Installation charges are fixed only for events in your home city.</p>
+  </div>
+
+  <form method="POST" class="bg-white border rounded-xl p-6 shadow-sm space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <div>
+      <label for="city" class="block font-semibold text-sm mb-1">Home city *</label>
+      <input id="city" name="city" list="cityList" required maxlength="60" autocomplete="off" value="{{ current_user.city or '' }}" class="w-full border rounded-lg p-2.5 text-sm">
+      <datalist id="cityList">{% for c in cities %}<option value="{{ c }}"></option>{% endfor %}</datalist>
+      <p class="text-xs text-gray-500 mt-1">Pick from the list or type your city.</p>
+    </div>
+    <div>
+      <label for="locality" class="block font-semibold text-sm mb-1">Area / locality *</label>
+      <input id="locality" name="locality" required minlength="3" maxlength="100" placeholder="e.g. Station Road" value="{{ current_user.locality or '' }}" class="w-full border rounded-lg p-2.5 text-sm">
+    </div>
+    <div>
+      <label for="pincode" class="block font-semibold text-sm mb-1">Pincode <span class="text-gray-400 font-normal">(optional)</span></label>
+      <input id="pincode" name="pincode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" value="{{ current_user.pincode or '' }}" class="w-full border rounded-lg p-2.5 text-sm">
+    </div>
+    <button type="submit" class="w-full bg-plum-600 text-white font-bold py-3 rounded-xl hover:bg-plum-700">Save location</button>
+  </form>
+</div>
+{% endblock %}
