@@ -1,0 +1,54 @@
+{# Included by base.html. Shows: (1) the customer's event-city finder + same-city notice on bundle pages,
+   (2) a prompt for vendors who have not set their location yet. #}
+{% set _ep = request.endpoint or '' %}
+
+{% if current_user.is_authenticated and current_user.role == 'vendor' and not current_user.locality
+      and _ep in ('vendor_dashboard', 'vendor_bundles', 'vendor_bundle_new', 'vendor_bundle_edit') %}
+<div class="max-w-6xl mx-auto px-4 mt-3">
+  <div class="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-900 flex flex-wrap items-center justify-between gap-2">
+    <span>📍 <strong>Set your business location.</strong> Customers use your home city and area to see whether your bundles are in their city.</span>
+    <a href="{{ url_for('vendor_locality', next=request.path) }}" class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-lg hover:bg-amber-700">Set location</a>
+  </div>
+</div>
+{% endif %}
+
+{% if _ep in ('bundles_list', 'bundle_detail', 'book_bundle') %}
+<div class="max-w-6xl mx-auto px-4 mt-3">
+  <form method="POST" action="{{ url_for('set_city') }}" class="bg-white border border-plum-100 rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2 text-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <label for="vmCity" class="font-semibold text-plum-700">📍 Your event city</label>
+    <input id="vmCity" name="city" list="vmCityList" value="{{ my_city }}" maxlength="60" autocomplete="off" placeholder="Type your event city"
+           class="border rounded-lg px-3 py-2 text-sm min-w-[170px] flex-1 sm:flex-none">
+    <datalist id="vmCityList">{% for c in city_options %}<option value="{{ c }}"></option>{% endfor %}</datalist>
+    <button type="submit" class="bg-plum-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-plum-700">Check</button>
+    {% if not my_city %}<span class="text-xs text-gray-500 w-full sm:w-auto">Tell us where your event is to see if a vendor is in your city.</span>{% endif %}
+  </form>
+
+  {% if _ep == 'bundles_list' and bundles is defined and my_city %}
+    {% set ns = namespace(n=0) %}
+    {% for b in bundles %}{% if bundle_locality(b).same %}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}
+    <p class="text-xs mt-2 {% if ns.n %}text-emerald-700{% else %}text-gray-500{% endif %}">
+      {% if ns.n %}✅ {{ ns.n }} of {{ bundles|length }} bundles are from vendors in {{ my_city }}. Installation is fixed for these.
+      {% else %}No bundle is from a vendor in {{ my_city }} yet. Installation for other cities is quoted separately by the vendor.{% endif %}
+    </p>
+  {% endif %}
+
+  {% if _ep in ('bundle_detail', 'book_bundle') and bundle is defined and bundle %}
+    {% set loc = bundle_locality(bundle) %}
+    {% if loc.same %}
+    <div class="mt-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-sm text-emerald-900">
+      ✅ <strong>Same city.</strong> This vendor is in {{ loc.vendor_city }}{% if loc.vendor_locality %} ({{ loc.vendor_locality }}){% endif %}.
+      {% if bundle.installation_fee %}Fixed installation charge: <strong>₹{{ '{:,.0f}'.format(bundle.installation_fee) }}</strong>.{% else %}No installation charge is set for this bundle.{% endif %}
+    </div>
+    {% elif loc.same is sameas false %}
+    <div class="mt-2 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-900">
+      📍 <strong>Different city.</strong> This vendor is in {{ loc.vendor_city }}{% if loc.vendor_locality %} ({{ loc.vendor_locality }}){% endif %}, and your event is in {{ loc.event_city }}.
+      The fixed installation charge applies only inside {{ loc.vendor_city }}. For {{ loc.event_city }}, the vendor confirms installation separately.
+    </div>
+    {% elif not loc.vendor_city %}
+    <div class="mt-2 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700">This vendor has not set a location yet.</div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endif %}
