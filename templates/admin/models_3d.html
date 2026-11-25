@@ -1,0 +1,65 @@
+{# ADMIN 3D models list — templates/admin/models_3d.html #}
+{% extends "base.html" %}
+
+{% block title %}3D Models - Admin{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex justify-between items-center mb-6 flex-wrap gap-3">
+        <div>
+            <h2 class="text-2xl font-bold"><i class="fa-solid fa-cube text-plum-600 mr-2"></i>3D / AR Models</h2>
+            <p class="text-sm text-gray-500">Verified items should get a .glb model within {{ deadline_hours }} hours of verification.</p>
+        </div>
+        <a href="{{ url_for('admin_dashboard') }}" class="text-gray-600 hover:text-gray-800 text-sm">&larr; Dashboard</a>
+    </div>
+
+    <section class="bg-white rounded-xl border shadow-sm p-5 mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold">Waiting for a 3D model ({{ rows|length }})</h3>
+            {% if overdue_count %}<span class="text-xs font-bold bg-red-100 text-red-700 px-2 py-1 rounded-full">{{ overdue_count }} overdue</span>{% endif %}
+        </div>
+        {% if rows %}
+        <div class="divide-y">
+            {% for r in rows %}
+            <div class="flex items-center gap-3 py-3">
+                <img src="{{ r.item.get_image() }}" alt="" class="w-12 h-12 rounded-lg object-cover border flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-sm truncate">{{ r.item.title }}</div>
+                    <div class="text-xs text-gray-500">
+                        {% if r.item.vendor %}{{ r.item.vendor.company_name or r.item.vendor.name }} &middot; {% endif %}
+                        waiting {% if r.hours >= 48 %}{{ (r.hours // 24) }} days{% else %}{{ r.hours }} hours{% endif %}
+                    </div>
+                </div>
+                {% if r.overdue %}<span class="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Overdue</span>{% endif %}
+                <a href="{{ url_for('admin_edit_item', item_id=r.item.id) }}"
+                   class="text-xs bg-plum-600 hover:bg-plum-700 text-white font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">Upload 3D</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">All verified items have a 3D model. 🎉</p>
+        {% endif %}
+    </section>
+
+    <section class="bg-white rounded-xl border shadow-sm p-5">
+        <h3 class="font-bold mb-3">Items with a 3D model ({{ done|length }})</h3>
+        {% if done %}
+        <div class="divide-y">
+            {% for it in done %}
+            <div class="flex items-center gap-3 py-3">
+                <img src="{{ it.get_image() }}" alt="" class="w-12 h-12 rounded-lg object-cover border flex-shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-sm truncate">{{ it.title }}</div>
+                    <div class="text-xs text-gray-500">Uploaded {{ it.model_3d_uploaded_at|ist_date }}{% if not it.is_currently_verified %} &middot; not verified now (viewer hidden){% endif %}</div>
+                </div>
+                <a href="{{ it.model_3d_url }}" target="_blank" rel="noopener" class="text-xs text-blue-700 underline">File</a>
+                <a href="{{ url_for('admin_edit_item', item_id=it.id) }}" class="text-xs text-gray-700 font-bold hover:underline">Edit</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No 3D models uploaded yet.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
